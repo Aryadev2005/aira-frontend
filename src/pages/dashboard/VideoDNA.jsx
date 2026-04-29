@@ -1,0 +1,180 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Link2, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+const mockAnalysis = {
+  overallScore: 87,
+  hookStrength: 92,
+  titleSEO: 78,
+  nicheBenchmark: 85,
+  ariaSays: "Strong hook that grabs attention in the first 2 seconds. The title could use more keywords — try adding your niche topic. Your pacing is above average for this category. Consider adding a CTA at the 80% mark for better retention.",
+  nextVideo: "Double down on the storytelling format. Your audience retention peaks during personal anecdotes — lead with that next time.",
+};
+
+function ScoreRing({ score, size = 80, label }) {
+  const radius = (size - 8) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const color = score >= 85 ? 'text-rising' : score >= 70 ? 'text-primary' : 'text-destructive';
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(var(--border))" strokeWidth="4" />
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: circumference - (score / 100) * circumference }}
+            transition={{ duration: 1.5, ease: 'easeOut' }}
+            className={color}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`font-heading text-xl ${color}`}>{score}</span>
+        </div>
+      </div>
+      {label && <span className="text-muted-foreground text-xs font-body">{label}</span>}
+    </div>
+  );
+}
+
+function ScoreBar({ label, score }) {
+  const color = score >= 85 ? 'bg-rising' : score >= 70 ? 'bg-primary' : 'bg-destructive';
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-body text-sm text-foreground">{label}</span>
+        <span className="font-body text-sm font-semibold text-foreground">{score}</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <motion.div
+          className={`h-full rounded-full ${color}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${score}%` }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } }
+};
+
+export default function VideoDNA() {
+  const [url, setUrl] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleAnalyze = () => {
+    setAnalyzing(true);
+    setResult(null);
+    setTimeout(() => {
+      setResult(mockAnalysis);
+      setAnalyzing(false);
+    }, 2500);
+  };
+
+  return (
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      <motion.div variants={item}>
+        <h1 className="font-heading text-2xl text-foreground mb-1">Video DNA</h1>
+        <p className="text-muted-foreground font-body text-sm">Analyse any YouTube video instantly</p>
+      </motion.div>
+
+      <motion.div variants={item} className="flex gap-3">
+        <div className="relative flex-1">
+          <Link2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste YouTube URL here..."
+            className="pl-10 bg-card border-border rounded-pill font-body text-sm h-11"
+          />
+        </div>
+        <Button
+          onClick={handleAnalyze}
+          disabled={analyzing}
+          className="bg-primary hover:bg-primary/90 text-white rounded-pill px-6 font-body font-semibold shadow-warm h-11"
+        >
+          {analyzing ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <span className="flex items-center gap-2">
+              <Sparkles size={16} /> Analyse
+            </span>
+          )}
+        </Button>
+      </motion.div>
+
+      {analyzing && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-card border border-border rounded-xl p-6 text-center"
+        >
+          <div className="w-10 h-10 mx-auto border-3 border-border border-t-primary rounded-full animate-spin mb-4" />
+          <p className="font-heading text-lg text-foreground mb-3">AIRA is reading the DNA...</p>
+          <div className="space-y-2 text-left max-w-xs mx-auto">
+            {['Extracting video data', 'Analysing hook strength', 'Checking SEO signals', 'Comparing with niche'].map((step, i) => (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.4 }}
+                className="flex items-center gap-2"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-muted-foreground text-xs font-body">{step}</span>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {result && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <ScoreRing score={result.overallScore} size={100} label="Overall Score" />
+              <div className="flex-1 space-y-4 w-full">
+                <ScoreBar label="Hook Strength" score={result.hookStrength} />
+                <ScoreBar label="Title SEO" score={result.titleSEO} />
+                <ScoreBar label="Niche Benchmark" score={result.nicheBenchmark} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-accent text-accent-foreground rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-primary" />
+              <span className="font-body font-semibold text-sm">ARIA Says</span>
+            </div>
+            <p className="text-accent-foreground/80 font-body text-sm leading-relaxed">{result.ariaSays}</p>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h4 className="font-body font-semibold text-sm text-foreground mb-2">🎬 Next Video Suggestion</h4>
+            <p className="text-muted-foreground font-body text-sm leading-relaxed">{result.nextVideo}</p>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
