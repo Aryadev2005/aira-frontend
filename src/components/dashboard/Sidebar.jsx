@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Compass, Clapperboard, Rocket, Music, Brain, BarChart3, User, Zap } from 'lucide-react';
+import { Home, Compass, Clapperboard, Rocket, Music, Brain, BarChart3, User, Zap, LogOut } from 'lucide-react';
+import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 
 const navItems = [
   { icon: Home, label: 'Home', path: '/dashboard' },
@@ -16,6 +17,11 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { dbUser, logout } = useFirebaseAuth();
+
+  const displayName = dbUser?.name || 'Creator';
+  const plan = dbUser?.subscription_tier || 'free';
+  const initial = displayName[0]?.toUpperCase() || 'A';
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -33,12 +39,18 @@ export default function Sidebar() {
         <div className="px-3 flex-1">
           <div className="flex items-center gap-3 px-3 py-3 mb-4">
             <div className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center">
-              <span className="text-white text-sm font-bold">A</span>
+              <span className="text-white text-sm font-bold">{initial}</span>
             </div>
-            <div>
-              <p className="font-body font-semibold text-sm text-sidebar-foreground">Arjun</p>
-              <p className="font-body text-xs text-sidebar-foreground/50">Free plan</p>
+            <div className="flex-1">
+              <p className="font-body font-semibold text-sm text-sidebar-foreground truncate">{displayName}</p>
+              <p className="font-body text-xs text-sidebar-foreground/50 capitalize">{plan === 'pro' ? 'Pro' : 'Free plan'}</p>
             </div>
+            <button 
+              onClick={logout}
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-destructive transition-colors"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
 
           <nav className="space-y-1">

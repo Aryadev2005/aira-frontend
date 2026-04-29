@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Music, TrendingUp } from 'lucide-react';
-import { mockSongs } from '@/lib/mockData';
+import { useSongs, useProfile } from '@/hooks/useApi';
 
 const signalStyles = {
   postNow: { label: 'Post Now', class: 'bg-rising/10 text-rising' },
@@ -20,7 +20,26 @@ const item = {
 export default function Songs() {
   const [filter, setFilter] = useState('All');
 
-  const filtered = filter === 'All' ? mockSongs : mockSongs.filter((s) => s.signal === filter);
+  const { data: profileData } = useProfile();
+  const niche = profileData?.data?.user?.niches?.[0];
+  const platform = profileData?.data?.user?.primary_platform;
+
+  const { data: songsData, isLoading, error } = useSongs({ niche, platform });
+
+  const songs = songsData?.data?.songs || [];
+  const filtered = filter === 'All' ? songs : songs.filter((s) => s.signal === filter);
+
+  if (isLoading) return (
+    <div className="space-y-4">
+      {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />)}
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-destructive/10 text-destructive rounded-xl p-4 font-body text-sm">
+      Could not load songs. {error.message}
+    </div>
+  );
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">

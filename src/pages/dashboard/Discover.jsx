@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RefreshCw, Sparkles } from 'lucide-react';
-import { mockTrends, niches } from '@/lib/mockData';
+import { niches } from '@/lib/mockData';
+import { useTrends, useProfile } from '@/hooks/useApi';
 
 const badges = ['ALL', 'HOT', 'RISING', 'NEW'];
 const badgeStyles = {
@@ -20,13 +21,28 @@ export default function Discover() {
   const [selectedNiche, setSelectedNiche] = useState('All');
   const [selectedBadge, setSelectedBadge] = useState('ALL');
 
-  const filtered = mockTrends.filter((t) => {
-    const nicheMatch = selectedNiche === 'All' || t.niche === selectedNiche;
-    const badgeMatch = selectedBadge === 'ALL' || t.badge === selectedBadge;
-    return nicheMatch && badgeMatch;
+  const { data: profileData } = useProfile();
+  const userNiche = profileData?.data?.user?.niches?.[0];
+
+  const { data: trendsData, isLoading, error } = useTrends({
+    badge: selectedBadge === 'ALL' ? '' : selectedBadge,
+    niche: selectedNiche === 'All' ? '' : selectedNiche,
   });
 
-  const topPick = filtered[0];
+  const trends = trendsData?.data?.trends || [];
+  const topPick = trends[0];
+
+  if (isLoading) return (
+    <div className="space-y-4">
+      {[1, 2, 3].map(i => <div key={i} className="h-40 bg-muted rounded-xl animate-pulse" />)}
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-destructive/10 text-destructive rounded-xl p-4 font-body text-sm">
+      Could not load trends. {error.message}
+    </div>
+  );
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -92,7 +108,7 @@ export default function Discover() {
 
       {/* Grid */}
       <motion.div variants={container} className="grid sm:grid-cols-2 gap-4">
-        {filtered.map((trend) => (
+        {trends.map((trend) => (
           <motion.div
             key={trend.id}
             variants={item}
@@ -100,7 +116,7 @@ export default function Discover() {
             className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[trend.badge]}`}>
+              <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[trend.badge] || 'bg-muted'}`}>
                 {trend.badge}
               </span>
               <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${

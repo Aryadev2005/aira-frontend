@@ -6,7 +6,8 @@ import DailyBrief from '@/components/dashboard/DailyBrief';
 import WorkflowCards from '@/components/dashboard/WorkflowCards';
 import TrendCard from '@/components/dashboard/TrendCard';
 import SongCard from '@/components/dashboard/SongCard';
-import { mockTrends, mockSongs } from '@/lib/mockData';
+import { useTrends, useSongs, useProfile } from '@/hooks/useApi';
+import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -28,6 +29,19 @@ const item = {
 };
 
 export default function DashboardHome() {
+  const { data: profileData } = useProfile();
+  const { dbUser } = useFirebaseAuth();
+  
+  const niche = profileData?.data?.user?.niches?.[0] || 'Lifestyle';
+  const platform = profileData?.data?.user?.primary_platform || 'Instagram';
+  const displayName = dbUser?.name || profileData?.data?.user?.name || 'Creator';
+
+  const { data: trendsData, isLoading: trendsLoading } = useTrends({ niche });
+  const { data: songsData, isLoading: songsLoading } = useSongs({ niche, platform });
+
+  const trends = trendsData?.data?.trends || [];
+  const songs = songsData?.data?.songs || [];
+
   return (
     <motion.div
       variants={container}
@@ -38,7 +52,7 @@ export default function DashboardHome() {
       <motion.div variants={item} className="flex items-start justify-between">
         <div>
           <p className="text-muted-foreground font-body text-sm">{getGreeting()} 👋</p>
-          <h1 className="font-heading text-2xl sm:text-3xl text-foreground mt-1">Hi, Arjun!</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl text-foreground mt-1">Hi, {displayName}!</h1>
         </div>
         <button className="p-2.5 rounded-lg bg-card border border-border hover:shadow-warm-sm transition-shadow">
           <Bell size={18} className="text-muted-foreground" />
@@ -79,9 +93,13 @@ export default function DashboardHome() {
           </Link>
         </div>
         <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-          {mockTrends.map((t) => (
-            <TrendCard key={t.id} trend={t} />
-          ))}
+          {trendsLoading ? (
+            [1, 2, 3].map(i => <div key={i} className="min-w-[200px] h-40 bg-muted rounded-xl animate-pulse" />)
+          ) : (
+            trends.map((t) => (
+              <TrendCard key={t.id} trend={t} />
+            ))
+          )}
         </div>
       </motion.div>
 
@@ -96,9 +114,13 @@ export default function DashboardHome() {
           </Link>
         </div>
         <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-          {mockSongs.slice(0, 5).map((s) => (
-            <SongCard key={s.id} song={s} />
-          ))}
+          {songsLoading ? (
+            [1, 2, 3].map(i => <div key={i} className="min-w-[200px] h-20 bg-muted rounded-xl animate-pulse" />)
+          ) : (
+            songs.slice(0, 5).map((s) => (
+              <SongCard key={s.id} song={s} />
+            ))
+          )}
         </div>
       </motion.div>
     </motion.div>

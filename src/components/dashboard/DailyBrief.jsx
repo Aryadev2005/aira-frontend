@@ -2,10 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { mockTrends } from '@/lib/mockData';
+import { useTrends, useProfile } from '@/hooks/useApi';
 
 export default function DailyBrief() {
-  const brief = mockTrends[0];
+  const { data: profileData } = useProfile();
+  const niche = profileData?.data?.user?.niches?.[0] || 'Lifestyle';
+  const { data: trendsData, isLoading } = useTrends({ niche });
+  
+  const brief = trendsData?.data?.trends?.[0];
+
+  if (isLoading) return <div className="h-32 bg-muted rounded-xl animate-pulse" />;
+  if (!brief) return null;
 
   return (
     <motion.div

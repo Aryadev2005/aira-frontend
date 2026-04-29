@@ -17,7 +17,7 @@ export default function TrendCard({ trend }) {
       className="bg-card border border-border rounded-xl p-4 min-w-[260px] max-w-[280px] flex-shrink-0 cursor-pointer hover:shadow-warm transition-shadow group"
     >
       <div className="flex items-center justify-between mb-3">
-        <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[trend.badge]}`}>
+        <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[trend.badge] || 'bg-muted'}`}>
           {trend.badge}
         </span>
         <div className={`w-9 h-9 rounded-full border-2 border-current flex items-center justify-center ${scoreColor}`}>

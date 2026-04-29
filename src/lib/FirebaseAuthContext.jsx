@@ -1,77 +1,83 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STUB — Replace the functions below with real Firebase calls once you install
-// the firebase package and add your config to lib/firebaseConfig.js
-//
-// Example real implementation:
-//   import { auth, googleProvider } from './firebase';
-//   import { signInWithEmailAndPassword, ... } from 'firebase/auth';
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  sendPasswordResetEmail,
+  updateProfile,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { auth, googleProvider } from './firebase';
+import { api } from './api';
 
 const FirebaseAuthContext = createContext();
 
-// Simulates a persisted session via localStorage
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem('aira_user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function FirebaseAuthProvider({ children }) {
-  const [user, setUser] = useState(getStoredUser);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [dbUser, setDbUser] = useState(null); // full user from our DB
+  const [loading, setLoading] = useState(true);
 
-  const persistUser = (u) => {
-    setUser(u);
-    if (u) localStorage.setItem('aira_user', JSON.stringify(u));
-    else localStorage.removeItem('aira_user');
+  // After Firebase auth, exchange token with our backend to create/fetch DB user
+  const syncWithBackend = async (firebaseUser) => {
+    if (!firebaseUser) { setDbUser(null); return; }
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/v1/auth/firebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: token }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDbUser(data.data?.user || null);
+      }
+    } catch (e) {
+      console.error('Backend sync failed', e);
+    }
   };
 
-  // ── Email / password sign-in ──────────────────────────────────────────────
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      await syncWithBackend(firebaseUser);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
   const signIn = async (email, password) => {
-    // TODO: replace with signInWithEmailAndPassword(auth, email, password)
-    if (!email || !password) throw { code: 'auth/invalid-credential' };
-    const u = { uid: 'stub-uid', email, displayName: email.split('@')[0] };
-    persistUser(u);
-    return { user: u };
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await syncWithBackend(cred.user);
+    return cred;
   };
 
-  // ── Email / password sign-up ──────────────────────────────────────────────
   const signUp = async (email, password, displayName) => {
-    // TODO: replace with createUserWithEmailAndPassword + updateProfile
-    if (!email || !password) throw { code: 'auth/invalid-email' };
-    const u = { uid: 'stub-uid', email, displayName: displayName || email.split('@')[0] };
-    persistUser(u);
-    return { user: u };
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName) await updateProfile(cred.user, { displayName });
+    await syncWithBackend(cred.user);
+    return cred;
   };
 
-  // ── Google sign-in ────────────────────────────────────────────────────────
   const signInWithGoogle = async () => {
-    // TODO: replace with signInWithPopup(auth, googleProvider)
-    const u = { uid: 'google-stub-uid', email: 'creator@gmail.com', displayName: 'Creator' };
-    persistUser(u);
-    return { user: u };
+    const cred = await signInWithPopup(auth, googleProvider);
+    await syncWithBackend(cred.user);
+    return cred;
   };
 
-  // ── Logout ────────────────────────────────────────────────────────────────
   const logout = async () => {
-    // TODO: replace with signOut(auth)
-    persistUser(null);
+    await signOut(auth);
+    setDbUser(null);
   };
 
-  // ── Password reset ────────────────────────────────────────────────────────
-  const resetPassword = async (email) => {
-    // TODO: replace with sendPasswordResetEmail(auth, email)
-    console.log('Password reset email sent to', email);
-  };
+  const resetPassword = (email) => sendPasswordResetEmail(auth, email);
+
+  // Check if onboarding is complete
+  const needsOnboarding = dbUser && (!dbUser.primary_platform || !dbUser.niches?.length);
 
   return (
     <FirebaseAuthContext.Provider
-      value={{ user, loading, signIn, signUp, signInWithGoogle, logout, resetPassword }}
+      value={{ user, dbUser, loading, needsOnboarding, signIn, signUp, signInWithGoogle, logout, resetPassword, syncWithBackend }}
     >
       {children}
     </FirebaseAuthContext.Provider>

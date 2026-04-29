@@ -3,17 +3,11 @@ import { motion } from 'framer-motion';
 import { Copy, Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useGenerateContent } from '@/hooks/useApi';
+import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 
 const platforms = ['Instagram', 'YouTube'];
 const types = ['Reel', 'Carousel', 'Short', 'Video'];
-
-const mockResult = {
-  hook: "Stop scrolling if you eat street food in India 🤯",
-  script: "Open with a dramatic close-up of sizzling oil. Cut to: the vendor's hands moving at impossible speed. Narrate: 'This man has been making the same chaat for 30 years — and he still sells out by 2 PM.' Show the crowd. Show the food. End with you tasting it — genuine reaction only.",
-  caption: "This 30-year-old chaat stall taught me everything about consistency 🔥\n\nFound this hidden gem in Old Delhi — the uncle starts at 6 AM and sells out by 2 PM every single day.\n\nSave this for your next Delhi trip 📍",
-  hashtags: "#StreetFood #DelhiFood #IndianFood #FoodBlogger #Foodie #OldDelhi #StreetFoodIndia #FoodReels",
-  bestTime: "Tuesday 7:30 PM IST — Your audience is most active",
-};
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -40,14 +34,32 @@ export default function Studio() {
   const [type, setType] = useState('Reel');
   const [idea, setIdea] = useState('');
   const [result, setResult] = useState(null);
-  const [generating, setGenerating] = useState(false);
 
-  const handleGenerate = () => {
-    setGenerating(true);
-    setTimeout(() => {
-      setResult(mockResult);
-      setGenerating(false);
-    }, 1500);
+  const { dbUser } = useFirebaseAuth();
+  const { mutateAsync: generateContent, isPending: generating } = useGenerateContent();
+
+  const handleGenerate = async () => {
+    if (!idea.trim()) return;
+    try {
+      const res = await generateContent({
+        trendTitle: idea,
+        niche: dbUser?.niches?.[0] || 'Lifestyle',
+        platform: platform,
+        followerRange: dbUser?.follower_range || '1K-10K',
+        contentFormat: type,
+      });
+      
+      const data = res.data;
+      setResult({
+        hook: data.hooks?.[0] || data.title || '',
+        script: Array.isArray(data.script) ? data.script.join('\n') : data.script || '',
+        caption: data.caption || '',
+        hashtags: typeof data.hashtags === 'object' ? Object.values(data.hashtags).join(' ') : data.hashtags || '',
+        bestTime: data.ai_tip || 'Check analytics for best time',
+      });
+    } catch (e) {
+      console.error('Generation failed', e);
+    }
   };
 
   return (

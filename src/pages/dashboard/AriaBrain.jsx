@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+import { auth } from '@/lib/firebase';
 
 const greetingMessage = {
   role: 'assistant',
@@ -9,41 +11,62 @@ const greetingMessage = {
   tools: [],
 };
 
-const mockResponses = [
-  {
-    content: "Great question! Based on current trends in your niche, here's what I'd recommend for this week:\n\n**Monday** — Behind-the-scenes content (your audience loves authenticity)\n**Wednesday** — Educational reel: Pick one trending topic and simplify it\n**Friday** — Trend hop: 'Aesthetic routine' format is blowing up right now\n\n💡 **Pro tip:** Post your educational reel at 7:30 PM IST — that's when your audience is most active.",
-    tools: ['checked live trends', 'analysed your niche'],
-  },
-  {
-    content: "Here's a script for your street food reel:\n\n🎣 **Hook:** \"This ₹20 plate destroyed every restaurant I've been to\"\n\n📝 **Script:**\n> Open on the vendor's hands. Close-up of the sizzle. Pull back to reveal the crowd.\n> \n> \"30 years. Same spot. Same recipe. And he still sells out by lunch.\"\n> \n> Cut to you tasting. Genuine reaction.\n> \n> \"₹20. That's it. That's the price of perfection.\"\n\n🎵 **Audio:** Use 'Agar Tum Saath Ho (Lo-fi)' — it's trending for aesthetic food content right now.",
-    tools: ['generated script', 'matched BGM', 'checked trends'],
-  },
-];
+// Removed mockResponses
 
 export default function AriaBrain() {
   const [messages, setMessages] = useState([greetingMessage]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const { dbUser } = useFirebaseAuth();
   const chatEndRef = useRef(null);
-  const responseIndex = useRef(0);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMsg]);
+    const userMessage = input.trim();
+    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(newMessages);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const resp = mockResponses[responseIndex.current % mockResponses.length];
-      responseIndex.current++;
-      setMessages((prev) => [...prev, { role: 'assistant', ...resp }]);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/v1/aria/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          context: {
+            niche: dbUser?.niches?.[0],
+            platform: dbUser?.primary_platform,
+            archetype: dbUser?.archetype,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.data?.reply || data.data?.content || "Sorry, I couldn't process that.";
+        setMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: reply,
+          tools: data.data?.tools || []
+        }]);
+      } else {
+        throw new Error('Chat failed');
+      }
+    } catch (e) {
+      console.error('Chat error', e);
+      setMessages((prev) => [...prev, { role: 'assistant', content: "Something went wrong. Please try again." }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (

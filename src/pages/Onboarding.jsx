@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { niches } from '@/lib/mockData';
+import { useCompleteOnboarding } from '@/hooks/useApi';
 
 const followerRanges = ['Under 1K', '1K–10K', '10K–50K', '50K–100K', '100K–500K', '500K+'];
 const platforms = [
@@ -38,11 +39,22 @@ export default function Onboarding() {
     return false;
   };
 
-  const handleContinue = () => {
+  const { mutateAsync: completeOnboarding, isPending } = useCompleteOnboarding();
+
+  const handleContinue = async () => {
     if (step < 2) {
       setStep(step + 1);
     } else {
-      navigate('/dashboard');
+      try {
+        await completeOnboarding({
+          followerRange,
+          primaryPlatform: platform,
+          niches: selectedNiches
+        });
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Onboarding failed', err);
+      }
     }
   };
 
@@ -174,10 +186,10 @@ export default function Onboarding() {
           <div className="mt-10 flex justify-center">
             <Button
               onClick={handleContinue}
-              disabled={!canContinue()}
+              disabled={!canContinue() || isPending}
               className="bg-primary hover:bg-primary/90 text-white rounded-pill px-10 py-6 font-body font-semibold shadow-warm text-base disabled:opacity-40"
             >
-              {step === 2 ? 'Start exploring →' : 'Continue →'}
+              {isPending ? 'Saving...' : (step === 2 ? 'Start exploring →' : 'Continue →')}
             </Button>
           </div>
         </div>

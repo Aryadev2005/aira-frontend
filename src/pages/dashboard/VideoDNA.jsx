@@ -3,15 +3,7 @@ import { motion } from 'framer-motion';
 import { Link2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-const mockAnalysis = {
-  overallScore: 87,
-  hookStrength: 92,
-  titleSEO: 78,
-  nicheBenchmark: 85,
-  ariaSays: "Strong hook that grabs attention in the first 2 seconds. The title could use more keywords — try adding your niche topic. Your pacing is above average for this category. Consider adding a CTA at the 80% mark for better retention.",
-  nextVideo: "Double down on the storytelling format. Your audience retention peaks during personal anecdotes — lead with that next time.",
-};
+import { useVideoDNA } from '@/hooks/useApi';
 
 function ScoreRing({ score, size = 80, label }) {
   const radius = (size - 8) / 2;
@@ -75,16 +67,19 @@ const item = {
 
 export default function VideoDNA() {
   const [url, setUrl] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
 
-  const handleAnalyze = () => {
-    setAnalyzing(true);
+  const { mutateAsync: analyseVideo, isPending: analyzing } = useVideoDNA();
+
+  const handleAnalyze = async () => {
+    if (!url.trim()) return;
     setResult(null);
-    setTimeout(() => {
-      setResult(mockAnalysis);
-      setAnalyzing(false);
-    }, 2500);
+    try {
+      const data = await analyseVideo({ url });
+      setResult(data.data);
+    } catch (e) {
+      console.error('Analysis failed', e);
+    }
   };
 
   return (

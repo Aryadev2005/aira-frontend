@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { FirebaseAuthProvider } from '@/lib/FirebaseAuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 import Landing from '@/pages/Landing';
 import Onboarding from '@/pages/Onboarding';
@@ -29,7 +30,7 @@ function App() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
               <Route index element={<DashboardHome />} />
               <Route path="discover" element={<Discover />} />
               <Route path="studio" element={<Studio />} />
