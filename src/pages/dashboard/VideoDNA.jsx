@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useVideoDNA } from '@/hooks/useApi';
+import { useVideoDNA, useVideoDNAHistory } from '@/hooks/useApi';
 
 function ScoreRing({ score, size = 80, label }) {
   const radius = (size - 8) / 2;
@@ -70,12 +70,23 @@ export default function VideoDNA() {
   const [result, setResult] = useState(null);
 
   const { mutateAsync: analyseVideo, isPending: analyzing } = useVideoDNA();
+  const { data: historyData } = useVideoDNAHistory();
 
   const handleAnalyze = async () => {
     if (!url.trim()) return;
     setResult(null);
+
+    // Extract video ID from URL
+    const videoIdMatch = url.match(
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
+    );
+    if (!videoIdMatch) {
+      alert('Please enter a valid YouTube URL');
+      return;
+    }
+
     try {
-      const data = await analyseVideo({ url });
+      const data = await analyseVideo({ videoId: videoIdMatch[1] });
       setResult(data.data);
     } catch (e) {
       console.error('Analysis failed', e);

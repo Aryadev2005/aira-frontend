@@ -4,6 +4,7 @@ import { Send, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { auth } from '@/lib/firebase';
+import { api } from '@/lib/api';
 
 const greetingMessage = {
   role: 'assistant',
@@ -17,6 +18,7 @@ export default function AriaBrain() {
   const [messages, setMessages] = useState([greetingMessage]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId] = useState(() => crypto.randomUUID());
   const { dbUser } = useFirebaseAuth();
   const chatEndRef = useRef(null);
 
@@ -33,34 +35,27 @@ export default function AriaBrain() {
     setIsTyping(true);
 
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/v1/aria/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+      const data = await api.post('/brain/chat', {
+        message: userMessage,
+        sessionId: sessionId || crypto.randomUUID(),
+        entryScreen: 'direct',
+        conversationHistory: newMessages.slice(-10).map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        })),
+        context: {
+          niche: dbUser?.niches?.[0],
+          platform: dbUser?.primary_platform,
+          archetype: dbUser?.archetype,
         },
-        body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          context: {
-            niche: dbUser?.niches?.[0],
-            platform: dbUser?.primary_platform,
-            archetype: dbUser?.archetype,
-          },
-        }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const reply = data.data?.reply || data.data?.content || "Sorry, I couldn't process that.";
-        setMessages((prev) => [...prev, {
-          role: 'assistant',
-          content: reply,
-          tools: data.data?.tools || []
-        }]);
-      } else {
-        throw new Error('Chat failed');
-      }
+      const reply = data.data?.message || data.data?.reply || data.data?.content || "Sorry, I couldn't process that.";
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: reply,
+        tools: data.data?.toolsUsed || []
+      }]);
     } catch (e) {
       console.error('Chat error', e);
       setMessages((prev) => [...prev, { role: 'assistant', content: "Something went wrong. Please try again." }]);
@@ -91,11 +86,10 @@ export default function AriaBrain() {
                 </div>
               )}
               <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-first' : ''}`}>
-                <div className={`rounded-2xl px-4 py-3 ${
-                  msg.role === 'user'
+                <div className={`rounded-2xl px-4 py-3 ${msg.role === 'user'
                     ? 'bg-primary text-white'
                     : 'bg-card border border-border text-foreground'
-                }`}>
+                  }`}>
                   {msg.role === 'user' ? (
                     <p className="font-body text-sm">{msg.content}</p>
                   ) : (

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Compass, Clapperboard, Rocket, Music, Brain, BarChart3, User, Zap, LogOut } from 'lucide-react';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+import { useProfile } from '@/hooks/useApi';
 
 const navItems = [
   { icon: Home, label: 'Home', path: '/dashboard' },
@@ -17,10 +18,12 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
-  const { dbUser, logout } = useFirebaseAuth();
+  const { logout } = useFirebaseAuth();
+  const { data: profileData } = useProfile();
+  const user = profileData?.data?.user;
 
-  const displayName = dbUser?.name || 'Creator';
-  const plan = dbUser?.subscription_tier || 'free';
+  const displayName = user?.name || 'Creator';
+  const plan = user?.subscription_tier || 'free';
   const initial = displayName[0]?.toUpperCase() || 'A';
 
   const isActive = (path) => {
@@ -43,7 +46,7 @@ export default function Sidebar() {
             </div>
             <div className="flex-1">
               <p className="font-body font-semibold text-sm text-sidebar-foreground truncate">{displayName}</p>
-              <p className="font-body text-xs text-sidebar-foreground/50 capitalize">{plan === 'pro' ? 'Pro' : 'Free plan'}</p>
+              <p className="font-body text-xs text-sidebar-foreground/50 capitalize">{plan === 'pro' ? 'Pro ✨' : 'Free plan'}</p>
             </div>
             <button 
               onClick={logout}

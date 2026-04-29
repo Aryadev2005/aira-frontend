@@ -65,16 +65,66 @@ export const useBestTimes = () =>
 export const useArchetype = () =>
   useQuery({ queryKey: ['archetype'], queryFn: () => api.get('/analytics/archetype') });
 
+export const useTriggerScrape = () =>
+  useMutation({ mutationFn: (body) => api.post('/analytics/scrape', body) });
+
+export const useWeeklyReport = () =>
+  useQuery({ queryKey: ['weekly-report'], queryFn: () => api.get('/analytics/weekly-report') });
+
 // ── ARIA BRAIN ────────────────────────────────────────────────────────────
 export const useAriaChat = () =>
-  useMutation({ mutationFn: (body) => api.post('/aria/chat', body) });
+  useMutation({ mutationFn: (body) => api.post('/brain/chat', body) });
+
+export const useBrainGreet = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return useQuery({
+    queryKey: ['brain-greet', params],
+    queryFn: () => api.get(`/brain/greet${qs ? `?${qs}` : ''}`),
+    enabled: !!params.sessionId,
+  });
+};
 
 // ── VIDEO DNA ─────────────────────────────────────────────────────────────
 export const useVideoDNA = () =>
-  useMutation({ mutationFn: (body) => api.post('/aria/video-dna', body) });
+  useMutation({ mutationFn: (body) => api.post('/video-dna/analyse', body) });
 
 export const useVideoDNAHistory = () =>
-  useQuery({ queryKey: ['video-dna-history'], queryFn: () => api.get('/aria/video-dna/history') });
+  useQuery({ queryKey: ['video-dna-history'], queryFn: () => api.get('/video-dna/history') });
+
+// ── DISCOVER ──────────────────────────────────────────────────────────────
+export const useDiscoverIntelligence = (filters = {}) => {
+  const params = new URLSearchParams(filters).toString();
+  return useQuery({
+    queryKey: ['discover-intelligence', filters],
+    queryFn: () => api.get(`/discover/intelligence${params ? `?${params}` : ''}`),
+  });
+};
+
+export const useCompetitorMoves = () =>
+  useQuery({ queryKey: ['competitor-moves'], queryFn: () => api.get('/discover/competitors') });
+
+// ── STUDIO ────────────────────────────────────────────────────────────────
+export const useScriptStructure = () =>
+  useMutation({ mutationFn: (body) => api.post('/studio/script/structure', body) });
+
+export const useBGMMatch = () =>
+  useMutation({ mutationFn: (body) => api.post('/studio/bgm/match', body) });
+
+export const useEditingHelp = () =>
+  useMutation({ mutationFn: (body) => api.post('/studio/editing/help', body) });
+
+// ── LAUNCH ────────────────────────────────────────────────────────────────
+export const useLaunchTiming = () =>
+  useQuery({ queryKey: ['launch-timing'], queryFn: () => api.get('/launch/timing') });
+
+export const useLaunchPackage = () =>
+  useMutation({ mutationFn: (body) => api.post('/launch/package', body) });
+
+export const useBrandAlert = () =>
+  useQuery({ queryKey: ['brand-alert'], queryFn: () => api.get('/launch/brand-alert') });
+
+export const useRateCard = () =>
+  useMutation({ mutationFn: (body) => api.post('/launch/rate-card', body) });
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 export const useGenerateCalendar = () =>

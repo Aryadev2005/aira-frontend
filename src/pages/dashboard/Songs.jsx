@@ -24,9 +24,9 @@ export default function Songs() {
   const niche = profileData?.data?.user?.niches?.[0];
   const platform = profileData?.data?.user?.primary_platform;
 
-  const { data: songsData, isLoading, error } = useSongs({ niche, platform });
+  const { data: songsData, isLoading, error } = useSongs({ niche, limit: 20 });
 
-  const songs = songsData?.data?.songs || [];
+  const songs = songsData?.data || [];
   const filtered = filter === 'All' ? songs : songs.filter((s) => s.signal === filter);
 
   if (isLoading) return (
@@ -99,9 +99,9 @@ export default function Songs() {
                 </span>
               </div>
             </div>
-            {song.tip && (
+            {(song.tip || song.ai_tip) && (
               <div className="mt-3 px-3 py-2 bg-primary/5 rounded-lg">
-                <p className="text-primary/80 text-xs font-body">💡 {song.tip}</p>
+                <p className="text-primary/80 text-xs font-body">💡 {song.tip || song.ai_tip}</p>
               </div>
             )}
           </motion.div>

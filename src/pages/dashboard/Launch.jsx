@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Zap, Handshake, Calendar } from 'lucide-react';
+import { useLaunchTiming, useLaunchPackage, useBrandAlert, useProfile } from '@/hooks/useApi';
 
 const features = [
   {
@@ -36,6 +37,25 @@ const item = {
 };
 
 export default function Launch() {
+  const { data: profileData } = useProfile();
+  const { data: timingData, isLoading: timingLoading } = useLaunchTiming();
+  const { data: brandAlertData } = useBrandAlert();
+  const { mutateAsync: generatePackage, isPending: packageLoading } = useLaunchPackage();
+
+  const [sessionIdea, setSessionIdea] = useState('');
+  const [postingPackage, setPostingPackage] = useState(null);
+
+  const timing = timingData?.data;
+
+  const handleGeneratePackage = async () => {
+    const data = await generatePackage({
+      idea: sessionIdea || 'general content',
+      platform: profileData?.data?.user?.primary_platform || 'instagram',
+      niche: profileData?.data?.user?.niches?.[0] || 'lifestyle',
+    });
+    setPostingPackage(data.data);
+  };
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={item}>

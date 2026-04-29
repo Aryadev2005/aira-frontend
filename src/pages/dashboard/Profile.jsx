@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { TrendingUp, Heart, BarChart3, Sprout, ChevronRight, LogOut, Bell, Globe, Zap, History, Compass } from 'lucide-react';
-import { useProfile } from '@/hooks/useApi';
+import { useProfile, useTriggerScrape } from '@/hooks/useApi';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 
 // Removed static stats definition to make it dynamic based on API data
@@ -23,8 +23,20 @@ const item = {
 
 export default function Profile() {
   const { data, isLoading } = useProfile();
+  const { mutateAsync: triggerScrape, isPending: scraping } = useTriggerScrape();
   const { logout } = useFirebaseAuth();
   const profile = data?.data?.user;
+
+  const handleConnectInstagram = async () => {
+    const handle = prompt('Enter your Instagram handle (without @):');
+    if (!handle) return;
+    try {
+      await triggerScrape({ handle, platform: 'instagram' });
+      alert('ARIA is analysing your profile! Check back in 2-3 minutes.');
+    } catch (e) {
+      console.error('Scrape failed', e);
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center animate-pulse">Loading profile...</div>;
   if (!profile) return null;
@@ -43,7 +55,7 @@ export default function Profile() {
         <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
           <span className="text-white text-xl font-bold font-body">{profile.name?.[0] || profile.email?.[0]}</span>
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="font-heading text-2xl text-foreground">{profile.name || 'Creator'}</h1>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground font-body text-sm">{profile.email}</span>
@@ -52,6 +64,13 @@ export default function Profile() {
             </span>
           </div>
         </div>
+        <button
+          onClick={handleConnectInstagram}
+          disabled={scraping}
+          className="px-4 py-2 bg-card border border-border rounded-lg text-sm font-body font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {scraping ? 'Connecting...' : 'Connect Instagram'}
+        </button>
       </motion.div>
 
       {/* Niches */}

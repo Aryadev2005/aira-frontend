@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { niches } from '@/lib/mockData';
-import { useTrends, useProfile } from '@/hooks/useApi';
+import { useDiscoverIntelligence, useCompetitorMoves, useProfile } from '@/hooks/useApi';
 
 const badges = ['ALL', 'HOT', 'RISING', 'NEW'];
 const badgeStyles = {
@@ -22,14 +22,17 @@ export default function Discover() {
   const [selectedBadge, setSelectedBadge] = useState('ALL');
 
   const { data: profileData } = useProfile();
-  const userNiche = profileData?.data?.user?.niches?.[0];
+  const userNiche = profileData?.data?.user?.niches?.[0] || 'lifestyle';
+  const platform = profileData?.data?.user?.primary_platform || 'instagram';
 
-  const { data: trendsData, isLoading, error } = useTrends({
+  const { data: intelligenceData, isLoading, error } = useDiscoverIntelligence({
+    niche: selectedNiche === 'All' ? userNiche : selectedNiche,
+    platform,
     badge: selectedBadge === 'ALL' ? '' : selectedBadge,
-    niche: selectedNiche === 'All' ? '' : selectedNiche,
   });
+  const { data: competitorData } = useCompetitorMoves();
 
-  const trends = trendsData?.data?.trends || [];
+  const trends = intelligenceData?.data?.opportunities || intelligenceData?.data?.trends || [];
   const topPick = trends[0];
 
   if (isLoading) return (
