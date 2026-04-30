@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="bg-accent text-accent-foreground py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-3 gap-12">
+        <div className="grid md:grid-cols-4 gap-12">
           <div>
             <h3 className="font-heading text-2xl text-primary mb-3">AIRA</h3>
             <p className="text-accent-foreground/50 font-body text-sm leading-relaxed">
@@ -24,6 +24,28 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-body font-semibold text-sm text-accent-foreground/70 mb-4 tracking-wider uppercase">
+              Legal
+            </h4>
+            <ul className="space-y-2">
+              <li>
+                <Link to="/privacy" className="text-accent-foreground/50 hover:text-primary font-body text-sm transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="text-accent-foreground/50 hover:text-primary font-body text-sm transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link to="/data-deletion" className="text-accent-foreground/50 hover:text-primary font-body text-sm transition-colors">
+                  Data Deletion
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

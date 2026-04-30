@@ -20,6 +20,10 @@ import VideoDNA from '@/pages/dashboard/VideoDNA';
 import Profile from '@/pages/dashboard/Profile';
 import Launch from '@/pages/dashboard/Launch';
 
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import TermsOfService from '@/pages/TermsOfService';
+import DataDeletion from '@/pages/DataDeletion';
+
 function App() {
   return (
     <FirebaseAuthProvider>
@@ -40,6 +44,9 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="launch" element={<Launch />} />
             </Route>
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
         </Router>
