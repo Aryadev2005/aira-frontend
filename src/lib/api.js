@@ -43,7 +43,7 @@ export async function apiRequest(path, options = {}) {
 }
 
 export const api = {
-  get: (path) => apiRequest(path),
+  get: (path) => apiRequest(path, { method: 'GET' }),
   post: (path, body) => apiRequest(path, { method: 'POST', body }),
   put: (path, body) => apiRequest(path, { method: 'PUT', body }),
   delete: (path) => apiRequest(path, { method: 'DELETE' }),

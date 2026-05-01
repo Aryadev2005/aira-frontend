@@ -138,7 +138,7 @@ export const useIntegrationStatus = () =>
   useQuery({
     queryKey: ['integration-status'],
     queryFn: () => api.get('/integrations/status'),
-    refetchInterval: 30_000, // Check every 30s for token expiry
+    refetchInterval: 60_000,
   });
 
 export const useInstagramAuthUrl = () =>
@@ -151,7 +151,10 @@ export const useDisconnectPlatform = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (platform) => api.delete(`/integrations/${platform}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['integration-status'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['integration-status'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+    },
   });
 };
 
