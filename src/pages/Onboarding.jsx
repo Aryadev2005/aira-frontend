@@ -50,12 +50,13 @@ export default function Onboarding() {
 
   const getErrorMessage = (code) => {
     const messages = {
-      instagram_denied: 'Instagram access was denied. Please try again.',
-      youtube_denied: 'YouTube access was denied. Please try again.',
-      instagram_token_failed: 'Could not connect Instagram. Check your app settings.',
-      youtube_token_failed: 'Could not connect YouTube. Check your app settings.',
-      instagram_failed: 'Instagram connection failed. Please try again.',
-      youtube_failed: 'YouTube connection failed. Please try again.',
+      instagram_denied:           'Instagram access was denied. Please try again.',
+      instagram_not_professional: 'Your Instagram account must be a Professional account (Business or Creator). Go to Instagram Settings → Account → Switch to Professional Account — it\'s free!',
+      instagram_token_failed:     'Could not connect Instagram. Please try again.',
+      instagram_failed:           'Instagram connection failed. Please try again.',
+      youtube_denied:             'YouTube access was denied. Please try again.',
+      youtube_failed:             'YouTube connection failed. Please try again.',
+      invalid_state:              'Session expired. Please try connecting again.',
     };
     return messages[code] || 'Something went wrong. Please try again.';
   };

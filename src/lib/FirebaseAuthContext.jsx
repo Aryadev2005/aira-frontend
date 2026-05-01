@@ -55,6 +55,7 @@ export function FirebaseAuthProvider({ children }) {
       setLoading(false);
     });
     return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Sign in — checks account exists first ─────────────────────────────────

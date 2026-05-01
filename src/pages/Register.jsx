@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle,
+  Mail, Lock, Eye, EyeOff, User, AlertCircle,
   Instagram, Youtube, CheckCircle2, ArrowRight, ArrowLeft,
-  Loader2, Sparkles, RefreshCw
+  Loader2, Sparkles
 } from 'lucide-react';
 import {
   createUserWithEmailAndPassword,
   updateProfile,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
+  sendEmailVerification,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
-import { auth, sendVerificationEmail } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { api } from '@/lib/api';
 
@@ -94,7 +94,7 @@ function NavButtons({ onBack, onNext, nextLabel = 'Continue', loading, disabled,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// STEP 1 — Credentials (email + password)
+// STEP 1 — Credentials
 // ════════════════════════════════════════════════════════════════════════════════
 function StepCredentials({ data, onChange, onNext }) {
   const [showPass, setShowPass]   = useState(false);
@@ -105,11 +105,11 @@ function StepCredentials({ data, onChange, onNext }) {
 
   const validate = () => {
     const e = {};
-    if (!data.email.trim())       e.email    = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(data.email)) e.email = 'Enter a valid email';
-    if (!data.password)           e.password = 'Password is required';
-    else if (data.password.length < 6) e.password = 'At least 6 characters';
-    if (data.password !== data.confirm) e.confirm = 'Passwords do not match';
+    if (!data.email.trim())                    e.email    = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(data.email)) e.email    = 'Enter a valid email';
+    if (!data.password)                        e.password = 'Password is required';
+    else if (data.password.length < 6)         e.password = 'At least 6 characters';
+    if (data.password !== data.confirm)        e.confirm  = 'Passwords do not match';
     return e;
   };
 
@@ -119,16 +119,13 @@ function StepCredentials({ data, onChange, onNext }) {
     setLoading(true);
     setGlobalErr('');
     try {
-      // Check if email already taken
-      const { fetchSignInMethodsForEmail } = await import('firebase/auth');
       const methods = await fetchSignInMethodsForEmail(auth, data.email.trim());
       if (methods.length > 0) {
         setGlobalErr('An account with this email already exists. Sign in instead.');
-        setLoading(false);
         return;
       }
       onNext();
-    } catch (err) {
+    } catch {
       setGlobalErr('Could not verify email. Please try again.');
     } finally {
       setLoading(false);
@@ -148,6 +145,7 @@ function StepCredentials({ data, onChange, onNext }) {
           onChange={e => onChange('email', e.target.value)}
           error={errors.email}
         />
+        {/* Password */}
         <div>
           <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">Password</label>
           <div className="relative">
@@ -165,6 +163,7 @@ function StepCredentials({ data, onChange, onNext }) {
           </div>
           {errors.password && <p className="text-xs text-destructive font-body mt-1">{errors.password}</p>}
         </div>
+        {/* Confirm password */}
         <div>
           <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">Confirm password</label>
           <div className="relative">
@@ -193,7 +192,7 @@ function StepCredentials({ data, onChange, onNext }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// STEP 2 — Personal details (name + phone)
+// STEP 2 — Personal details
 // ════════════════════════════════════════════════════════════════════════════════
 function StepDetails({ data, onChange, onNext, onBack }) {
   const [errors, setErrors] = useState({});
@@ -251,43 +250,48 @@ function StepDetails({ data, onChange, onNext, onBack }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// STEP 3 — Verification (email OTP via Firebase)
+// STEP 3 — Email verification
 // ════════════════════════════════════════════════════════════════════════════════
 function StepVerify({ data, onChange, onNext, onBack }) {
-  const [method, setMethod]         = useState('email'); // 'email' | 'phone'
-  const [codeSent, setCodeSent]     = useState(false);
-  const [otp, setOtp]               = useState(['', '', '', '', '', '']);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
+  const [codeSent, setCodeSent]       = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
   const [resendTimer, setResendTimer] = useState(0);
-  const [confirmed, setConfirmed]   = useState(null); // Firebase phone confirmation result
-  const inputRefs                   = useRef([]);
-  const recaptchaRef                = useRef(null);
 
-  // Countdown timer for resend
+  // Resend countdown
   useEffect(() => {
     if (resendTimer <= 0) return;
     const t = setTimeout(() => setResendTimer(v => v - 1), 1000);
     return () => clearTimeout(t);
   }, [resendTimer]);
 
+  // Auto-advance if returning from email verification link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
-      // User came back from email link — check verification and advance
       checkEmailVerified();
       window.history.replaceState({}, '', window.location.pathname);
     }
+  // checkEmailVerified is stable — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sendEmailCode = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
-      // Create Firebase user first, then send verification email
+      // Create Firebase account then send verification email
       const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
       await updateProfile(cred.user, { displayName: data.name });
-      await sendVerificationEmail(cred.user);
-      data._firebaseUser = cred.user; // store temporarily
+
+      // FIX: use sendEmailVerification directly from firebase/auth
+      // Pass actionCodeSettings so user returns to /register?verified=true
+      await sendEmailVerification(cred.user, {
+        url: `${window.location.origin}/register?verified=true`,
+        handleCodeInApp: false,
+      });
+
+      // FIX: use onChange instead of mutating data directly
       onChange('_firebaseUser', cred.user);
       setCodeSent(true);
       setResendTimer(60);
@@ -303,77 +307,45 @@ function StepVerify({ data, onChange, onNext, onBack }) {
   };
 
   const checkEmailVerified = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
       const user = auth.currentUser;
+      if (!user) {
+        setError('Session lost. Please go back and try again.');
+        return;
+      }
       await user.reload();
       if (user.emailVerified) {
         onNext();
       } else {
-        setError('Email not verified yet. Please click the link in your inbox, then click Continue.');
+        setError('Email not verified yet. Click the link in your inbox, then click Continue.');
       }
-    } catch (err) {
+    } catch {
       setError('Could not check verification status. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOtpChange = (index, value) => {
-    if (value.length > 1) return;
-    const next = [...otp];
-    next[index] = value;
-    setOtp(next);
-    if (value && index < 5) inputRefs.current[index + 1]?.focus();
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted.length === 6) {
-      setOtp(pasted.split(''));
-      inputRefs.current[5]?.focus();
-    }
-  };
-
   return (
     <div>
-      <h2 className="font-heading text-2xl text-foreground mb-1">Verify your identity</h2>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Verify your email</h2>
       <p className="text-muted-foreground font-body text-sm mb-6">
-        Choose how you'd like to verify your account
+        We'll send a verification link to confirm your identity
       </p>
 
       <ErrorBanner message={error} />
 
-      {/* Method selector */}
-      {!codeSent && (
+      {!codeSent ? (
         <>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {[
-              { id: 'email', icon: Mail, label: 'Email', sub: data.email },
-            ].map(({ id, icon: Icon, label, sub }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setMethod(id)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                  method === id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-card hover:border-primary/40'
-                }`}
-              >
-                <Icon size={20} className={method === id ? 'text-primary' : 'text-muted-foreground'} />
-                <div className="text-center">
-                  <p className={`font-body text-sm font-semibold ${method === id ? 'text-primary' : 'text-foreground'}`}>{label}</p>
-                  <p className="font-body text-[10px] text-muted-foreground truncate max-w-[100px]">{sub}</p>
-                </div>
-              </button>
-            ))}
+          {/* Email preview card */}
+          <div className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl mb-6">
+            <Mail size={18} className="text-primary shrink-0" />
+            <div>
+              <p className="font-body text-xs text-muted-foreground">Sending to</p>
+              <p className="font-body text-sm font-medium text-foreground">{data.email}</p>
+            </div>
           </div>
 
           <button
@@ -384,13 +356,10 @@ function StepVerify({ data, onChange, onNext, onBack }) {
           >
             {loading
               ? <><Loader2 size={15} className="animate-spin" /> Sending...</>
-              : `Send verification email`}
+              : 'Send verification email'}
           </button>
         </>
-      )}
-
-      {/* Email sent state */}
-      {codeSent && method === 'email' && (
+      ) : (
         <div className="text-center space-y-4">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
             <Mail size={28} className="text-primary" />
@@ -398,14 +367,15 @@ function StepVerify({ data, onChange, onNext, onBack }) {
           <div>
             <p className="font-body font-semibold text-foreground">Check your inbox</p>
             <p className="font-body text-sm text-muted-foreground mt-1">
-              We sent a verification link to <span className="text-foreground font-medium">{data.email}</span>
+              Verification link sent to{' '}
+              <span className="text-foreground font-medium">{data.email}</span>
             </p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-2">
-            <p className="font-body text-xs text-muted-foreground">How to verify:</p>
+          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-1.5">
+            <p className="font-body text-xs text-muted-foreground mb-1">Steps:</p>
             <p className="font-body text-sm text-foreground">1. Open the email from ARIA</p>
-            <p className="font-body text-sm text-foreground">2. Click the "Verify email address" link</p>
-            <p className="font-body text-sm text-foreground">3. Come back here and click Continue</p>
+            <p className="font-body text-sm text-foreground">2. Click "Verify email address"</p>
+            <p className="font-body text-sm text-foreground">3. Come back and click Continue below</p>
           </div>
           <button
             type="button"
@@ -413,7 +383,9 @@ function StepVerify({ data, onChange, onNext, onBack }) {
             disabled={loading}
             className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? <><Loader2 size={15} className="animate-spin" /> Checking...</> : 'I\'ve verified — Continue →'}
+            {loading
+              ? <><Loader2 size={15} className="animate-spin" /> Checking...</>
+              : "I've verified — Continue →"}
           </button>
           <button
             type="button"
@@ -421,16 +393,17 @@ function StepVerify({ data, onChange, onNext, onBack }) {
             onClick={() => { setCodeSent(false); setResendTimer(0); }}
             className="text-xs text-muted-foreground font-body hover:text-foreground transition-colors disabled:opacity-40"
           >
-            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Didn\'t get it? Resend'}
+            {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Didn't get it? Resend"}
           </button>
         </div>
       )}
 
-      {/* Hidden recaptcha div for phone */}
-      <div id="recaptcha-container" ref={recaptchaRef} />
-
       <div className="mt-4">
-        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground font-body hover:text-foreground transition-colors">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground font-body hover:text-foreground transition-colors"
+        >
           <ArrowLeft size={14} /> Back
         </button>
       </div>
@@ -454,33 +427,20 @@ function StepPlatforms({ data, onChange, onNext, onBack }) {
   };
 
   const handleNext = () => {
-    if (!data.platforms?.length) {
-      setError('Please select at least one platform');
-      return;
-    }
+    if (!data.platforms?.length) { setError('Please select at least one platform'); return; }
     onNext();
   };
 
   const platforms = [
     {
-      id: 'instagram',
-      icon: Instagram,
-      label: 'Instagram',
-      sub: 'Reels, Stories, Posts',
-      gradient: 'from-purple-500 to-pink-500',
-      bg: 'bg-purple-500/10',
-      border: 'border-purple-500',
-      check: 'bg-purple-500',
+      id: 'instagram', icon: Instagram, label: 'Instagram', sub: 'Reels, Stories, Posts',
+      gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/10',
+      border: 'border-purple-500', check: 'bg-purple-500',
     },
     {
-      id: 'youtube',
-      icon: Youtube,
-      label: 'YouTube',
-      sub: 'Videos, Shorts',
-      gradient: 'from-red-500 to-orange-400',
-      bg: 'bg-red-500/10',
-      border: 'border-red-500',
-      check: 'bg-red-500',
+      id: 'youtube', icon: Youtube, label: 'YouTube', sub: 'Videos, Shorts',
+      gradient: 'from-red-500 to-orange-400', bg: 'bg-red-500/10',
+      border: 'border-red-500', check: 'bg-red-500',
     },
   ];
 
@@ -488,7 +448,7 @@ function StepPlatforms({ data, onChange, onNext, onBack }) {
     <div>
       <h2 className="font-heading text-2xl text-foreground mb-1">Where do you create?</h2>
       <p className="text-muted-foreground font-body text-sm mb-6">
-        Select all platforms you use. ARIA will personalise trends and analytics for each.
+        Select all platforms you use. ARIA will personalise trends for each.
       </p>
       <ErrorBanner message={error} />
       <div className="space-y-3 mb-2">
@@ -528,25 +488,34 @@ function StepPlatforms({ data, onChange, onNext, onBack }) {
 // STEP 5 — Connect accounts via OAuth
 // ════════════════════════════════════════════════════════════════════════════════
 function StepConnect({ data, onChange, onNext, onBack }) {
-  const [connecting, setConnecting]   = useState(null);
-  const [connected, setConnected]     = useState({}); // { instagram: true, youtube: true }
-  const [error, setError]             = useState('');
+  const [connecting, setConnecting] = useState(null);
+  const [connected, setConnected]   = useState({});
+  const [error, setError]           = useState('');
 
   const platforms = data.platforms || [];
 
-  // Check URL params on mount — user may be returning from OAuth redirect
+  // Resume from OAuth redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const successPlatform = params.get('oauth_success');
     const handle          = params.get('handle');
+    const errorParam      = params.get('oauth_error');
+
     if (successPlatform) {
       setConnected(prev => ({ ...prev, [successPlatform]: handle || true }));
-      // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
-    const errorParam = params.get('oauth_error');
     if (errorParam) {
-      setError(`Connection failed for ${errorParam}. Please try again.`);
+      const messages = {
+        instagram_denied:           'Instagram access was denied. Please try again.',
+        instagram_not_professional: 'Your Instagram account must be a Professional account (Business or Creator). Go to Instagram Settings → Account → Switch to Professional Account — it\'s free!',
+        instagram_token_failed:     'Could not connect Instagram. Please try again.',
+        instagram_failed:           'Instagram connection failed. Please try again.',
+        youtube_denied:             'YouTube access was denied. Please try again.',
+        youtube_failed:             'YouTube connection failed. Please try again.',
+        invalid_state:              'Session expired. Please try connecting again.',
+      };
+      setError(messages[errorParam] || 'Connection failed. Please try again.');
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -555,16 +524,21 @@ function StepConnect({ data, onChange, onNext, onBack }) {
     setError('');
     setConnecting(platform);
     try {
+      // FIX: api.get returns parsed JSON directly — response shape is { success, data: { url } }
       const res = await api.get(`/integrations/${platform}/auth-url`);
-      // Store current register step in sessionStorage so we can resume
+      const url = res?.data?.url || res?.url;
+      if (!url) throw new Error('No auth URL returned');
+
+      // Save step so we can resume after redirect
       sessionStorage.setItem('aria_register_step', '4');
       sessionStorage.setItem('aria_register_data', JSON.stringify({
         ...data,
+        _firebaseUser: null, // Don't serialize Firebase user object
         _resumeFromOAuth: true,
       }));
-      window.location.href = res.data.url;
+      window.location.href = url;
     } catch (err) {
-      setError(`Could not connect ${platform}. Make sure you're logged in and try again.`);
+      setError(err.message || `Could not connect ${platform}. Please try again.`);
       setConnecting(null);
     }
   };
@@ -572,30 +546,21 @@ function StepConnect({ data, onChange, onNext, onBack }) {
   const allConnected = platforms.every(p => connected[p]);
 
   const handleNext = () => {
-    if (!allConnected) {
-      setError('Please connect all selected platforms to continue.');
-      return;
-    }
+    if (!allConnected) { setError('Please connect all selected platforms to continue.'); return; }
     onChange('connected', connected);
     onNext();
   };
 
   const platformConfig = {
     instagram: {
-      icon: Instagram,
-      label: 'Instagram',
+      icon: Instagram, label: 'Instagram',
       sub: 'ARIA will read your posts, reels and engagement',
-      gradient: 'from-purple-500 to-pink-500',
-      bg: 'bg-purple-500/10',
-      border: 'border-purple-500/30',
+      gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/10', border: 'border-purple-500/30',
     },
     youtube: {
-      icon: Youtube,
-      label: 'YouTube',
+      icon: Youtube, label: 'YouTube',
       sub: 'ARIA will read your videos, views and subscriber data',
-      gradient: 'from-red-500 to-orange-400',
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/30',
+      gradient: 'from-red-500 to-orange-400', bg: 'bg-red-500/10', border: 'border-red-500/30',
     },
   };
 
@@ -605,7 +570,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
       <p className="text-muted-foreground font-body text-sm mb-2">
         ARIA needs read-only access to analyse your content and detect your niche.
       </p>
-      <p className="text-primary/70 font-body text-xs mb-6 flex items-center gap-1">
+      <p className="text-primary/70 font-body text-xs mb-6">
         🔒 Read-only. ARIA never posts without your permission.
       </p>
 
@@ -614,7 +579,8 @@ function StepConnect({ data, onChange, onNext, onBack }) {
       <div className="space-y-3">
         {platforms.map(platform => {
           const cfg = platformConfig[platform];
-          const isConnected = !!connected[platform];
+          if (!cfg) return null;
+          const isConnected  = !!connected[platform];
           const isConnecting = connecting === platform;
           const Icon = cfg.icon;
 
@@ -669,12 +635,12 @@ function StepConnect({ data, onChange, onNext, onBack }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// STEP 6 — ARIA analysis (scrape + profile generation)
+// STEP 6 — ARIA analysis
 // ════════════════════════════════════════════════════════════════════════════════
 function StepAnalysis({ data, onFinish }) {
-  const [status, setStatus]       = useState('loading'); // loading | done | error
-  const [analysis, setAnalysis]   = useState(null);
-  const [progress, setProgress]   = useState(0);
+  const [status, setStatus]         = useState('loading');
+  const [analysis, setAnalysis]     = useState(null);
+  const [progress, setProgress]     = useState(0);
   const [currentMsg, setCurrentMsg] = useState(0);
 
   const messages = [
@@ -687,25 +653,18 @@ function StepAnalysis({ data, onFinish }) {
   ];
 
   useEffect(() => {
-    // Progress animation
-    const progressInterval = setInterval(() => {
-      setProgress(p => Math.min(p + 8, 90));
-    }, 800);
+    const progressInterval = setInterval(() => setProgress(p => Math.min(p + 8, 90)), 800);
+    const msgInterval      = setInterval(() => setCurrentMsg(m => Math.min(m + 1, messages.length - 1)), 2500);
 
-    // Message cycling
-    const msgInterval = setInterval(() => {
-      setCurrentMsg(m => Math.min(m + 1, messages.length - 1));
-    }, 2500);
-
-    // Poll backend for analysis completion
     let attempts = 0;
-    const maxAttempts = 15; // 75 seconds
+    const maxAttempts = 15;
 
     const poll = async () => {
       attempts++;
       try {
-        const res = await api.get('/users/me');
-        const profile = res.data || res;
+        // FIX: /users/me returns { success, data: {...user} } — handle both shapes
+        const res     = await api.get('/users/me');
+        const profile = res?.data || res;
 
         if (profile?.niches?.length > 0 && profile?.archetype) {
           setProgress(100);
@@ -715,13 +674,13 @@ function StepAnalysis({ data, onFinish }) {
           clearInterval(msgInterval);
           return;
         }
-      } catch (err) {
-        console.warn('Poll error:', err);
+      } catch {
+        // Polling errors are non-fatal
       }
 
       if (attempts >= maxAttempts) {
-        setStatus('done'); // Timeout — go to dashboard anyway
         setProgress(100);
+        setStatus('done');
         clearInterval(progressInterval);
         clearInterval(msgInterval);
         return;
@@ -730,22 +689,19 @@ function StepAnalysis({ data, onFinish }) {
       setTimeout(poll, 5000);
     };
 
-    // Trigger analysis
     const runAnalysis = async () => {
       try {
-        // Trigger onboarding connect for each connected platform
         const connectedPlatforms = Object.entries(data.connected || {});
         for (const [platform, handle] of connectedPlatforms) {
-          if (handle) {
-            await api.post('/onboarding/connect', {
-              handle: typeof handle === 'string' ? handle : platform,
-              platform,
-              followerRange: 'Under 1K',
-            }).catch(() => {}); // Non-fatal
-          }
+          if (!handle) continue;
+          await api.post('/onboarding/connect', {
+            handle:        typeof handle === 'string' ? handle : platform,
+            platform,
+            followerRange: 'Under 1K',
+          }).catch(() => {});
         }
-      } catch (err) {
-        console.warn('Analysis trigger error:', err);
+      } catch {
+        // Non-fatal
       }
       setTimeout(poll, 3000);
     };
@@ -756,6 +712,7 @@ function StepAnalysis({ data, onFinish }) {
       clearInterval(progressInterval);
       clearInterval(msgInterval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (status === 'loading') {
@@ -768,11 +725,8 @@ function StepAnalysis({ data, onFinish }) {
         >
           <Sparkles size={32} className="text-primary" />
         </motion.div>
-
         <h2 className="font-heading text-2xl text-foreground mb-2">ARIA is analysing your account</h2>
-        <p className="text-muted-foreground font-body text-sm mb-6">This takes about 30-60 seconds</p>
-
-        {/* Progress bar */}
+        <p className="text-muted-foreground font-body text-sm mb-6">This takes about 30–60 seconds</p>
         <div className="w-full bg-muted rounded-full h-2 mb-4">
           <motion.div
             className="h-2 bg-primary rounded-full"
@@ -780,8 +734,6 @@ function StepAnalysis({ data, onFinish }) {
             transition={{ duration: 0.5 }}
           />
         </div>
-
-        {/* Current message */}
         <AnimatePresence mode="wait">
           <motion.p
             key={currentMsg}
@@ -797,14 +749,13 @@ function StepAnalysis({ data, onFinish }) {
     );
   }
 
-  // Done — show summary
-  const emoji = analysis?.aria_profile?.archetypeEmoji || '🎯';
-  const archetypeLabel = analysis?.aria_profile?.archetypeLabel || analysis?.archetype || 'Creator';
-  const niches = analysis?.niches || [];
-  const ariaMessage = analysis?.aria_profile?.ariaMessage || `Welcome to ARIA! Your account is being set up.`;
-  const healthScore = analysis?.aria_profile?.healthScore || analysis?.health_score;
-  const strengths = analysis?.aria_profile?.strengths || [];
-  const topOpportunity = analysis?.aria_profile?.topOpportunity || '';
+  const emoji           = analysis?.aria_profile?.archetypeEmoji || '🎯';
+  const archetypeLabel  = analysis?.aria_profile?.archetypeLabel || analysis?.archetype || 'Creator';
+  const niches          = analysis?.niches || [];
+  const ariaMessage     = analysis?.aria_profile?.ariaMessage || 'Welcome to ARIA! Your account is being set up.';
+  const healthScore     = analysis?.aria_profile?.healthScore || analysis?.health_score;
+  const strengths       = analysis?.aria_profile?.strengths || [];
+  const topOpportunity  = analysis?.aria_profile?.topOpportunity || '';
   const estimatedEarning = analysis?.aria_profile?.estimatedMonthlyEarning || '';
 
   return (
@@ -819,7 +770,6 @@ function StepAnalysis({ data, onFinish }) {
         <p className="text-primary font-body font-semibold text-lg mt-1">{archetypeLabel}</p>
       </div>
 
-      {/* Niches */}
       {niches.length > 0 && (
         <div className="flex flex-wrap gap-2 justify-center">
           {niches.map(n => (
@@ -830,13 +780,11 @@ function StepAnalysis({ data, onFinish }) {
         </div>
       )}
 
-      {/* ARIA personal message */}
       <div className="bg-card border border-border rounded-xl p-4 text-left">
         <p className="text-[10px] text-muted-foreground font-body mb-1 uppercase tracking-wide">ARIA says</p>
         <p className="text-sm text-foreground font-body italic leading-relaxed">"{ariaMessage}"</p>
       </div>
 
-      {/* Key stats */}
       {(healthScore || topOpportunity || estimatedEarning) && (
         <div className="grid grid-cols-2 gap-3 text-left">
           {healthScore && (
@@ -886,65 +834,53 @@ function StepAnalysis({ data, onFinish }) {
 // MAIN Register component
 // ════════════════════════════════════════════════════════════════════════════════
 export default function Register() {
-  const navigate                  = useNavigate();
-  const { syncWithBackend }       = useFirebaseAuth();
+  const navigate             = useNavigate();
+  const { syncWithBackend }  = useFirebaseAuth();
 
-  // Restore from sessionStorage if returning from OAuth redirect
   const savedStep = parseInt(sessionStorage.getItem('aria_register_step') || '0');
   const savedData = (() => {
-    try {
-      return JSON.parse(sessionStorage.getItem('aria_register_data') || '{}');
-    } catch { return {}; }
+    try { return JSON.parse(sessionStorage.getItem('aria_register_data') || '{}'); }
+    catch { return {}; }
   })();
 
   const [step, setStep] = useState(savedStep || 0);
   const [data, setData] = useState({
-    email: '',
-    password: '',
-    confirm: '',
-    name: '',
-    phone: '',
-    platforms: [],
-    connected: {},
+    email: '', password: '', confirm: '',
+    name: '', phone: '',
+    platforms: [], connected: {},
     _firebaseUser: null,
     ...savedData,
   });
 
-  const onChange = (key, value) => {
-    setData(prev => ({ ...prev, [key]: value }));
-  };
+  const onChange = (key, value) => setData(prev => ({ ...prev, [key]: value }));
+  const goNext   = () => setStep(s => s + 1);
+  const goBack   = () => setStep(s => s - 1);
 
-  const goNext = () => setStep(s => s + 1);
-  const goBack = () => setStep(s => s - 1);
-
-  // Sync with backend after Firebase user is created (happens in StepVerify)
+  // Sync with backend when user reaches platform step (Firebase account now exists)
   useEffect(() => {
     if (step === 3 && auth.currentUser) {
       syncWithBackend(auth.currentUser).catch(() => {});
     }
+  // syncWithBackend is stable — intentionally omitted from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const handleFinish = async () => {
-    // Save final onboarding step to backend
     try {
       await api.post('/onboarding/finalise', {
-        confirmedNiches: [],
+        confirmedNiches:    [],
         confirmedArchetype: '',
-        platform: data.platforms[0] || 'instagram',
-        followerRange: 'Under 1K',
+        platform:           data.platforms[0] || 'instagram',
+        followerRange:      'Under 1K',
       }).catch(() => {});
     } catch {}
-    // Clear session storage
     sessionStorage.removeItem('aria_register_step');
     sessionStorage.removeItem('aria_register_data');
     navigate('/dashboard');
   };
 
-  const totalSteps = STEPS.length;
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-8 px-4 pb-12">
-      {/* Logo */}
       <Link to="/" className="font-heading text-2xl text-primary mb-8">ARIA</Link>
 
       {/* Progress bar */}
@@ -961,7 +897,12 @@ export default function Register() {
         </div>
         <div className="flex justify-between">
           {STEPS.map((s, i) => (
-            <p key={s.id} className={`text-[9px] font-body transition-colors ${i === step ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+            <p
+              key={s.id}
+              className={`text-[9px] font-body transition-colors ${
+                i === step ? 'text-primary font-semibold' : 'text-muted-foreground'
+              }`}
+            >
               {s.label}
             </p>
           ))}
