@@ -9,11 +9,10 @@ import {
 import {
   createUserWithEmailAndPassword,
   updateProfile,
-  sendEmailVerification,
   RecaptchaVerifier,
   signInWithPhoneNumber,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, sendVerificationEmail } from '@/lib/firebase';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { api } from '@/lib/api';
 
@@ -272,13 +271,22 @@ function StepVerify({ data, onChange, onNext, onBack }) {
     return () => clearTimeout(t);
   }, [resendTimer]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      // User came back from email link — check verification and advance
+      checkEmailVerified();
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const sendEmailCode = async () => {
     setLoading(true); setError('');
     try {
       // Create Firebase user first, then send verification email
       const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
       await updateProfile(cred.user, { displayName: data.name });
-      await sendEmailVerification(cred.user);
+      await sendVerificationEmail(cred.user);
       data._firebaseUser = cred.user; // store temporarily
       onChange('_firebaseUser', cred.user);
       setCodeSent(true);
