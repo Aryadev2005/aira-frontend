@@ -15,10 +15,10 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export const sendVerificationEmail = async (user) => {
-  const actionCodeSettings = {
-    // After clicking the link, Firebase redirects here
-    url: 'http://localhost:5173/register?verified=true',
-    handleCodeInApp: false, // false = opens in browser, not in-app
-  };
-  await sendEmailVerification(user, actionCodeSettings);
+  // const actionCodeSettings = {
+  //   // After clicking the link, Firebase redirects here
+  //   url: 'http://localhost:5173/register?verified=true',
+  //   handleCodeInApp: false, // false = opens in browser, not in-app
+  // };
+  await sendEmailVerification(user);
 };
