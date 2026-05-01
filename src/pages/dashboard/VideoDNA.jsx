@@ -68,6 +68,7 @@ const item = {
 export default function VideoDNA() {
   const [url, setUrl] = useState('');
   const [result, setResult] = useState(null);
+  const [analyzeError, setAnalyzeError] = useState(null);
 
   const { mutateAsync: analyseVideo, isPending: analyzing } = useVideoDNA();
   const { data: historyData } = useVideoDNAHistory();
@@ -75,13 +76,14 @@ export default function VideoDNA() {
   const handleAnalyze = async () => {
     if (!url.trim()) return;
     setResult(null);
+    setAnalyzeError(null);
 
-    // Extract video ID from URL
+    // Extract video ID from URL — backend expects { videoId: string }
     const videoIdMatch = url.match(
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
     );
     if (!videoIdMatch) {
-      alert('Please enter a valid YouTube URL');
+      setAnalyzeError('Please enter a valid YouTube URL (youtube.com or youtu.be)');
       return;
     }
 
@@ -90,6 +92,7 @@ export default function VideoDNA() {
       setResult(data.data);
     } catch (e) {
       console.error('Analysis failed', e);
+      setAnalyzeError(e?.response?.data?.message || 'Analysis failed. Please try again.');
     }
   };
 
@@ -100,29 +103,35 @@ export default function VideoDNA() {
         <p className="text-muted-foreground font-body text-sm">Analyse any YouTube video instantly</p>
       </motion.div>
 
-      <motion.div variants={item} className="flex gap-3">
-        <div className="relative flex-1">
-          <Link2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste YouTube URL here..."
-            className="pl-10 bg-card border-border rounded-pill font-body text-sm h-11"
-          />
+      <motion.div variants={item} className="space-y-2">
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Link2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
+              placeholder="Paste YouTube URL here..."
+              className="pl-10 bg-card border-border rounded-pill font-body text-sm h-11"
+            />
+          </div>
+          <Button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="bg-primary hover:bg-primary/90 text-white rounded-pill px-6 font-body font-semibold shadow-warm h-11"
+          >
+            {analyzing ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <span className="flex items-center gap-2">
+                <Sparkles size={16} /> Analyse
+              </span>
+            )}
+          </Button>
         </div>
-        <Button
-          onClick={handleAnalyze}
-          disabled={analyzing}
-          className="bg-primary hover:bg-primary/90 text-white rounded-pill px-6 font-body font-semibold shadow-warm h-11"
-        >
-          {analyzing ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <span className="flex items-center gap-2">
-              <Sparkles size={16} /> Analyse
-            </span>
-          )}
-        </Button>
+        {analyzeError && (
+          <p className="text-destructive text-sm font-body">{analyzeError}</p>
+        )}
       </motion.div>
 
       {analyzing && (
@@ -156,15 +165,35 @@ export default function VideoDNA() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          {/* Video metadata */}
+          {result.videoTitle && (
+            <div className="bg-muted rounded-xl p-4">
+              <p className="font-body font-semibold text-sm text-foreground">{result.videoTitle}</p>
+              <p className="text-muted-foreground text-xs font-body mt-1">
+                {result.channelName} · {result.publishedAt} · {result.duration}
+              </p>
+              <div className="flex gap-4 mt-2 text-xs text-muted-foreground font-body">
+                <span>👁 {result.viewCount}</span>
+                <span>❤️ {result.likeCount}</span>
+                <span>💬 {result.commentCount}</span>
+                <span>📊 {result.engagementRate}%</span>
+              </div>
+            </div>
+          )}
+
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <ScoreRing score={result.overallScore} size={100} label="Overall Score" />
               <div className="flex-1 space-y-4 w-full">
-                <ScoreBar label="Hook Strength" score={result.hookStrength} />
-                <ScoreBar label="Title SEO" score={result.titleSEO} />
-                <ScoreBar label="Niche Benchmark" score={result.nicheBenchmark} />
+                {/* Backend returns hookScore, titleScore, benchmarkScore */}
+                <ScoreBar label="Hook Strength" score={result.hookScore ?? result.hookStrength ?? 0} />
+                <ScoreBar label="Title SEO" score={result.titleScore ?? result.titleSEO ?? 0} />
+                <ScoreBar label="Niche Benchmark" score={result.benchmarkScore ?? result.nicheBenchmark ?? 0} />
               </div>
             </div>
+            {result.scoreSummary && (
+              <p className="text-muted-foreground font-body text-sm mt-4 leading-relaxed">{result.scoreSummary}</p>
+            )}
           </div>
 
           <div className="bg-accent text-accent-foreground rounded-xl p-6">
@@ -172,12 +201,35 @@ export default function VideoDNA() {
               <Sparkles size={16} className="text-primary" />
               <span className="font-body font-semibold text-sm">ARIA Says</span>
             </div>
-            <p className="text-accent-foreground/80 font-body text-sm leading-relaxed">{result.ariaSays}</p>
+            {/* Backend returns ariaInsight, not ariaSays */}
+            <p className="text-accent-foreground/80 font-body text-sm leading-relaxed">
+              {result.ariaInsight || result.ariaSays}
+            </p>
           </div>
+
+          {result.actionItems?.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h4 className="font-body font-semibold text-sm text-foreground mb-3">✅ Action Items</h4>
+              <ul className="space-y-2">
+                {result.actionItems.map((action, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-primary font-body text-sm font-semibold mt-0.5">{i + 1}.</span>
+                    <p className="text-muted-foreground font-body text-sm">{action}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="bg-card border border-border rounded-xl p-6">
             <h4 className="font-body font-semibold text-sm text-foreground mb-2">🎬 Next Video Suggestion</h4>
-            <p className="text-muted-foreground font-body text-sm leading-relaxed">{result.nextVideo}</p>
+            {/* Backend returns nextVideoSuggestion + nextVideoReason */}
+            <p className="font-body font-semibold text-sm text-primary mb-1">
+              {result.nextVideoSuggestion || result.nextVideo}
+            </p>
+            {result.nextVideoReason && (
+              <p className="text-muted-foreground font-body text-sm leading-relaxed">{result.nextVideoReason}</p>
+            )}
           </div>
         </motion.div>
       )}

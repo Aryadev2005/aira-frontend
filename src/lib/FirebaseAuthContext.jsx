@@ -72,8 +72,13 @@ export function FirebaseAuthProvider({ children }) {
 
   const resetPassword = (email) => sendPasswordResetEmail(auth, email);
 
-  // Check if onboarding is complete
-  const needsOnboarding = dbUser && (!dbUser.primary_platform || !dbUser.niches?.length);
+  // Check if onboarding is complete.
+  // A user does NOT need onboarding if they have already connected a social account,
+  // regardless of whether niches have been detected yet.
+  const needsOnboarding = dbUser &&
+    (!dbUser.onboarding_step || dbUser.onboarding_step === 'new') &&
+    !dbUser.instagram_handle &&
+    !dbUser.youtube_handle;
 
   return (
     <FirebaseAuthContext.Provider

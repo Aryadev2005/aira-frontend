@@ -123,8 +123,8 @@ export const useLaunchPackage = () =>
 export const useBrandAlert = () =>
   useQuery({ queryKey: ['brand-alert'], queryFn: () => api.get('/launch/brand-alert') });
 
-export const useRateCard = () =>
-  useMutation({ mutationFn: (body) => api.post('/launch/rate-card', body) });
+// Note: /launch/rate-card does not exist in the backend — removed useRateCard.
+// Use useLaunchPackage() for posting package generation instead.
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 export const useGenerateCalendar = () =>
@@ -132,3 +132,36 @@ export const useGenerateCalendar = () =>
 
 export const useSavedCalendar = () =>
   useQuery({ queryKey: ['saved-calendar'], queryFn: () => api.get('/calendar/saved') });
+
+// ── INTEGRATIONS ─────────────────────────────────────────────────────────
+export const useIntegrationStatus = () =>
+  useQuery({
+    queryKey: ['integration-status'],
+    queryFn: () => api.get('/integrations/status'),
+    refetchInterval: 30_000, // Check every 30s for token expiry
+  });
+
+export const useInstagramAuthUrl = () =>
+  useMutation({ mutationFn: () => api.get('/integrations/instagram/auth-url') });
+
+export const useYoutubeAuthUrl = () =>
+  useMutation({ mutationFn: () => api.get('/integrations/youtube/auth-url') });
+
+export const useDisconnectPlatform = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (platform) => api.delete(`/integrations/${platform}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integration-status'] }),
+  });
+};
+
+export const useConnectHandle = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/onboarding/connect', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profile'] });
+      qc.invalidateQueries({ queryKey: ['integration-status'] });
+    },
+  });
+};
