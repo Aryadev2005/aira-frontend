@@ -1,222 +1,985 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle,
+  Instagram, Youtube, CheckCircle2, ArrowRight, ArrowLeft,
+  Loader2, Sparkles, RefreshCw
+} from 'lucide-react';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+import { api } from '@/lib/api';
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
-};
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
-
-const perks = [
-  '48h early trend radar',
-  'AI script & caption generator',
-  'Viral song matcher',
-  'Free forever — no card needed',
+// ── Step config ───────────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 'credentials', label: 'Account'    },
+  { id: 'details',     label: 'About you'  },
+  { id: 'verify',      label: 'Verify'     },
+  { id: 'platforms',   label: 'Platforms'  },
+  { id: 'connect',     label: 'Connect'    },
+  { id: 'analysis',    label: 'ARIA Setup' },
 ];
 
-export default function Register() {
-  const navigate = useNavigate();
-  const { signUp, signInWithGoogle } = useFirebaseAuth();
+const stepVariants = {
+  enter:  { opacity: 0, x: 40 },
+  center: { opacity: 1, x: 0  },
+  exit:   { opacity: 0, x: -40},
+};
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState('');
+// ── Reusable input ────────────────────────────────────────────────────────────
+function Input({ icon: Icon, label, hint, error, ...props }) {
+  return (
+    <div>
+      {label && <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">{label}</label>}
+      <div className="relative">
+        {Icon && <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />}
+        <input
+          className={`w-full ${Icon ? 'pl-9' : 'pl-4'} pr-4 py-3 bg-card border rounded-xl font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${
+            error ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
+          }`}
+          {...props}
+        />
+      </div>
+      {error && <p className="text-xs text-destructive font-body mt-1">{error}</p>}
+      {hint && !error && <p className="text-xs text-muted-foreground font-body mt-1">{hint}</p>}
+    </div>
+  );
+}
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+// ── Error banner ──────────────────────────────────────────────────────────────
+function ErrorBanner({ message }) {
+  if (!message) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+      className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-xl p-3 mb-4"
+    >
+      <AlertCircle size={15} className="text-destructive mt-0.5 shrink-0" />
+      <p className="text-sm font-body text-destructive">{message}</p>
+    </motion.div>
+  );
+}
+
+// ── Nav buttons ───────────────────────────────────────────────────────────────
+function NavButtons({ onBack, onNext, nextLabel = 'Continue', loading, disabled, showBack = true }) {
+  return (
+    <div className={`flex gap-3 mt-6 ${showBack ? 'justify-between' : 'justify-end'}`}>
+      {showBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-border text-foreground font-body text-sm font-medium hover:bg-card transition-colors"
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={disabled || loading}
+        className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-primary text-white font-body text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
+      >
+        {loading
+          ? <><Loader2 size={14} className="animate-spin" /> Working...</>
+          : <>{nextLabel} <ArrowRight size={14} /></>}
+      </button>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 1 — Credentials (email + password)
+// ════════════════════════════════════════════════════════════════════════════════
+function StepCredentials({ data, onChange, onNext }) {
+  const [showPass, setShowPass]   = useState(false);
+  const [showConf, setShowConf]   = useState(false);
+  const [errors, setErrors]       = useState({});
+  const [loading, setLoading]     = useState(false);
+  const [globalErr, setGlobalErr] = useState('');
+
+  const validate = () => {
+    const e = {};
+    if (!data.email.trim())       e.email    = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(data.email)) e.email = 'Enter a valid email';
+    if (!data.password)           e.password = 'Password is required';
+    else if (data.password.length < 6) e.password = 'At least 6 characters';
+    if (data.password !== data.confirm) e.confirm = 'Passwords do not match';
+    return e;
+  };
+
+  const handleNext = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
     setLoading(true);
+    setGlobalErr('');
     try {
-      await signUp(email, password, name);
-      navigate('/onboarding');
+      // Check if email already taken
+      const { fetchSignInMethodsForEmail } = await import('firebase/auth');
+      const methods = await fetchSignInMethodsForEmail(auth, data.email.trim());
+      if (methods.length > 0) {
+        setGlobalErr('An account with this email already exists. Sign in instead.');
+        setLoading(false);
+        return;
+      }
+      onNext();
     } catch (err) {
-      setError(friendlyError(err.code));
+      setGlobalErr('Could not verify email. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogle = async () => {
-    setError('');
-    setGoogleLoading(true);
+  return (
+    <div>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Create your account</h2>
+      <p className="text-muted-foreground font-body text-sm mb-6">Join 10,000+ Indian creators on ARIA</p>
+      <ErrorBanner message={globalErr} />
+      <div className="space-y-4">
+        <Input
+          icon={Mail} label="Email" type="email"
+          placeholder="you@example.com"
+          value={data.email}
+          onChange={e => onChange('email', e.target.value)}
+          error={errors.email}
+        />
+        <div>
+          <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">Password</label>
+          <div className="relative">
+            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type={showPass ? 'text' : 'password'}
+              placeholder="Min 6 characters"
+              value={data.password}
+              onChange={e => onChange('password', e.target.value)}
+              className={`w-full pl-9 pr-10 py-3 bg-card border rounded-xl font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.password ? 'border-destructive' : 'border-border focus:border-primary'}`}
+            />
+            <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {errors.password && <p className="text-xs text-destructive font-body mt-1">{errors.password}</p>}
+        </div>
+        <div>
+          <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">Confirm password</label>
+          <div className="relative">
+            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type={showConf ? 'text' : 'password'}
+              placeholder="Same password again"
+              value={data.confirm}
+              onChange={e => onChange('confirm', e.target.value)}
+              className={`w-full pl-9 pr-10 py-3 bg-card border rounded-xl font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.confirm ? 'border-destructive' : 'border-border focus:border-primary'}`}
+            />
+            <button type="button" onClick={() => setShowConf(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              {showConf ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {errors.confirm && <p className="text-xs text-destructive font-body mt-1">{errors.confirm}</p>}
+        </div>
+      </div>
+      <NavButtons showBack={false} onNext={handleNext} loading={loading} />
+      <p className="text-center text-muted-foreground font-body text-xs mt-4">
+        Already have an account?{' '}
+        <Link to="/signin" className="text-primary font-semibold hover:underline">Sign in</Link>
+      </p>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 2 — Personal details (name + phone)
+// ════════════════════════════════════════════════════════════════════════════════
+function StepDetails({ data, onChange, onNext, onBack }) {
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!data.name.trim())  e.name  = 'Your name is required';
+    if (!data.phone.trim()) e.phone = 'Mobile number is required';
+    else if (!/^[6-9]\d{9}$/.test(data.phone.replace(/\s/g, '')))
+      e.phone = 'Enter a valid 10-digit Indian mobile number';
+    return e;
+  };
+
+  const handleNext = () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    onNext();
+  };
+
+  return (
+    <div>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Tell us about you</h2>
+      <p className="text-muted-foreground font-body text-sm mb-6">ARIA uses this to personalise your experience</p>
+      <div className="space-y-4">
+        <Input
+          icon={User} label="Full name"
+          placeholder="Your name"
+          value={data.name}
+          onChange={e => onChange('name', e.target.value)}
+          error={errors.name}
+        />
+        <div>
+          <label className="text-xs font-body font-medium text-foreground/70 mb-1.5 block">Mobile number</label>
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              <span className="text-sm font-body text-muted-foreground">🇮🇳 +91</span>
+              <div className="w-px h-4 bg-border" />
+            </div>
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="9876543210"
+              value={data.phone}
+              onChange={e => onChange('phone', e.target.value.replace(/\D/g, ''))}
+              className={`w-full pl-[72px] pr-4 py-3 bg-card border rounded-xl font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${errors.phone ? 'border-destructive' : 'border-border focus:border-primary'}`}
+            />
+          </div>
+          {errors.phone && <p className="text-xs text-destructive font-body mt-1">{errors.phone}</p>}
+        </div>
+      </div>
+      <NavButtons onBack={onBack} onNext={handleNext} />
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 3 — Verification (email OTP via Firebase)
+// ════════════════════════════════════════════════════════════════════════════════
+function StepVerify({ data, onChange, onNext, onBack }) {
+  const [method, setMethod]         = useState('email'); // 'email' | 'phone'
+  const [codeSent, setCodeSent]     = useState(false);
+  const [otp, setOtp]               = useState(['', '', '', '', '', '']);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+  const [confirmed, setConfirmed]   = useState(null); // Firebase phone confirmation result
+  const inputRefs                   = useRef([]);
+  const recaptchaRef                = useRef(null);
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
+  const sendEmailCode = async () => {
+    setLoading(true); setError('');
     try {
-      await signInWithGoogle();
-      navigate('/onboarding');
+      // Create Firebase user first, then send verification email
+      const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      await updateProfile(cred.user, { displayName: data.name });
+      await sendEmailVerification(cred.user);
+      data._firebaseUser = cred.user; // store temporarily
+      onChange('_firebaseUser', cred.user);
+      setCodeSent(true);
+      setResendTimer(60);
     } catch (err) {
-      setError(friendlyError(err.code));
+      if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Please sign in.');
+      } else {
+        setError(err.message || 'Could not send verification email.');
+      }
     } finally {
-      setGoogleLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const checkEmailVerified = async () => {
+    setLoading(true); setError('');
+    try {
+      const user = auth.currentUser;
+      await user.reload();
+      if (user.emailVerified) {
+        onNext();
+      } else {
+        setError('Email not verified yet. Please click the link in your inbox, then click Continue.');
+      }
+    } catch (err) {
+      setError('Could not check verification status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index, value) => {
+    if (value.length > 1) return;
+    const next = [...otp];
+    next[index] = value;
+    setOtp(next);
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(''));
+      inputRefs.current[5]?.focus();
     }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-accent flex-col justify-between p-12">
-        <Link to="/" className="font-heading text-3xl text-primary">AIRA</Link>
-        <div className="space-y-6">
-          <h2 className="font-heading text-4xl text-accent-foreground leading-tight">
-            Your AI content<br /><span className="italic">manager awaits.</span>
-          </h2>
-          <ul className="space-y-3">
-            {perks.map((p) => (
-              <li key={p} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Check size={11} className="text-primary" />
+    <div>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Verify your identity</h2>
+      <p className="text-muted-foreground font-body text-sm mb-6">
+        Choose how you'd like to verify your account
+      </p>
+
+      <ErrorBanner message={error} />
+
+      {/* Method selector */}
+      {!codeSent && (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {[
+              { id: 'email', icon: Mail, label: 'Email', sub: data.email },
+            ].map(({ id, icon: Icon, label, sub }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMethod(id)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  method === id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-card hover:border-primary/40'
+                }`}
+              >
+                <Icon size={20} className={method === id ? 'text-primary' : 'text-muted-foreground'} />
+                <div className="text-center">
+                  <p className={`font-body text-sm font-semibold ${method === id ? 'text-primary' : 'text-foreground'}`}>{label}</p>
+                  <p className="font-body text-[10px] text-muted-foreground truncate max-w-[100px]">{sub}</p>
                 </div>
-                <span className="text-accent-foreground/70 font-body text-sm">{p}</span>
-              </li>
+              </button>
             ))}
-          </ul>
-        </div>
-        <p className="text-accent-foreground/30 font-body text-xs">
-          India's first AI content manager · 50,000+ creators
-        </p>
-      </div>
+          </div>
 
-      {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-background">
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="w-full max-w-md"
-        >
-          <Link to="/" className="lg:hidden font-heading text-2xl text-primary block mb-8">AIRA</Link>
+          <button
+            type="button"
+            onClick={sendEmailCode}
+            disabled={loading}
+            className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading
+              ? <><Loader2 size={15} className="animate-spin" /> Sending...</>
+              : `Send verification email`}
+          </button>
+        </>
+      )}
 
-          <motion.div variants={item} className="mb-8">
-            <h1 className="font-heading text-3xl text-foreground mb-2">Create your account</h1>
-            <p className="text-muted-foreground font-body text-sm">Free forever. No credit card needed.</p>
-          </motion.div>
-
-          {/* Google */}
-          <motion.div variants={item}>
-            <Button
-              type="button"
-              onClick={handleGoogle}
-              disabled={googleLoading}
-              variant="outline"
-              className="w-full h-12 rounded-pill border-border font-body font-semibold text-foreground hover:bg-muted/50 mb-6"
-            >
-              {googleLoading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continue with Google
-                </>
-              )}
-            </Button>
-          </motion.div>
-
-          <motion.div variants={item} className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-muted-foreground font-body text-xs">or sign up with email</span>
-            <div className="flex-1 h-px bg-border" />
-          </motion.div>
-
-          <motion.form variants={item} onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm font-body rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label className="font-body text-sm font-medium text-foreground mb-1.5 block">Your Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Priya Sharma"
-                required
-                className="w-full h-12 bg-card border border-border rounded-xl px-4 font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            <div>
-              <label className="font-body text-sm font-medium text-foreground mb-1.5 block">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="w-full h-12 bg-card border border-border rounded-xl px-4 font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            <div>
-              <label className="font-body text-sm font-medium text-foreground mb-1.5 block">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min. 6 characters"
-                  required
-                  className="w-full h-12 bg-card border border-border rounded-xl px-4 pr-12 font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-white rounded-pill font-body font-semibold shadow-warm text-base"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : 'Create account'}
-            </Button>
-
-            <p className="text-muted-foreground font-body text-xs text-center leading-relaxed">
-              By signing up you agree to our{' '}
-              <span className="text-primary cursor-pointer hover:underline">Terms</span> &{' '}
-              <span className="text-primary cursor-pointer hover:underline">Privacy Policy</span>.
+      {/* Email sent state */}
+      {codeSent && method === 'email' && (
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <Mail size={28} className="text-primary" />
+          </div>
+          <div>
+            <p className="font-body font-semibold text-foreground">Check your inbox</p>
+            <p className="font-body text-sm text-muted-foreground mt-1">
+              We sent a verification link to <span className="text-foreground font-medium">{data.email}</span>
             </p>
-          </motion.form>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-2">
+            <p className="font-body text-xs text-muted-foreground">How to verify:</p>
+            <p className="font-body text-sm text-foreground">1. Open the email from ARIA</p>
+            <p className="font-body text-sm text-foreground">2. Click the "Verify email address" link</p>
+            <p className="font-body text-sm text-foreground">3. Come back here and click Continue</p>
+          </div>
+          <button
+            type="button"
+            onClick={checkEmailVerified}
+            disabled={loading}
+            className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Checking...</> : 'I\'ve verified — Continue →'}
+          </button>
+          <button
+            type="button"
+            disabled={resendTimer > 0 || loading}
+            onClick={() => { setCodeSent(false); setResendTimer(0); }}
+            className="text-xs text-muted-foreground font-body hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Didn\'t get it? Resend'}
+          </button>
+        </div>
+      )}
 
-          <motion.p variants={item} className="text-center text-muted-foreground font-body text-sm mt-6">
-            Already have an account?{' '}
-            <Link to="/signin" className="text-primary font-semibold hover:underline">
-              Sign in
-            </Link>
-          </motion.p>
-        </motion.div>
+      {/* Hidden recaptcha div for phone */}
+      <div id="recaptcha-container" ref={recaptchaRef} />
+
+      <div className="mt-4">
+        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground font-body hover:text-foreground transition-colors">
+          <ArrowLeft size={14} /> Back
+        </button>
       </div>
     </div>
   );
 }
 
-function friendlyError(code) {
-  const map = {
-    'auth/email-already-in-use': 'An account with this email already exists.',
-    'auth/invalid-email': 'Please enter a valid email address.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
-    'auth/popup-closed-by-user': 'Google sign-up was cancelled.',
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 4 — Platform selection
+// ════════════════════════════════════════════════════════════════════════════════
+function StepPlatforms({ data, onChange, onNext, onBack }) {
+  const [error, setError] = useState('');
+
+  const toggle = (platform) => {
+    const current = data.platforms || [];
+    const next = current.includes(platform)
+      ? current.filter(p => p !== platform)
+      : [...current, platform];
+    onChange('platforms', next);
+    if (next.length) setError('');
   };
-  return map[code] || 'Something went wrong. Please try again.';
+
+  const handleNext = () => {
+    if (!data.platforms?.length) {
+      setError('Please select at least one platform');
+      return;
+    }
+    onNext();
+  };
+
+  const platforms = [
+    {
+      id: 'instagram',
+      icon: Instagram,
+      label: 'Instagram',
+      sub: 'Reels, Stories, Posts',
+      gradient: 'from-purple-500 to-pink-500',
+      bg: 'bg-purple-500/10',
+      border: 'border-purple-500',
+      check: 'bg-purple-500',
+    },
+    {
+      id: 'youtube',
+      icon: Youtube,
+      label: 'YouTube',
+      sub: 'Videos, Shorts',
+      gradient: 'from-red-500 to-orange-400',
+      bg: 'bg-red-500/10',
+      border: 'border-red-500',
+      check: 'bg-red-500',
+    },
+  ];
+
+  return (
+    <div>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Where do you create?</h2>
+      <p className="text-muted-foreground font-body text-sm mb-6">
+        Select all platforms you use. ARIA will personalise trends and analytics for each.
+      </p>
+      <ErrorBanner message={error} />
+      <div className="space-y-3 mb-2">
+        {platforms.map(({ id, icon: Icon, label, sub, gradient, bg, border, check }) => {
+          const selected = (data.platforms || []).includes(id);
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => toggle(id)}
+              className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
+                selected ? `${bg} ${border} border-2` : 'bg-card border-border hover:border-primary/30'
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                <Icon size={24} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-body font-semibold text-foreground">{label}</p>
+                <p className="font-body text-xs text-muted-foreground">{sub}</p>
+              </div>
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                selected ? `${check} border-transparent` : 'border-border'
+              }`}>
+                {selected && <CheckCircle2 size={14} className="text-white" />}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <NavButtons onBack={onBack} onNext={handleNext} />
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 5 — Connect accounts via OAuth
+// ════════════════════════════════════════════════════════════════════════════════
+function StepConnect({ data, onChange, onNext, onBack }) {
+  const [connecting, setConnecting]   = useState(null);
+  const [connected, setConnected]     = useState({}); // { instagram: true, youtube: true }
+  const [error, setError]             = useState('');
+
+  const platforms = data.platforms || [];
+
+  // Check URL params on mount — user may be returning from OAuth redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const successPlatform = params.get('oauth_success');
+    const handle          = params.get('handle');
+    if (successPlatform) {
+      setConnected(prev => ({ ...prev, [successPlatform]: handle || true }));
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    const errorParam = params.get('oauth_error');
+    if (errorParam) {
+      setError(`Connection failed for ${errorParam}. Please try again.`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleConnect = async (platform) => {
+    setError('');
+    setConnecting(platform);
+    try {
+      const res = await api.get(`/integrations/${platform}/auth-url`);
+      // Store current register step in sessionStorage so we can resume
+      sessionStorage.setItem('aria_register_step', '4');
+      sessionStorage.setItem('aria_register_data', JSON.stringify({
+        ...data,
+        _resumeFromOAuth: true,
+      }));
+      window.location.href = res.data.url;
+    } catch (err) {
+      setError(`Could not connect ${platform}. Make sure you're logged in and try again.`);
+      setConnecting(null);
+    }
+  };
+
+  const allConnected = platforms.every(p => connected[p]);
+
+  const handleNext = () => {
+    if (!allConnected) {
+      setError('Please connect all selected platforms to continue.');
+      return;
+    }
+    onChange('connected', connected);
+    onNext();
+  };
+
+  const platformConfig = {
+    instagram: {
+      icon: Instagram,
+      label: 'Instagram',
+      sub: 'ARIA will read your posts, reels and engagement',
+      gradient: 'from-purple-500 to-pink-500',
+      bg: 'bg-purple-500/10',
+      border: 'border-purple-500/30',
+    },
+    youtube: {
+      icon: Youtube,
+      label: 'YouTube',
+      sub: 'ARIA will read your videos, views and subscriber data',
+      gradient: 'from-red-500 to-orange-400',
+      bg: 'bg-red-500/10',
+      border: 'border-red-500/30',
+    },
+  };
+
+  return (
+    <div>
+      <h2 className="font-heading text-2xl text-foreground mb-1">Connect your accounts</h2>
+      <p className="text-muted-foreground font-body text-sm mb-2">
+        ARIA needs read-only access to analyse your content and detect your niche.
+      </p>
+      <p className="text-primary/70 font-body text-xs mb-6 flex items-center gap-1">
+        🔒 Read-only. ARIA never posts without your permission.
+      </p>
+
+      <ErrorBanner message={error} />
+
+      <div className="space-y-3">
+        {platforms.map(platform => {
+          const cfg = platformConfig[platform];
+          const isConnected = !!connected[platform];
+          const isConnecting = connecting === platform;
+          const Icon = cfg.icon;
+
+          return (
+            <div
+              key={platform}
+              className={`rounded-xl border-2 p-4 transition-all ${
+                isConnected ? `${cfg.bg} ${cfg.border}` : 'bg-card border-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${cfg.gradient} flex items-center justify-center shrink-0`}>
+                  <Icon size={20} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-body font-semibold text-sm text-foreground">{cfg.label}</p>
+                  {isConnected ? (
+                    <p className="font-body text-xs text-green-600 flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 size={11} /> Connected
+                      {typeof connected[platform] === 'string' && ` · @${connected[platform]}`}
+                    </p>
+                  ) : (
+                    <p className="font-body text-xs text-muted-foreground mt-0.5 truncate">{cfg.sub}</p>
+                  )}
+                </div>
+                {!isConnected && (
+                  <button
+                    type="button"
+                    onClick={() => handleConnect(platform)}
+                    disabled={!!connecting}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-xs font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    {isConnecting
+                      ? <><Loader2 size={12} className="animate-spin" /> Connecting</>
+                      : <>Connect <ArrowRight size={12} /></>}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <NavButtons
+        onBack={onBack}
+        onNext={handleNext}
+        nextLabel={allConnected ? 'Let ARIA analyse →' : 'Continue'}
+        disabled={!allConnected}
+      />
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// STEP 6 — ARIA analysis (scrape + profile generation)
+// ════════════════════════════════════════════════════════════════════════════════
+function StepAnalysis({ data, onFinish }) {
+  const [status, setStatus]       = useState('loading'); // loading | done | error
+  const [analysis, setAnalysis]   = useState(null);
+  const [progress, setProgress]   = useState(0);
+  const [currentMsg, setCurrentMsg] = useState(0);
+
+  const messages = [
+    'Connecting to your account...',
+    'Reading your recent content...',
+    'Detecting your niche...',
+    'Analysing engagement patterns...',
+    'Building your creator profile...',
+    'ARIA is almost ready...',
+  ];
+
+  useEffect(() => {
+    // Progress animation
+    const progressInterval = setInterval(() => {
+      setProgress(p => Math.min(p + 8, 90));
+    }, 800);
+
+    // Message cycling
+    const msgInterval = setInterval(() => {
+      setCurrentMsg(m => Math.min(m + 1, messages.length - 1));
+    }, 2500);
+
+    // Poll backend for analysis completion
+    let attempts = 0;
+    const maxAttempts = 15; // 75 seconds
+
+    const poll = async () => {
+      attempts++;
+      try {
+        const res = await api.get('/users/me');
+        const profile = res.data || res;
+
+        if (profile?.niches?.length > 0 && profile?.archetype) {
+          setProgress(100);
+          setAnalysis(profile);
+          setStatus('done');
+          clearInterval(progressInterval);
+          clearInterval(msgInterval);
+          return;
+        }
+      } catch (err) {
+        console.warn('Poll error:', err);
+      }
+
+      if (attempts >= maxAttempts) {
+        setStatus('done'); // Timeout — go to dashboard anyway
+        setProgress(100);
+        clearInterval(progressInterval);
+        clearInterval(msgInterval);
+        return;
+      }
+
+      setTimeout(poll, 5000);
+    };
+
+    // Trigger analysis
+    const runAnalysis = async () => {
+      try {
+        // Trigger onboarding connect for each connected platform
+        const connectedPlatforms = Object.entries(data.connected || {});
+        for (const [platform, handle] of connectedPlatforms) {
+          if (handle) {
+            await api.post('/onboarding/connect', {
+              handle: typeof handle === 'string' ? handle : platform,
+              platform,
+              followerRange: 'Under 1K',
+            }).catch(() => {}); // Non-fatal
+          }
+        }
+      } catch (err) {
+        console.warn('Analysis trigger error:', err);
+      }
+      setTimeout(poll, 3000);
+    };
+
+    runAnalysis();
+
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(msgInterval);
+    };
+  }, []);
+
+  if (status === 'loading') {
+    return (
+      <div className="text-center py-4">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6"
+        >
+          <Sparkles size={32} className="text-primary" />
+        </motion.div>
+
+        <h2 className="font-heading text-2xl text-foreground mb-2">ARIA is analysing your account</h2>
+        <p className="text-muted-foreground font-body text-sm mb-6">This takes about 30-60 seconds</p>
+
+        {/* Progress bar */}
+        <div className="w-full bg-muted rounded-full h-2 mb-4">
+          <motion.div
+            className="h-2 bg-primary rounded-full"
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+
+        {/* Current message */}
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={currentMsg}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="text-sm text-muted-foreground font-body"
+          >
+            {messages[currentMsg]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Done — show summary
+  const emoji = analysis?.aria_profile?.archetypeEmoji || '🎯';
+  const archetypeLabel = analysis?.aria_profile?.archetypeLabel || analysis?.archetype || 'Creator';
+  const niches = analysis?.niches || [];
+  const ariaMessage = analysis?.aria_profile?.ariaMessage || `Welcome to ARIA! Your account is being set up.`;
+  const healthScore = analysis?.aria_profile?.healthScore || analysis?.health_score;
+  const strengths = analysis?.aria_profile?.strengths || [];
+  const topOpportunity = analysis?.aria_profile?.topOpportunity || '';
+  const estimatedEarning = analysis?.aria_profile?.estimatedMonthlyEarning || '';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="text-center space-y-4"
+    >
+      <div className="text-5xl mb-2">{emoji}</div>
+      <div>
+        <h2 className="font-heading text-2xl text-foreground">ARIA found your vibe</h2>
+        <p className="text-primary font-body font-semibold text-lg mt-1">{archetypeLabel}</p>
+      </div>
+
+      {/* Niches */}
+      {niches.length > 0 && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          {niches.map(n => (
+            <span key={n} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-body font-medium border border-primary/20">
+              {n}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ARIA personal message */}
+      <div className="bg-card border border-border rounded-xl p-4 text-left">
+        <p className="text-[10px] text-muted-foreground font-body mb-1 uppercase tracking-wide">ARIA says</p>
+        <p className="text-sm text-foreground font-body italic leading-relaxed">"{ariaMessage}"</p>
+      </div>
+
+      {/* Key stats */}
+      {(healthScore || topOpportunity || estimatedEarning) && (
+        <div className="grid grid-cols-2 gap-3 text-left">
+          {healthScore && (
+            <div className="bg-card border border-border rounded-xl p-3">
+              <p className="text-[10px] text-muted-foreground font-body">Health Score</p>
+              <p className="font-heading text-xl text-foreground">{healthScore}/100</p>
+            </div>
+          )}
+          {estimatedEarning && (
+            <div className="bg-card border border-border rounded-xl p-3">
+              <p className="text-[10px] text-muted-foreground font-body">Est. Monthly</p>
+              <p className="font-heading text-lg text-foreground">{estimatedEarning}</p>
+            </div>
+          )}
+          {topOpportunity && (
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 col-span-2">
+              <p className="text-[10px] text-primary font-body mb-1">Top Opportunity</p>
+              <p className="text-sm text-foreground font-body">{topOpportunity}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {strengths.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4 text-left">
+          <p className="text-[10px] text-muted-foreground font-body mb-2 uppercase tracking-wide">Your Strengths</p>
+          {strengths.slice(0, 2).map((s, i) => (
+            <p key={i} className="text-sm text-foreground font-body flex items-start gap-2 mb-1">
+              <span className="text-primary mt-0.5">✦</span> {s}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onFinish}
+        className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+      >
+        Enter ARIA <ArrowRight size={16} />
+      </button>
+    </motion.div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// MAIN Register component
+// ════════════════════════════════════════════════════════════════════════════════
+export default function Register() {
+  const navigate                  = useNavigate();
+  const { syncWithBackend }       = useFirebaseAuth();
+
+  // Restore from sessionStorage if returning from OAuth redirect
+  const savedStep = parseInt(sessionStorage.getItem('aria_register_step') || '0');
+  const savedData = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('aria_register_data') || '{}');
+    } catch { return {}; }
+  })();
+
+  const [step, setStep] = useState(savedStep || 0);
+  const [data, setData] = useState({
+    email: '',
+    password: '',
+    confirm: '',
+    name: '',
+    phone: '',
+    platforms: [],
+    connected: {},
+    _firebaseUser: null,
+    ...savedData,
+  });
+
+  const onChange = (key, value) => {
+    setData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const goNext = () => setStep(s => s + 1);
+  const goBack = () => setStep(s => s - 1);
+
+  // Sync with backend after Firebase user is created (happens in StepVerify)
+  useEffect(() => {
+    if (step === 3 && auth.currentUser) {
+      syncWithBackend(auth.currentUser).catch(() => {});
+    }
+  }, [step]);
+
+  const handleFinish = async () => {
+    // Save final onboarding step to backend
+    try {
+      await api.post('/onboarding/finalise', {
+        confirmedNiches: [],
+        confirmedArchetype: '',
+        platform: data.platforms[0] || 'instagram',
+        followerRange: 'Under 1K',
+      }).catch(() => {});
+    } catch {}
+    // Clear session storage
+    sessionStorage.removeItem('aria_register_step');
+    sessionStorage.removeItem('aria_register_data');
+    navigate('/dashboard');
+  };
+
+  const totalSteps = STEPS.length;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-8 px-4 pb-12">
+      {/* Logo */}
+      <Link to="/" className="font-heading text-2xl text-primary mb-8">ARIA</Link>
+
+      {/* Progress bar */}
+      <div className="w-full max-w-sm mb-6">
+        <div className="flex justify-between mb-2">
+          {STEPS.map((s, i) => (
+            <div
+              key={s.id}
+              className={`flex-1 h-1 rounded-full mx-0.5 transition-all duration-300 ${
+                i <= step ? 'bg-primary' : 'bg-muted'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between">
+          {STEPS.map((s, i) => (
+            <p key={s.id} className={`text-[9px] font-body transition-colors ${i === step ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+              {s.label}
+            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="w-full max-w-sm">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          >
+            {step === 0 && <StepCredentials data={data} onChange={onChange} onNext={goNext} />}
+            {step === 1 && <StepDetails     data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
+            {step === 2 && <StepVerify      data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
+            {step === 3 && <StepPlatforms   data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
+            {step === 4 && <StepConnect     data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
+            {step === 5 && <StepAnalysis    data={data} onFinish={handleFinish} />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
