@@ -45,6 +45,14 @@ function persistRegisterProgress(stepIndex, formData) {
 }
 
 // ── Reusable input ────────────────────────────────────────────────────────────
+/**
+ * @param {import('react').ComponentPropsWithoutRef<'input'> & {
+ *   icon?: import('react').ElementType<{ className?: string; size?: string | number }>;
+ *   label?: string;
+ *   hint?: string;
+ *   error?: string;
+ * }} props
+ */
 function Input({ icon: Icon, label, hint, error, ...props }) {
   return (
     <div>
@@ -79,7 +87,24 @@ function ErrorBanner({ message }) {
 }
 
 // ── Nav buttons ───────────────────────────────────────────────────────────────
-function NavButtons({ onBack, onNext, nextLabel = 'Continue', loading, disabled, showBack = true }) {
+/**
+ * @param {{
+ *   onBack?: () => void;
+ *   onNext: () => void;
+ *   nextLabel?: string;
+ *   loading?: boolean;
+ *   disabled?: boolean;
+ *   showBack?: boolean;
+ * }} props
+ */
+function NavButtons({
+  onBack,
+  onNext,
+  nextLabel = 'Continue',
+  loading = false,
+  disabled = false,
+  showBack = true,
+}) {
   return (
     <div className={`flex gap-3 mt-6 ${showBack ? 'justify-between' : 'justify-end'}`}>
       {showBack && (
