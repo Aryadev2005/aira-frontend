@@ -48,150 +48,108 @@ function ConnectedAccounts() {
   const { data: statusData, isLoading, refetch } = useIntegrationStatus();
   const disconnectMutation = useDisconnectPlatform();
   const connections = statusData?.data?.connections || {};
-  const [connectError, setConnectError] = useState('');
-  const [connectSuccess, setConnectSuccess] = useState('');
-  const [connecting, setConnecting] = useState(null);
+
+  const [connectError, setConnectError]       = useState('');
+  const [connectSuccess, setConnectSuccess]   = useState('');
+  const [connecting, setConnecting]           = useState(null);
   const [instagramHandle, setInstagramHandle] = useState('');
+  const [showIgInput, setShowIgInput]         = useState(false);
   const [showBrainRedirect, setShowBrainRedirect] = useState(false);
-  const [showInstagramInput, setShowInstagramInput] = useState(true);
+  const [analysisResult, setAnalysisResult]   = useState(null);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const successPlatform = params.get('oauth_success');
-    const errorParam = params.get('oauth_error');
-
-    if (!successPlatform && !errorParam) return;
-
-    window.history.replaceState({}, '', window.location.pathname);
-
-    if (successPlatform) {
-      refetch();
-      setConnectError('');
-      const h = params.get('handle');
-      const integrationFlow = params.get('integration_flow') || 'settings';
-      try {
-        sessionStorage.setItem(
-          'integration_oauth_last',
-          JSON.stringify({
-            ok: true,
-            platform: successPlatform,
-            handle: h,
-            integration_flow: integrationFlow,
-            t: Date.now(),
-          }),
-        );
-      } catch {
-        /* ignore */
-      }
-      const label = successPlatform === 'instagram' ? 'Instagram' : 'YouTube';
-      setConnectSuccess(
-        h ? `${label} connected · @${decodeURIComponent(h)}` : `${label} connected`,
-      );
-    }
-    if (errorParam) {
-      const integrationFlow = params.get('integration_flow') || 'settings';
-      try {
-        sessionStorage.setItem(
-          'integration_oauth_last',
-          JSON.stringify({
-            ok: false,
-            error: errorParam,
-            integration_flow: integrationFlow,
-            t: Date.now(),
-          }),
-        );
-      } catch {
-        /* ignore */
-      }
-      setConnectError(OAUTH_ERROR_MESSAGES[errorParam] || 'Connection failed. Please try again.');
-    }
-  }, [refetch]);
-
-  const handleConnect = async (platform) => {
-    setConnectError('');
-    setConnectSuccess('');
-    setConnecting(platform);
-
-    if (platform === 'instagram') {
-      const cleaned = instagramHandle.replace(/^@/, '').trim();
-      if (!cleaned) {
-        setConnectError('Please enter your Instagram username');
-        return;
-      }
-
-      setConnecting('instagram');
-      setConnectError('');
-
-      try {
-        const res = await api.post('/integrations/instagram/connect-by-handle', {
-          handle: cleaned,
-          flow: 'dashboard',
-        });
-
-        if (res.data?.success) {
-          setConnectSuccess(`Instagram connected · @${res.data.handle} — ARIA is analysing your profile...`);
-          setShowInstagramInput(false);
-          setInstagramHandle('');
-          refetch();
-
-          // Poll for niche detection — then redirect to ARIA Brain
-          let attempts = 0;
-          const poll = async () => {
-            attempts++;
-            try {
-              const profile = await api.get('/users/me');
-              const data = profile?.data || profile;
-
-              if (data?.niches?.length > 0 && data?.archetype) {
-                // Analysis done — update banner and show redirect button
-                setConnectSuccess(`✨ ARIA detected your niche: ${data.niches[0]} · ${data.archetype_label || data.archetype}`);
-                setShowBrainRedirect(true); // show the "Open ARIA Brain" button
-                refetch();
-                return;
-              }
-            } catch { /* non-fatal */ }
-
-            if (attempts < 12) setTimeout(poll, 5000);
-            else setConnectSuccess(`Instagram connected · @${res.data.handle} — Analysis running, check ARIA Brain in a moment.`);
-          };
-
-          setTimeout(poll, 4000);
-        } else {
-          throw new Error(res.data?.message || 'Connection failed');
-        }
-      } catch (err) {
-        const errCode = err?.response?.data?.error;
-        const messages = {
-          instagram_private:   'Your account is private. Please switch to a public account.',
-          instagram_not_found: 'Username not found. Please check and try again.',
-          instagram_failed:    'Connection failed. Please try again.',
-        };
-        setConnectError(messages[errCode] || err.message || 'Instagram connection failed');
-      } finally {
-        setConnecting(null);
-      }
+  // ── Connect Instagram by username ──────────────────────────────────────
+  const handleConnectInstagram = async () => {
+    const cleaned = instagramHandle.replace(/^@/, '').trim();
+    if (!cleaned) {
+      setConnectError('Please enter your Instagram username');
       return;
     }
 
-    // YouTube: OAuth redirect
+    setConnecting('instagram');
+    setConnectError('');
+    setConnectSuccess('');
+    setShowBrainRedirect(false);
+
     try {
-      const res = await api.get(`/integrations/${platform}/auth-url?flow=settings`);
-      const url = res?.data?.url || res?.url;
-      if (!url) throw new Error('No authorization URL returned. Try again later.');
-      window.location.href = url;
-    } catch (e) {
-      const msg =
-        e?.message ||
-        e?.data?.message ||
-        `Could not start ${platform} connection. Check your network and try again.`;
-      setConnectError(typeof msg === 'string' ? msg : 'Connection failed.');
+      const res = await api.post('/integrations/instagram/connect-by-handle', {
+        handle: cleaned,
+        flow: 'dashboard',
+      });
+
+      if (res?.data?.success || res?.success) {
+        const handle = res?.data?.handle || res?.handle || cleaned;
+        setConnectSuccess(`Analysing @${handle}... this takes ~30 seconds`);
+        setShowIgInput(false);
+        setInstagramHandle('');
+        refetch();
+
+        // Poll every 5s for up to 60s
+        let attempts = 0;
+        const poll = async () => {
+          attempts++;
+          try {
+            const profile = await api.get('/users/me');
+            const data = profile?.data || profile;
+            if (data?.niches?.length > 0 && data?.archetype) {
+              const niche     = Array.isArray(data.niches) ? data.niches[0] : data.niches;
+              const archetype = data.archetype_label || data.archetype;
+              setConnectSuccess(`✨ Niche detected: ${niche} · ${archetype}`);
+              setAnalysisResult({ niche, archetype });
+              setShowBrainRedirect(true);
+              refetch();
+              return;
+            }
+          } catch { /* non-fatal */ }
+          if (attempts < 12) setTimeout(poll, 5000);
+          else {
+            setConnectSuccess(`Connected @${handle} — analysis still running, check ARIA Brain`);
+            setShowBrainRedirect(true);
+          }
+        };
+        setTimeout(poll, 5000);
+      } else {
+        throw new Error('Connection failed');
+      }
+    } catch (err) {
+      const errCode = err?.response?.data?.error || err?.data?.error;
+      const messages = {
+        instagram_private:   'Your account is private. Switch to public first.',
+        instagram_not_found: 'Username not found. Check and try again.',
+        instagram_failed:    'Connection failed. Please try again.',
+        invalid_handle:      'Invalid username format.',
+      };
+      setConnectError(messages[errCode] || err?.message || 'Instagram connection failed');
+    } finally {
       setConnecting(null);
     }
   };
 
+  // ── Connect YouTube (OAuth) ────────────────────────────────────────────
+  const handleConnectYouTube = async () => {
+    setConnectError('');
+    setConnectSuccess('');
+    setConnecting('youtube');
+    try {
+      const res = await api.get('/integrations/youtube/auth-url?flow=settings');
+      const url = res?.data?.url || res?.url;
+      if (!url) throw new Error('No auth URL returned');
+      window.location.href = url;
+    } catch (e) {
+      setConnectError(e?.message || 'Could not start YouTube connection');
+      setConnecting(null);
+    }
+  };
+
+  // ── Disconnect ─────────────────────────────────────────────────────────
   const handleDisconnect = (platform) => {
     if (window.confirm(`Disconnect ${platform}? You can reconnect at any time.`)) {
-      disconnectMutation.mutate(platform, { onSuccess: () => refetch() });
+      disconnectMutation.mutate(platform, {
+        onSuccess: () => {
+          refetch();
+          setConnectSuccess('');
+          setShowBrainRedirect(false);
+        },
+      });
     }
   };
 
@@ -207,17 +165,29 @@ function ConnectedAccounts() {
 
   return (
     <div className="space-y-3">
+
+      {/* ── Success banner ── */}
       {connectSuccess && (
         <div className="flex items-start gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5">
-          <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
           <p className="text-xs font-body text-emerald-800 dark:text-emerald-200">{connectSuccess}</p>
         </div>
       )}
+
+      {/* ── Error banner ── */}
+      {connectError && (
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5">
+          <AlertTriangle size={15} className="text-destructive shrink-0 mt-0.5" />
+          <p className="text-xs font-body text-destructive">{connectError}</p>
+        </div>
+      )}
+
+      {/* ── ARIA Brain redirect card ── */}
       {showBrainRedirect && (
         <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
           <div>
             <p className="text-sm font-body font-semibold text-foreground">
-              🎯 Your niche analysis is ready
+              🎯 Your analysis is ready
             </p>
             <p className="text-xs text-muted-foreground font-body mt-0.5">
               ARIA has analysed your profile. See your full breakdown.
@@ -232,121 +202,155 @@ function ConnectedAccounts() {
           </button>
         </div>
       )}
-      {connectError && (
-        <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5">
-          <AlertTriangle size={15} className="text-destructive shrink-0 mt-0.5" />
-          <p className="text-xs font-body text-destructive">{connectError}</p>
-        </div>
-      )}
-      {platforms.map(({ id, label, Icon: PlatformIcon, gradient, bg, description }) => {
-        const conn = connections[id];
-        const isConnected = conn?.connected;
-        const isExpired = conn?.tokenExpired;
-        const isBusy = connecting === id;
-        const isInstagram = id === 'instagram';
 
+      {/* ── Instagram card ── */}
+      {(() => {
+        const conn = connections['instagram'];
+        const isConnected = conn?.connected;
         return (
-          <div
-            key={id}
-            className={`flex flex-col p-4 rounded-xl border gap-3 ${
-              isConnected ? `${bg} border-border` : 'bg-card border-border'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}
-                >
-                  <PlatformIcon size={20} className="text-white" />
+          <div className={`rounded-xl border p-4 space-y-3 ${isConnected ? 'bg-purple-500/10 border-border' : 'bg-card border-border'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                  <Instagram size={20} className="text-white" />
                 </div>
-                <div className="min-w-0">
-                  <p className="font-body font-semibold text-foreground">{label}</p>
-                  {isConnected && !isExpired ? (
-                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                      <CheckCircle2 size={12} className="inline text-green-500 shrink-0" />
-                      <span className="truncate">
-                        @{conn.handle} · Connected
-                      </span>
-                    </p>
-                  ) : isExpired ? (
-                    <p className="text-xs text-amber-500 truncate flex items-center gap-1 mt-0.5">
-                      <AlertTriangle size={12} className="inline shrink-0" />
-                      @{conn.handle} · Token expired — reconnect
+                <div>
+                  <p className="font-body font-semibold text-foreground">Instagram</p>
+                  {isConnected ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 size={12} className="text-green-500" />
+                      @{conn.handle} · Connected
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Reels analytics, niche detection, and engagement insights
+                    </p>
                   )}
                 </div>
               </div>
 
-              {isConnected && !isExpired ? (
+              {isConnected ? (
                 <button
                   type="button"
-                  id={`disconnect-${id}`}
-                  onClick={() => handleDisconnect(id)}
+                  onClick={() => handleDisconnect('instagram')}
                   disabled={disconnectMutation.isPending}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 font-body font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 font-body font-medium transition-colors disabled:opacity-50"
                 >
                   <XCircle size={14} />
                   Disconnect
                 </button>
-              ) : !isInstagram ? (
-                // YouTube — OAuth button
+              ) : (
                 <button
                   type="button"
-                  id={`connect-${id}`}
-                  onClick={() => handleConnect(id)}
-                  disabled={isBusy || disconnectMutation.isPending}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  onClick={() => { setShowIgInput(v => !v); setConnectError(''); }}
+                  className="flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors"
                 >
-                  {isBusy ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Opening…
-                    </>
-                  ) : isExpired ? (
-                    'Reconnect'
-                  ) : (
-                    'Connect'
-                  )}
+                  Connect
                 </button>
-              ) : null}
+              )}
             </div>
 
-            {/* Instagram: username input (shown when not connected or expired) */}
-            {isInstagram && (!isConnected || isExpired) && showInstagramInput && (
-              <div className="flex gap-2">
+            {/* Username input — shown when not connected and toggle is open */}
+            {!isConnected && showIgInput && (
+              <div className="space-y-2">
                 <input
                   type="text"
-                  id="connect-instagram-input"
-                  placeholder="@yourusername"
+                  placeholder="your_instagram_username"
                   value={instagramHandle}
-                  onChange={(e) => setInstagramHandle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConnect('instagram')}
-                  disabled={isBusy || disconnectMutation.isPending}
-                  className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:opacity-50"
+                  onChange={(e) => setInstagramHandle(e.target.value.replace(/^@/, ''))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConnectInstagram()}
+                  autoFocus
+                  disabled={connecting === 'instagram'}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-body placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
                 />
-                <button
-                  type="button"
-                  id="connect-instagram"
-                  onClick={() => handleConnect('instagram')}
-                  disabled={isBusy || !instagramHandle.trim() || disconnectMutation.isPending}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {isBusy ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Connecting…
-                    </>
-                  ) : (
-                    isExpired ? 'Reconnect' : 'Connect'
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleConnectInstagram}
+                    disabled={connecting === 'instagram' || !instagramHandle.trim()}
+                    className="flex-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-body font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {connecting === 'instagram' ? (
+                      <><Loader2 size={12} className="animate-spin" /> Connecting...</>
+                    ) : (
+                      'Analyse My Instagram'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowIgInput(false); setInstagramHandle(''); setConnectError(''); }}
+                    className="px-3 py-2 rounded-lg border border-border text-xs font-body text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground font-body text-center">
+                  🔒 Public profile only — no login or password needed
+                </p>
               </div>
             )}
           </div>
         );
-      })}
+      })()}
+
+      {/* ── YouTube card ── */}
+      {(() => {
+        const conn = connections['youtube'];
+        const isConnected = conn?.connected;
+        const isExpired = conn?.tokenExpired;
+        const isBusy = connecting === 'youtube';
+        return (
+          <div className={`flex items-center justify-between p-4 rounded-xl border gap-4 ${isConnected ? 'bg-red-500/10 border-border' : 'bg-card border-border'}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-400 flex items-center justify-center shrink-0">
+                <Youtube size={20} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-body font-semibold text-foreground">YouTube</p>
+                {isConnected && !isExpired ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <CheckCircle2 size={12} className="text-green-500" />
+                    @{conn.handle} · Connected
+                  </p>
+                ) : isExpired ? (
+                  <p className="text-xs text-amber-500 flex items-center gap-1 mt-0.5">
+                    <AlertTriangle size={12} />
+                    @{conn.handle} · Token expired — reconnect
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Channel analytics, video trends, and subscriber insights
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {isConnected && !isExpired ? (
+              <button
+                type="button"
+                onClick={() => handleDisconnect('youtube')}
+                disabled={disconnectMutation.isPending}
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 font-body font-medium transition-colors disabled:opacity-50"
+              >
+                <XCircle size={14} />
+                Disconnect
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectYouTube}
+                disabled={isBusy || disconnectMutation.isPending}
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isBusy ? (
+                  <><Loader2 size={12} className="animate-spin" /> Opening…</>
+                ) : isExpired ? 'Reconnect' : 'Connect'}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
