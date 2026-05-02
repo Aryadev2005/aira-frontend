@@ -140,8 +140,8 @@ export default function Onboarding() {
       // Save follower range first
       await api.put("/users/onboarding", { followerRange });
 
-      // Getting auth URL — api utility will handle token refresh if needed
-      const res = await api.get("/integrations/instagram/auth-url");
+      // Getting auth URL — pass flow=onboarding
+      const res = await api.get("/integrations/instagram/auth-url?flow=onboarding");
 
       if (res.data?.url) {
         window.location.href = res.data.url;
@@ -166,8 +166,8 @@ export default function Onboarding() {
       // Save follower range first
       await api.put("/users/onboarding", { followerRange });
 
-      // Getting auth URL — api utility will handle token refresh if needed
-      const res = await api.get("/integrations/youtube/auth-url");
+      // Getting auth URL — pass flow=onboarding
+      const res = await api.get("/integrations/youtube/auth-url?flow=onboarding");
 
       if (res.data?.url) {
         window.location.href = res.data.url;
