@@ -22,18 +22,21 @@ export async function apiRequest(path, options = {}) {
 
     try {
       const token = await user.getIdToken(forceRefresh);
+
+      const hasBody = options.body !== undefined && options.body !== null;
+
       const res = await fetch(`${BASE_URL}/api/v1${path}`, {
         ...options,
         headers: {
-          "Content-Type": "application/json",
+          // Only set Content-Type when sending a body
+          ...(hasBody ? { "Content-Type": "application/json" } : {}),
           Authorization: `Bearer ${token}`,
           ...(isNgrokUrl ? { "ngrok-skip-browser-warning": "true" } : {}),
           ...(options.headers || {}),
         },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        body: hasBody ? JSON.stringify(options.body) : undefined,
       });
 
-      // Handle 401 Unauthorized — likely an expired token
       if (res.status === 401 && !forceRefresh) {
         console.log("Token expired, retrying with force refresh...");
         return makeRequest(true);

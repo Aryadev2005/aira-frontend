@@ -52,6 +52,8 @@ function ConnectedAccounts() {
   const [connectSuccess, setConnectSuccess] = useState('');
   const [connecting, setConnecting] = useState(null);
   const [instagramHandle, setInstagramHandle] = useState('');
+  const [showBrainRedirect, setShowBrainRedirect] = useState(false);
+  const [showInstagramInput, setShowInstagramInput] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -111,24 +113,60 @@ function ConnectedAccounts() {
     setConnecting(platform);
 
     if (platform === 'instagram') {
-      // Instagram: direct username connect — no OAuth redirect
-      const cleanHandle = instagramHandle.replace(/^@/, '').trim();
-      if (!cleanHandle) {
-        setConnectError('Please enter your Instagram username.');
-        setConnecting(null);
+      const cleaned = instagramHandle.replace(/^@/, '').trim();
+      if (!cleaned) {
+        setConnectError('Please enter your Instagram username');
         return;
       }
+
+      setConnecting('instagram');
+      setConnectError('');
+
       try {
-        const res = await api.post('/integrations/instagram/connect-by-handle', { handle: cleanHandle });
-        const ok = res?.data?.connected || res?.connected;
-        if (!ok) throw new Error(res?.data?.message || 'Could not connect Instagram');
-        refetch();
-        setConnectSuccess(`Instagram connected · @${cleanHandle}`);
-        setInstagramHandle('');
-      } catch (e) {
-        setConnectError(
-          e?.response?.data?.message || e?.message || 'Could not connect Instagram. Please check your username.',
-        );
+        const res = await api.post('/integrations/instagram/connect-by-handle', {
+          handle: cleaned,
+          flow: 'dashboard',
+        });
+
+        if (res.data?.success) {
+          setConnectSuccess(`Instagram connected · @${res.data.handle} — ARIA is analysing your profile...`);
+          setShowInstagramInput(false);
+          setInstagramHandle('');
+          refetch();
+
+          // Poll for niche detection — then redirect to ARIA Brain
+          let attempts = 0;
+          const poll = async () => {
+            attempts++;
+            try {
+              const profile = await api.get('/users/me');
+              const data = profile?.data || profile;
+
+              if (data?.niches?.length > 0 && data?.archetype) {
+                // Analysis done — update banner and show redirect button
+                setConnectSuccess(`✨ ARIA detected your niche: ${data.niches[0]} · ${data.archetype_label || data.archetype}`);
+                setShowBrainRedirect(true); // show the "Open ARIA Brain" button
+                refetch();
+                return;
+              }
+            } catch { /* non-fatal */ }
+
+            if (attempts < 12) setTimeout(poll, 5000);
+            else setConnectSuccess(`Instagram connected · @${res.data.handle} — Analysis running, check ARIA Brain in a moment.`);
+          };
+
+          setTimeout(poll, 4000);
+        } else {
+          throw new Error(res.data?.message || 'Connection failed');
+        }
+      } catch (err) {
+        const errCode = err?.response?.data?.error;
+        const messages = {
+          instagram_private:   'Your account is private. Please switch to a public account.',
+          instagram_not_found: 'Username not found. Please check and try again.',
+          instagram_failed:    'Connection failed. Please try again.',
+        };
+        setConnectError(messages[errCode] || err.message || 'Instagram connection failed');
       } finally {
         setConnecting(null);
       }
@@ -173,6 +211,25 @@ function ConnectedAccounts() {
         <div className="flex items-start gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5">
           <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-xs font-body text-emerald-800 dark:text-emerald-200">{connectSuccess}</p>
+        </div>
+      )}
+      {showBrainRedirect && (
+        <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-body font-semibold text-foreground">
+              🎯 Your niche analysis is ready
+            </p>
+            <p className="text-xs text-muted-foreground font-body mt-0.5">
+              ARIA has analysed your profile. See your full breakdown.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.href = '/dashboard/brain'}
+            className="shrink-0 ml-4 px-4 py-2 rounded-xl bg-primary text-white text-xs font-body font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Open ARIA Brain →
+          </button>
         </div>
       )}
       {connectError && (
@@ -257,7 +314,7 @@ function ConnectedAccounts() {
             </div>
 
             {/* Instagram: username input (shown when not connected or expired) */}
-            {isInstagram && (!isConnected || isExpired) && (
+            {isInstagram && (!isConnected || isExpired) && showInstagramInput && (
               <div className="flex gap-2">
                 <input
                   type="text"

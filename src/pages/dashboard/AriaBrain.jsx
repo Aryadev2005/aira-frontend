@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { auth } from '@/lib/firebase';
 import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 const greetingMessage = {
   role: 'assistant',
@@ -114,8 +115,13 @@ export default function AriaBrain() {
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId] = useState(() => crypto.randomUUID());
-  const { dbUser } = useFirebaseAuth();
+  const { user, dbUser, syncWithBackend } = useFirebaseAuth();
   const chatEndRef = useRef(null);
+  const navigate = useNavigate();
+
+  const refreshUser = async () => {
+    if (user) await syncWithBackend(user);
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -130,6 +136,26 @@ export default function AriaBrain() {
     setStreamingText('');
 
     const useStream = !!import.meta.env.VITE_API_BASE_URL;
+
+    const checkConfirmation = async () => {
+      const confirmationPhrases = ['yes', 'correct', 'looks right', 'that\'s right', 'accurate', 'perfect', 'haan', 'bilkul'];
+      const userConfirmed = confirmationPhrases.some(p => 
+        userMessage.toLowerCase().includes(p)
+      );
+
+      if (userConfirmed) {
+        try {
+          await api.put('/users/confirm-niche');
+          // Show Discovery redirect after ARIA's response
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              role: 'system-ui',
+              content: 'niche-confirmed',
+            }]);
+          }, 1000);
+        } catch { /* non-fatal */ }
+      }
+    };
 
     if (useStream) {
       setIsStreaming(true);
@@ -164,6 +190,8 @@ export default function AriaBrain() {
           });
           setStreamingText('');
           setIsStreaming(false);
+          refreshUser(); // Check for confirmed niche
+          checkConfirmation();
         },
         // onError: fall back to non-streaming
         async () => {
@@ -181,6 +209,7 @@ export default function AriaBrain() {
               }
               return updated;
             });
+            checkConfirmation();
           } catch {
             setMessages((prev) => {
               const updated = [...prev];
@@ -192,6 +221,7 @@ export default function AriaBrain() {
             });
           } finally {
             setIsTyping(false);
+            refreshUser(); // Check for confirmed niche
           }
         }
       );
@@ -201,10 +231,12 @@ export default function AriaBrain() {
       try {
         const reply = await chatFallback(userMessage, sessionId, newMessages, dbUser);
         setMessages((prev) => [...prev, { role: 'assistant', content: reply, tools: [] }]);
+        checkConfirmation();
       } catch {
         setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.', tools: [] }]);
       } finally {
         setIsTyping(false);
+        refreshUser(); // Check for confirmed niche
       }
     }
   };
@@ -230,34 +262,64 @@ export default function AriaBrain() {
                   <span className="text-white text-xs font-bold">A</span>
                 </div>
               )}
-              <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-first' : ''}`}>
-                <div className={`rounded-2xl px-4 py-3 ${msg.role === 'user'
-                    ? 'bg-primary text-white'
-                    : 'bg-card border border-border text-foreground'
-                  }`}>
-                  {msg.role === 'user' ? (
-                    <p className="font-body text-sm">{msg.content}</p>
-                  ) : (
-                    <>
-                      <ReactMarkdown className="font-body text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground/80">
-                        {msg.content}
-                      </ReactMarkdown>
-                      {msg._streaming && !msg.content && (
-                        <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse rounded-sm ml-0.5" />
-                      )}
-                    </>
+              {msg.role === 'system-ui' && msg.content === 'niche-confirmed' ? (
+                <div className="flex-1 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 mx-4 my-2">
+                  <div>
+                    <p className="text-sm font-body font-semibold text-foreground">
+                      ✅ Niche confirmed
+                    </p>
+                    <p className="text-xs text-muted-foreground font-body mt-0.5">
+                      Ready to see trends personalised to your niche?
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/dashboard/discover')}
+                    className="shrink-0 ml-4 px-4 py-2 rounded-xl bg-primary text-white text-xs font-body font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Go to Discovery →
+                  </button>
+                </div>
+              ) : (
+                <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-first' : ''}`}>
+                  <div className={`rounded-2xl px-4 py-3 ${msg.role === 'user'
+                      ? 'bg-primary text-white'
+                      : 'bg-card border border-border text-foreground'
+                    }`}>
+                    {msg.role === 'user' ? (
+                      <p className="font-body text-sm">{msg.content}</p>
+                    ) : (
+                      <>
+                        <ReactMarkdown className="font-body text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground/80">
+                          {msg.content}
+                        </ReactMarkdown>
+                        {msg._streaming && !msg.content && (
+                          <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse rounded-sm ml-0.5" />
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {msg.role === 'assistant' && dbUser?.aria_confirmed_niche && i === messages.length - 1 && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      onClick={() => navigate('/dashboard/discover')}
+                      className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+                    >
+                      <Sparkles size={16} />
+                      Go to Discovery
+                    </motion.button>
+                  )}
+                  {msg.tools && msg.tools.length > 0 && (
+                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                      {msg.tools.map((tool) => (
+                        <span key={tool} className="px-2 py-0.5 rounded-pill bg-primary/10 text-primary text-[10px] font-body font-medium">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-                {msg.tools && msg.tools.length > 0 && (
-                  <div className="flex gap-1.5 mt-2 flex-wrap">
-                    {msg.tools.map((tool) => (
-                      <span key={tool} className="px-2 py-0.5 rounded-pill bg-primary/10 text-primary text-[10px] font-body font-medium">
-                        {tool}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
