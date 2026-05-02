@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { fetchSignInMethodsForEmail } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
@@ -28,17 +26,6 @@ export default function SignIn() {
 
     setLoading(true);
     try {
-      // ── Step 1: Check if account EXISTS before attempting sign-in ──────
-      const methods = await fetchSignInMethodsForEmail(auth, email.trim());
-
-      if (methods.length === 0) {
-        // No account found — block and redirect to register
-        setError('No account found with this email. Please sign up first.');
-        setLoading(false);
-        return;
-      }
-
-      // ── Step 2: Account exists — sign in ───────────────────────────────
       await signIn(email.trim(), password);
       navigate('/dashboard');
     } catch (err) {
@@ -151,7 +138,7 @@ function friendlyError(code) {
   const map = {
     'auth/wrong-password':        'Incorrect password. Please try again.',
     'auth/invalid-credential':    'Incorrect email or password.',
-    'auth/user-not-found':        'No account found with this email.',
+    'auth/user-not-found':        'No account found with this email. Please sign up first.',
     'auth/invalid-email':         'Please enter a valid email address.',
     'auth/too-many-requests':     'Too many attempts. Please try again in a few minutes.',
     'auth/user-disabled':         'This account has been disabled.',

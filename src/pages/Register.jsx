@@ -10,7 +10,6 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
-  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
@@ -31,6 +30,19 @@ const stepVariants = {
   center: { opacity: 1, x: 0  },
   exit:   { opacity: 0, x: -40},
 };
+
+const REGISTER_STEP_KEY = 'aria_register_step';
+const REGISTER_DATA_KEY = 'aria_register_data';
+
+/** Persist onboarding progress without passwords (sessionStorage). */
+function persistRegisterProgress(stepIndex, formData) {
+  const safe = { ...formData };
+  delete safe._firebaseUser;
+  delete safe.password;
+  delete safe.confirm;
+  sessionStorage.setItem(REGISTER_STEP_KEY, String(stepIndex));
+  sessionStorage.setItem(REGISTER_DATA_KEY, JSON.stringify(safe));
+}
 
 // ── Reusable input ────────────────────────────────────────────────────────────
 function Input({ icon: Icon, label, hint, error, ...props }) {
@@ -99,7 +111,7 @@ function NavButtons({ onBack, onNext, nextLabel = 'Continue', loading, disabled,
 function StepCredentials({ data, onChange, onNext }) {
   const [showPass, setShowPass]   = useState(false);
   const [showConf, setShowConf]   = useState(false);
-  const [errors, setErrors]       = useState({});
+  const [errors, setErrors]       = useState({ email: '', password: '', confirm: '' });
   const [loading, setLoading]     = useState(false);
   const [globalErr, setGlobalErr] = useState('');
 
@@ -119,14 +131,9 @@ function StepCredentials({ data, onChange, onNext }) {
     setLoading(true);
     setGlobalErr('');
     try {
-      const methods = await fetchSignInMethodsForEmail(auth, data.email.trim());
-      if (methods.length > 0) {
-        setGlobalErr('An account with this email already exists. Sign in instead.');
-        return;
-      }
+      // Do not rely on fetchSignInMethodsForEmail — enumeration protection can return no methods.
+      // Duplicate Firebase accounts surface when sending verification / creating user.
       onNext();
-    } catch {
-      setGlobalErr('Could not verify email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +202,7 @@ function StepCredentials({ data, onChange, onNext }) {
 // STEP 2 — Personal details
 // ════════════════════════════════════════════════════════════════════════════════
 function StepDetails({ data, onChange, onNext, onBack }) {
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({ name: '', phone: '' });
 
   const validate = () => {
     const e = {};
@@ -253,6 +260,7 @@ function StepDetails({ data, onChange, onNext, onBack }) {
 // STEP 3 — Email verification
 // ════════════════════════════════════════════════════════════════════════════════
 function StepVerify({ data, onChange, onNext, onBack }) {
+  const { syncWithBackend } = useFirebaseAuth();
   const [codeSent, setCodeSent]       = useState(false);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
@@ -265,16 +273,12 @@ function StepVerify({ data, onChange, onNext, onBack }) {
     return () => clearTimeout(t);
   }, [resendTimer]);
 
-  // Auto-advance if returning from email verification link
+  // Same browser: Firebase session survives reload — show "check inbox" if account already exists.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('verified') === 'true') {
-      checkEmailVerified();
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  // checkEmailVerified is stable — safe to omit from deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const u = auth.currentUser;
+    const email = data.email?.trim().toLowerCase();
+    if (u?.email?.toLowerCase() === email && email) setCodeSent(true);
+  }, [data.email]);
 
   const sendEmailCode = async () => {
     setLoading(true);
@@ -293,6 +297,8 @@ function StepVerify({ data, onChange, onNext, onBack }) {
 
       // FIX: use onChange instead of mutating data directly
       onChange('_firebaseUser', cred.user);
+      await syncWithBackend(cred.user, { name: data.name, phone: data.phone });
+      persistRegisterProgress(2, data);
       setCodeSent(true);
       setResendTimer(60);
     } catch (err) {
@@ -317,6 +323,8 @@ function StepVerify({ data, onChange, onNext, onBack }) {
       }
       await user.reload();
       if (user.emailVerified) {
+        persistRegisterProgress(3, data);
+        await syncWithBackend(user, { name: data.name, phone: data.phone }).catch(() => {});
         onNext();
       } else {
         setError('Email not verified yet. Click the link in your inbox, then click Continue.');
@@ -529,13 +537,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
       const url = res?.data?.url || res?.url;
       if (!url) throw new Error('No auth URL returned');
 
-      // Save step so we can resume after redirect
-      sessionStorage.setItem('aria_register_step', '4');
-      sessionStorage.setItem('aria_register_data', JSON.stringify({
-        ...data,
-        _firebaseUser: null, // Don't serialize Firebase user object
-        _resumeFromOAuth: true,
-      }));
+      persistRegisterProgress(4, { ...data, _resumeFromOAuth: true });
       window.location.href = url;
     } catch (err) {
       setError(err.message || `Could not connect ${platform}. Please try again.`);
@@ -548,6 +550,14 @@ function StepConnect({ data, onChange, onNext, onBack }) {
   const handleNext = () => {
     if (!allConnected) { setError('Please connect all selected platforms to continue.'); return; }
     onChange('connected', connected);
+    onNext();
+  };
+
+  const handleSkip = () => {
+    setError('');
+    const partial = {};
+    platforms.forEach((p) => { partial[p] = connected[p] || null; });
+    onChange('connected', partial);
     onNext();
   };
 
@@ -624,12 +634,21 @@ function StepConnect({ data, onChange, onNext, onBack }) {
         })}
       </div>
 
-      <NavButtons
-        onBack={onBack}
-        onNext={handleNext}
-        nextLabel={allConnected ? 'Let ARIA analyse →' : 'Continue'}
-        disabled={!allConnected}
-      />
+      <div className="flex flex-col gap-3 mt-6">
+        <NavButtons
+          onBack={onBack}
+          onNext={handleNext}
+          nextLabel={allConnected ? 'Let ARIA analyse →' : 'Continue'}
+          disabled={!allConnected}
+        />
+        <button
+          type="button"
+          onClick={handleSkip}
+          className="w-full py-2.5 rounded-xl border border-border text-muted-foreground font-body text-sm font-medium hover:bg-card hover:text-foreground transition-colors"
+        >
+          Skip for now — connect later in Settings
+        </button>
+      </div>
     </div>
   );
 }
@@ -837,13 +856,18 @@ export default function Register() {
   const navigate             = useNavigate();
   const { syncWithBackend }  = useFirebaseAuth();
 
-  const savedStep = parseInt(sessionStorage.getItem('aria_register_step') || '0');
+  const savedStepRaw = sessionStorage.getItem(REGISTER_STEP_KEY);
+  const parsedSavedStep = savedStepRaw != null ? parseInt(savedStepRaw, 10) : NaN;
+  const initialStep =
+    Number.isFinite(parsedSavedStep) && parsedSavedStep >= 0 && parsedSavedStep <= 5
+      ? parsedSavedStep
+      : 0;
   const savedData = (() => {
-    try { return JSON.parse(sessionStorage.getItem('aria_register_data') || '{}'); }
+    try { return JSON.parse(sessionStorage.getItem(REGISTER_DATA_KEY) || '{}'); }
     catch { return {}; }
   })();
 
-  const [step, setStep] = useState(savedStep || 0);
+  const [step, setStep] = useState(initialStep);
   const [data, setData] = useState({
     email: '', password: '', confirm: '',
     name: '', phone: '',
@@ -856,14 +880,70 @@ export default function Register() {
   const goNext   = () => setStep(s => s + 1);
   const goBack   = () => setStep(s => s - 1);
 
+  const goNextFromCredentials = () => {
+    setData((prev) => {
+      persistRegisterProgress(1, prev);
+      return prev;
+    });
+    setStep(1);
+  };
+
+  const goNextFromDetails = () => {
+    setData((prev) => {
+      persistRegisterProgress(2, prev);
+      return prev;
+    });
+    setStep(2);
+  };
+
+  // Returning from Firebase email link: restore step from session and continue after verify.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') !== 'true') return;
+
+    let cancelled = false;
+
+    (async () => {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      if (cancelled) return;
+
+      const u = auth.currentUser;
+      try {
+        await u?.reload?.();
+      } catch {
+        /* non-fatal */
+      }
+
+      if (cancelled) return;
+
+      const raw = sessionStorage.getItem(REGISTER_STEP_KEY);
+      const saved = raw != null ? parseInt(raw, 10) : NaN;
+
+      if (u?.emailVerified) {
+        setStep(3);
+        setData((prev) => {
+          persistRegisterProgress(3, prev);
+          return prev;
+        });
+        await syncWithBackend(u, { name: data.name, phone: data.phone }).catch(() => {});
+      } else if (Number.isFinite(saved) && saved >= 2 && saved <= 5) {
+        setStep(saved);
+      }
+
+      window.history.replaceState({}, '', window.location.pathname);
+    })();
+
+    return () => { cancelled = true; };
+    // Run once on load when ?verified=true; initial `data` already includes session snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncWithBackend]);
+
   // Sync with backend when user reaches platform step (Firebase account now exists)
   useEffect(() => {
     if (step === 3 && auth.currentUser) {
-      syncWithBackend(auth.currentUser).catch(() => {});
+      syncWithBackend(auth.currentUser, { name: data.name, phone: data.phone }).catch(() => {});
     }
-  // syncWithBackend is stable — intentionally omitted from deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, data.name, data.phone, syncWithBackend]);
 
   const handleFinish = async () => {
     try {
@@ -920,8 +1000,8 @@ export default function Register() {
             exit="exit"
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
-            {step === 0 && <StepCredentials data={data} onChange={onChange} onNext={goNext} />}
-            {step === 1 && <StepDetails     data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
+            {step === 0 && <StepCredentials data={data} onChange={onChange} onNext={goNextFromCredentials} />}
+            {step === 1 && <StepDetails     data={data} onChange={onChange} onNext={goNextFromDetails} onBack={goBack} />}
             {step === 2 && <StepVerify      data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
             {step === 3 && <StepPlatforms   data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}
             {step === 4 && <StepConnect     data={data} onChange={onChange} onNext={goNext} onBack={goBack} />}

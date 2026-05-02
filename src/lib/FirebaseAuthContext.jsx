@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext, useCallback, useContext, useEffect, useState,
+} from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -7,12 +9,11 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
-  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import { api } from './api';
 
-const FirebaseAuthContext = createContext();
+const FirebaseAuthContext = createContext(null);
 
 export function FirebaseAuthProvider({ children }) {
   const [user, setUser]       = useState(null);
@@ -20,16 +21,20 @@ export function FirebaseAuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // Exchange Firebase token with backend — creates user in DB if new
-  const syncWithBackend = async (firebaseUser) => {
+  // Optional profile fields keep DB aligned with registration (name/phone) before other API calls.
+  const syncWithBackend = useCallback(async (firebaseUser, profile = {}) => {
     if (!firebaseUser) { setDbUser(null); return null; }
     try {
       const token = await firebaseUser.getIdToken(true);
+      const body = { idToken: token };
+      if (profile.name?.trim()) body.name = profile.name.trim();
+      if (profile.phone?.trim()) body.phone = profile.phone.trim();
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/auth/firebase`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken: token }),
+          body: JSON.stringify(body),
         }
       );
       if (res.ok) {
@@ -42,7 +47,7 @@ export function FirebaseAuthProvider({ children }) {
       console.error('Backend sync failed', e);
     }
     return null;
-  };
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -55,19 +60,11 @@ export function FirebaseAuthProvider({ children }) {
       setLoading(false);
     });
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [syncWithBackend]);
 
-  // ── Sign in — checks account exists first ─────────────────────────────────
+  // ── Sign in — do not gate on fetchSignInMethodsForEmail: with email enumeration
+  // protection enabled Firebase often returns no methods and blocks real users.
   const signIn = async (email, password) => {
-    // Check if account exists before attempting sign-in
-    // This gives a cleaner error than Firebase's generic auth/wrong-password
-    const methods = await fetchSignInMethodsForEmail(auth, email.trim());
-    if (methods.length === 0) {
-      const err = new Error('No account found with this email. Please sign up first.');
-      err.code = 'auth/user-not-found-custom';
-      throw err;
-    }
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
     await syncWithBackend(cred.user);
     return cred;

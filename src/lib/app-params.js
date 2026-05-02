@@ -20,14 +20,17 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 		window.history.replaceState({}, document.title, newUrl);
 	}
 	if (searchParam) {
-		storage.setItem(storageKey, searchParam);
+		(storage instanceof Map ? storage.set : storage.setItem).call(storage, storageKey, searchParam);
 		return searchParam;
 	}
 	if (defaultValue) {
-		storage.setItem(storageKey, defaultValue);
+		(storage instanceof Map ? storage.set : storage.setItem).call(storage, storageKey, defaultValue);
 		return defaultValue;
 	}
-	const storedValue = storage.getItem(storageKey);
+	const storedValue = (storage instanceof Map)
+		? storage.get(storageKey)
+		: storage.getItem(storageKey);
+
 	if (storedValue) {
 		return storedValue;
 	}
@@ -36,8 +39,8 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 
 const getAppParams = () => {
 	if (getAppParamValue("clear_access_token") === 'true') {
-		storage.removeItem('base44_access_token');
-		storage.removeItem('token');
+		(storage instanceof Map ? storage.delete : storage.removeItem).call(storage, 'base44_access_token');
+		(storage instanceof Map ? storage.delete : storage.removeItem).call(storage, 'token');
 	}
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
