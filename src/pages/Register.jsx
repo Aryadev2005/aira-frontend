@@ -45,6 +45,14 @@ function persistRegisterProgress(stepIndex, formData) {
 }
 
 // ── Reusable input ────────────────────────────────────────────────────────────
+/**
+ * @param {import('react').ComponentPropsWithoutRef<'input'> & {
+ *   icon?: import('react').ElementType<{ className?: string; size?: string | number }>;
+ *   label?: string;
+ *   hint?: string;
+ *   error?: string;
+ * }} props
+ */
 function Input({ icon: Icon, label, hint, error, ...props }) {
   return (
     <div>
@@ -79,7 +87,24 @@ function ErrorBanner({ message }) {
 }
 
 // ── Nav buttons ───────────────────────────────────────────────────────────────
-function NavButtons({ onBack, onNext, nextLabel = 'Continue', loading, disabled, showBack = true }) {
+/**
+ * @param {{
+ *   onBack?: () => void;
+ *   onNext: () => void;
+ *   nextLabel?: string;
+ *   loading?: boolean;
+ *   disabled?: boolean;
+ *   showBack?: boolean;
+ * }} props
+ */
+function NavButtons({
+  onBack,
+  onNext,
+  nextLabel = 'Continue',
+  loading = false,
+  disabled = false,
+  showBack = true,
+}) {
   return (
     <div className={`flex gap-3 mt-6 ${showBack ? 'justify-between' : 'justify-end'}`}>
       {showBack && (
@@ -549,7 +574,13 @@ function StepConnect({ data, onChange, onNext, onBack }) {
 
   const handleNext = () => {
     if (!allConnected) { setError('Please connect all selected platforms to continue.'); return; }
+    onChange('skipProfileAnalysis', false);
     onChange('connected', connected);
+    persistRegisterProgress(5, {
+      ...data,
+      skipProfileAnalysis: false,
+      connected,
+    });
     onNext();
   };
 
@@ -557,7 +588,13 @@ function StepConnect({ data, onChange, onNext, onBack }) {
     setError('');
     const partial = {};
     platforms.forEach((p) => { partial[p] = connected[p] || null; });
+    onChange('skipProfileAnalysis', true);
     onChange('connected', partial);
+    persistRegisterProgress(5, {
+      ...data,
+      skipProfileAnalysis: true,
+      connected: partial,
+    });
     onNext();
   };
 
@@ -657,7 +694,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
 // STEP 6 — ARIA analysis
 // ════════════════════════════════════════════════════════════════════════════════
 function StepAnalysis({ data, onFinish }) {
-  const [status, setStatus]         = useState('loading');
+  const [status, setStatus] = useState(() => data.skipProfileAnalysis ? 'skipped' : 'loading');
   const [analysis, setAnalysis]     = useState(null);
   const [progress, setProgress]     = useState(0);
   const [currentMsg, setCurrentMsg] = useState(0);
@@ -672,6 +709,8 @@ function StepAnalysis({ data, onFinish }) {
   ];
 
   useEffect(() => {
+    if (data.skipProfileAnalysis) return undefined;
+
     const progressInterval = setInterval(() => setProgress(p => Math.min(p + 8, 90)), 800);
     const msgInterval      = setInterval(() => setCurrentMsg(m => Math.min(m + 1, messages.length - 1)), 2500);
 
@@ -731,8 +770,32 @@ function StepAnalysis({ data, onFinish }) {
       clearInterval(progressInterval);
       clearInterval(msgInterval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data.skipProfileAnalysis]);
+
+  if (status === 'skipped') {
+    return (
+      <div className="text-center space-y-5 py-4">
+        <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+          <Sparkles size={28} className="text-primary" />
+        </div>
+        <div>
+          <h2 className="font-heading text-2xl text-foreground">You&apos;re all set</h2>
+          <p className="text-muted-foreground font-body text-sm mt-2 px-1">
+            We didn&apos;t run a profile analysis because no account was connected. Link Instagram or YouTube anytime in{' '}
+            <span className="text-foreground font-medium">Settings</span>
+            {' '}to unlock niche detection and personalised insights.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onFinish}
+          className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 mt-4"
+        >
+          Enter ARIA <ArrowRight size={16} />
+        </button>
+      </div>
+    );
+  }
 
   if (status === 'loading') {
     return (
@@ -771,7 +834,10 @@ function StepAnalysis({ data, onFinish }) {
   const emoji           = analysis?.aria_profile?.archetypeEmoji || '🎯';
   const archetypeLabel  = analysis?.aria_profile?.archetypeLabel || analysis?.archetype || 'Creator';
   const niches          = analysis?.niches || [];
-  const ariaMessage     = analysis?.aria_profile?.ariaMessage || 'Welcome to ARIA! Your account is being set up.';
+  const ariaMessage     = analysis?.aria_profile?.ariaMessage
+    ?? (niches.length > 0 || analysis?.archetype
+      ? 'Here’s what we found from your connected accounts.'
+      : 'We couldn’t finish analysing your profile yet. Try reconnecting from Settings, or explore ARIA — we’ll keep improving your insights.');
   const healthScore     = analysis?.aria_profile?.healthScore || analysis?.health_score;
   const strengths       = analysis?.aria_profile?.strengths || [];
   const topOpportunity  = analysis?.aria_profile?.topOpportunity || '';
@@ -872,6 +938,7 @@ export default function Register() {
     email: '', password: '', confirm: '',
     name: '', phone: '',
     platforms: [], connected: {},
+    skipProfileAnalysis: false,
     _firebaseUser: null,
     ...savedData,
   });

@@ -13,7 +13,7 @@ const navItems = [
   { icon: Brain,       label: 'ARIA Brain',path: '/dashboard/brain' },
   { icon: BarChart3,   label: 'Video DNA', path: '/dashboard/video-dna' },
   { icon: User,        label: 'Profile',   path: '/dashboard/profile' },
-  { icon: Settings,    label: 'Settings',  path: '/dashboard/profile', state: { tab: 'settings' } },
+  { icon: Settings,    label: 'Settings',  path: '/dashboard/settings' },
 ];
 
 export default function Sidebar() {
@@ -29,7 +29,7 @@ export default function Sidebar() {
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
-    return location.pathname.startsWith(path);
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   return (
@@ -67,9 +67,8 @@ export default function Sidebar() {
               <Link
                 key={item.label}
                 to={item.path}
-                state={item.state}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-all ${
-                  isActive(item.path) && !item.state
+                  isActive(item.path)
                     ? 'bg-sidebar-primary/10 text-sidebar-primary font-semibold'
                     : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent'
                 }`}
@@ -93,8 +92,7 @@ export default function Sidebar() {
                 Unlimited trends, AI tools & brand alerts
               </p>
               <Link
-                to="/dashboard/profile"
-                state={{ tab: 'settings' }}
+                to="/dashboard/settings"
                 className="block w-full py-2 bg-sidebar-primary text-white rounded-pill text-xs font-body font-semibold hover:bg-sidebar-primary/90 transition-colors text-center"
               >
                 ₹499/month

@@ -152,7 +152,7 @@ function ConnectedAccounts({ profile }) {
   const handleConnect = async (platform) => {
     try {
       setConnecting(platform);
-      const res = await api.get(`/integrations/${platform}/auth-url`);
+      const res = await api.get(`/integrations/${platform}/auth-url?flow=settings`);
       window.location.href = res.data.url;
     } catch (e) {
       console.error('Connect failed:', e);
@@ -281,6 +281,7 @@ function SettingsSection({ profile, onUpgrade }) {
   const isPro = profile?.is_pro || profile?.subscription_tier === 'pro';
 
   const settingsItems = [
+    { icon: LinkIcon, label: 'Social connections', path: '/dashboard/settings', description: 'Connect Instagram & YouTube' },
     { icon: Compass, label: 'My Trends', path: '/dashboard/discover', description: 'Trend radar for your niche' },
     { icon: History, label: 'Content History', path: '/dashboard/studio', description: 'Your past AI-generated content' },
     { icon: Bell, label: 'Notifications', path: '/dashboard', description: 'Manage alerts' },
@@ -427,8 +428,18 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-12 space-y-4 max-w-md mx-auto">
         <p className="text-muted-foreground font-body text-sm">Could not load profile.</p>
+        <p className="text-muted-foreground font-body text-xs">
+          You can still connect Instagram or YouTube and manage integrations from Settings.
+        </p>
+        <Link
+          to="/dashboard/settings"
+          className="inline-flex items-center gap-2 text-sm font-body font-semibold text-primary hover:underline"
+        >
+          <Settings size={14} />
+          Open Settings
+        </Link>
       </div>
     );
   }
