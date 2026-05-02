@@ -530,9 +530,9 @@ function StepConnect({ data, onChange, onNext, onBack }) {
   // Resume from OAuth redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const successPlatform = params.get('oauth_success');
+    const successPlatform = params.get('success');
     const handle          = params.get('handle');
-    const errorParam      = params.get('oauth_error');
+    const errorParam      = params.get('error');
 
     if (successPlatform) {
       setConnected(prev => ({ ...prev, [successPlatform]: handle || true }));
@@ -557,7 +557,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
     setError('');
     setConnecting(platform);
     try {
-      // FIX: api.get returns parsed JSON directly — response shape is { success, data: { url } }
+      // Pass flow=register
       const res = await api.get(`/integrations/${platform}/auth-url?flow=register`);
       const url = res?.data?.url || res?.url;
       if (!url) throw new Error('No auth URL returned');
