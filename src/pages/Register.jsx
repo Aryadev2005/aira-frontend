@@ -831,17 +831,17 @@ function StepAnalysis({ data, onFinish }) {
     );
   }
 
-  const emoji           = analysis?.aria_profile?.archetypeEmoji || '🎯';
-  const archetypeLabel  = analysis?.aria_profile?.archetypeLabel || analysis?.archetype || 'Creator';
+  const emoji           = analysis?.aria_last_analysis?.archetypeEmoji || '🎯';
+  const archetypeLabel  = analysis?.aria_last_analysis?.archetypeLabel || analysis?.archetype || 'Creator';
   const niches          = analysis?.niches || [];
-  const ariaMessage     = analysis?.aria_profile?.ariaMessage
+  const ariaMessage     = analysis?.aria_last_analysis?.ariaMessage
     ?? (niches.length > 0 || analysis?.archetype
       ? 'Here’s what we found from your connected accounts.'
       : 'We couldn’t finish analysing your profile yet. Try reconnecting from Settings, or explore ARIA — we’ll keep improving your insights.');
-  const healthScore     = analysis?.aria_profile?.healthScore || analysis?.health_score;
-  const strengths       = analysis?.aria_profile?.strengths || [];
-  const topOpportunity  = analysis?.aria_profile?.topOpportunity || '';
-  const estimatedEarning = analysis?.aria_profile?.estimatedMonthlyEarning || '';
+  const healthScore     = analysis?.aria_last_analysis?.healthScore || analysis?.health_score;
+  const strengths       = analysis?.aria_last_analysis?.strengths || [];
+  const topOpportunity  = analysis?.aria_last_analysis?.topOpportunity || '';
+  const estimatedEarning = analysis?.aria_last_analysis?.estimatedMonthlyEarning || '';
 
   return (
     <motion.div

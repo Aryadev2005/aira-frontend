@@ -87,9 +87,9 @@ export default function Onboarding() {
           setDetectedNiche({
             niches: profile.data.niches,
             archetype: profile.data.archetype,
-            archetypeLabel: profile.data.aria_profile?.archetypeLabel,
-            archetypeEmoji: profile.data.aria_profile?.archetypeEmoji,
-            ariaMessage: profile.data.aria_profile?.ariaMessage,
+            archetypeLabel: profile.data.aria_last_analysis?.archetypeLabel,
+            archetypeEmoji: profile.data.aria_last_analysis?.archetypeEmoji,
+            ariaMessage: profile.data.aria_last_analysis?.ariaMessage,
           });
           setAnalysingStatus("done");
 
@@ -141,7 +141,9 @@ export default function Onboarding() {
       await api.put("/users/onboarding", { followerRange });
 
       // Getting auth URL — pass flow=onboarding
-      const res = await api.get("/integrations/instagram/auth-url?flow=onboarding");
+      const res = await api.get(
+        "/integrations/instagram/auth-url?flow=onboarding",
+      );
 
       if (res.data?.url) {
         window.location.href = res.data.url;
@@ -167,7 +169,9 @@ export default function Onboarding() {
       await api.put("/users/onboarding", { followerRange });
 
       // Getting auth URL — pass flow=onboarding
-      const res = await api.get("/integrations/youtube/auth-url?flow=onboarding");
+      const res = await api.get(
+        "/integrations/youtube/auth-url?flow=onboarding",
+      );
 
       if (res.data?.url) {
         window.location.href = res.data.url;
