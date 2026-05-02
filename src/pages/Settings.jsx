@@ -39,11 +39,6 @@ const platforms = [
 ];
 
 const OAUTH_ERROR_MESSAGES = {
-  instagram_denied: 'Instagram access was denied. Please try again.',
-  instagram_not_professional:
-    'Your Instagram account must be a Professional account (Business or Creator). Go to Instagram Settings → Account → Switch to Professional Account.',
-  instagram_token_failed: 'Could not connect Instagram. Please try again.',
-  instagram_failed: 'Instagram connection failed. Please try again.',
   youtube_denied: 'YouTube access was denied. Please try again.',
   youtube_failed: 'YouTube connection failed. Please try again.',
   invalid_state: 'Session expired. Please try connecting again.',
@@ -56,6 +51,7 @@ function ConnectedAccounts() {
   const [connectError, setConnectError] = useState('');
   const [connectSuccess, setConnectSuccess] = useState('');
   const [connecting, setConnecting] = useState(null);
+  const [instagramHandle, setInstagramHandle] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -113,6 +109,33 @@ function ConnectedAccounts() {
     setConnectError('');
     setConnectSuccess('');
     setConnecting(platform);
+
+    if (platform === 'instagram') {
+      // Instagram: direct username connect — no OAuth redirect
+      const cleanHandle = instagramHandle.replace(/^@/, '').trim();
+      if (!cleanHandle) {
+        setConnectError('Please enter your Instagram username.');
+        setConnecting(null);
+        return;
+      }
+      try {
+        const res = await api.post('/integrations/instagram/connect-by-handle', { handle: cleanHandle });
+        const ok = res?.data?.connected || res?.connected;
+        if (!ok) throw new Error(res?.data?.message || 'Could not connect Instagram');
+        refetch();
+        setConnectSuccess(`Instagram connected · @${cleanHandle}`);
+        setInstagramHandle('');
+      } catch (e) {
+        setConnectError(
+          e?.response?.data?.message || e?.message || 'Could not connect Instagram. Please check your username.',
+        );
+      } finally {
+        setConnecting(null);
+      }
+      return;
+    }
+
+    // YouTube: OAuth redirect
     try {
       const res = await api.get(`/integrations/${platform}/auth-url?flow=settings`);
       const url = res?.data?.url || res?.url;
@@ -163,70 +186,106 @@ function ConnectedAccounts() {
         const isConnected = conn?.connected;
         const isExpired = conn?.tokenExpired;
         const isBusy = connecting === id;
+        const isInstagram = id === 'instagram';
 
         return (
           <div
             key={id}
-            className={`flex items-center justify-between p-4 rounded-xl border gap-4 ${
+            className={`flex flex-col p-4 rounded-xl border gap-3 ${
               isConnected ? `${bg} border-border` : 'bg-card border-border'
             }`}
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}
-              >
-                <PlatformIcon size={20} className="text-white" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}
+                >
+                  <PlatformIcon size={20} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-body font-semibold text-foreground">{label}</p>
+                  {isConnected && !isExpired ? (
+                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 size={12} className="inline text-green-500 shrink-0" />
+                      <span className="truncate">
+                        @{conn.handle} · Connected
+                      </span>
+                    </p>
+                  ) : isExpired ? (
+                    <p className="text-xs text-amber-500 truncate flex items-center gap-1 mt-0.5">
+                      <AlertTriangle size={12} className="inline shrink-0" />
+                      @{conn.handle} · Token expired — reconnect
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-body font-semibold text-foreground">{label}</p>
-                {isConnected && !isExpired ? (
-                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                    <CheckCircle2 size={12} className="inline text-green-500 shrink-0" />
-                    <span className="truncate">
-                      @{conn.handle} · Connected
-                    </span>
-                  </p>
-                ) : isExpired ? (
-                  <p className="text-xs text-amber-500 truncate flex items-center gap-1 mt-0.5">
-                    <AlertTriangle size={12} className="inline shrink-0" />
-                    @{conn.handle} · Token expired — reconnect
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-                )}
-              </div>
+
+              {isConnected && !isExpired ? (
+                <button
+                  type="button"
+                  id={`disconnect-${id}`}
+                  onClick={() => handleDisconnect(id)}
+                  disabled={disconnectMutation.isPending}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 font-body font-medium transition-colors disabled:opacity-50"
+                >
+                  <XCircle size={14} />
+                  Disconnect
+                </button>
+              ) : !isInstagram ? (
+                // YouTube — OAuth button
+                <button
+                  type="button"
+                  id={`connect-${id}`}
+                  onClick={() => handleConnect(id)}
+                  disabled={isBusy || disconnectMutation.isPending}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isBusy ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Opening…
+                    </>
+                  ) : isExpired ? (
+                    'Reconnect'
+                  ) : (
+                    'Connect'
+                  )}
+                </button>
+              ) : null}
             </div>
 
-            {isConnected && !isExpired ? (
-              <button
-                type="button"
-                id={`disconnect-${id}`}
-                onClick={() => handleDisconnect(id)}
-                disabled={disconnectMutation.isPending}
-                className="flex-shrink-0 flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 font-body font-medium transition-colors disabled:opacity-50"
-              >
-                <XCircle size={14} />
-                Disconnect
-              </button>
-            ) : (
-              <button
-                type="button"
-                id={`connect-${id}`}
-                onClick={() => handleConnect(id)}
-                disabled={isBusy || disconnectMutation.isPending}
-                className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {isBusy ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" />
-                    Opening…
-                  </>
-                ) : isExpired ? (
-                  'Reconnect'
-                ) : (
-                  'Connect'
-                )}
-              </button>
+            {/* Instagram: username input (shown when not connected or expired) */}
+            {isInstagram && (!isConnected || isExpired) && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="connect-instagram-input"
+                  placeholder="@yourusername"
+                  value={instagramHandle}
+                  onChange={(e) => setInstagramHandle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConnect('instagram')}
+                  disabled={isBusy || disconnectMutation.isPending}
+                  className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  id="connect-instagram"
+                  onClick={() => handleConnect('instagram')}
+                  disabled={isBusy || !instagramHandle.trim() || disconnectMutation.isPending}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isBusy ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Connecting…
+                    </>
+                  ) : (
+                    isExpired ? 'Reconnect' : 'Connect'
+                  )}
+                </button>
+              </div>
             )}
           </div>
         );

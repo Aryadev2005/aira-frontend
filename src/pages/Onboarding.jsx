@@ -28,6 +28,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [followerRange, setFollowerRange] = useState("");
   const [connectingPlatform, setConnectingPlatform] = useState(null);
+  const [instagramHandle, setInstagramHandle] = useState("");
   const [connectionStatus, setConnectionStatus] = useState({
     instagram: null,
     youtube: null,
@@ -60,14 +61,10 @@ export default function Onboarding() {
 
   const getErrorMessage = (code) => {
     const messages = {
-      instagram_denied: "Instagram access was denied. Please try again.",
-      instagram_not_professional:
-        "Your Instagram account must be a Professional account (Business or Creator). Go to Instagram Settings → Account → Switch to Professional Account — it's free!",
-      instagram_token_failed: "Could not connect Instagram. Please try again.",
-      instagram_failed: "Instagram connection failed. Please try again.",
       youtube_denied: "YouTube access was denied. Please try again.",
       youtube_failed: "YouTube connection failed. Please try again.",
-      invalid_state: "Session expired. Please try connecting again.",
+      invalid_handle: "Please enter a valid Instagram username.",
+      connection_failed: "Instagram connection failed. Please try again.",
     };
     return messages[code] || "Something went wrong. Please try again.";
   };
@@ -133,6 +130,11 @@ export default function Onboarding() {
   };
 
   const handleConnectInstagram = async () => {
+    if (!instagramHandle.trim()) {
+      setError("Please enter your Instagram username.");
+      return;
+    }
+    const cleanHandle = instagramHandle.replace(/^@/, "").trim();
     try {
       setConnectingPlatform("instagram");
       setError(null);
@@ -140,21 +142,27 @@ export default function Onboarding() {
       // Save follower range first
       await api.put("/users/onboarding", { followerRange });
 
-      // Getting auth URL — pass flow=onboarding
-      const res = await api.get(
-        "/integrations/instagram/auth-url?flow=onboarding",
-      );
+      // POST username directly — Apify handles the scraping
+      const res = await api.post("/integrations/instagram/connect-by-handle", {
+        handle: cleanHandle,
+      });
 
-      if (res.data?.url) {
-        window.location.href = res.data.url;
+      if (res.data?.connected || res.connected) {
+        setConnectionStatus((prev) => ({
+          ...prev,
+          instagram: { connected: true, handle: cleanHandle },
+        }));
+        setStep(2);
+        startNicheAnalysis("instagram", cleanHandle);
       } else {
-        throw new Error("Instagram configuration missing on server");
+        throw new Error(res.data?.message || "Could not connect Instagram");
       }
     } catch (err) {
       console.error("Instagram connection error:", err);
       setError(
-        err.message ||
-          "Could not initiate Instagram connection. Please try again.",
+        err.response?.data?.message ||
+          err.message ||
+          "Could not connect Instagram. Please check your username and try again.",
       );
       setConnectingPlatform(null);
     }
@@ -292,29 +300,41 @@ export default function Onboarding() {
                 </p>
 
                 <div className="space-y-3">
-                  {/* Instagram */}
-                  <button
-                    onClick={handleConnectInstagram}
-                    disabled={!!connectingPlatform}
-                    className="w-full flex items-center gap-4 px-6 py-5 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-2 border-purple-500/20 hover:border-purple-500/50 transition-all disabled:opacity-50"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl">
-                      📸
+                  {/* Instagram — username input */}
+                  <div className="rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-2 border-purple-500/20 p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl">
+                        📸
+                      </div>
+                      <div>
+                        <p className="font-body font-semibold text-foreground">Connect Instagram</p>
+                        <p className="font-body text-xs text-muted-foreground">Reels, Stories, Posts — ARIA reads your analytics</p>
+                      </div>
+                      {connectionStatus.instagram?.connected && (
+                        <span className="ml-auto text-green-500 text-xs font-body font-medium">✓ Connected</span>
+                      )}
                     </div>
-                    <div className="text-left">
-                      <p className="font-body font-semibold text-foreground">
-                        Connect Instagram
-                      </p>
-                      <p className="font-body text-xs text-muted-foreground">
-                        Reels, Stories, Posts — ARIA reads your analytics
-                      </p>
-                    </div>
-                    {connectingPlatform === "instagram" && (
-                      <div className="ml-auto animate-spin text-purple-500">
-                        ⟳
+                    {!connectionStatus.instagram?.connected && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="@yourusername"
+                          value={instagramHandle}
+                          onChange={(e) => setInstagramHandle(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleConnectInstagram()}
+                          disabled={!!connectingPlatform}
+                          className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:opacity-50"
+                        />
+                        <button
+                          onClick={handleConnectInstagram}
+                          disabled={!!connectingPlatform || !instagramHandle.trim()}
+                          className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-body font-semibold disabled:opacity-50 transition-opacity"
+                        >
+                          {connectingPlatform === "instagram" ? "⏳" : "Connect"}
+                        </button>
                       </div>
                     )}
-                  </button>
+                  </div>
 
                   {/* YouTube */}
                   <button

@@ -141,8 +141,16 @@ export const useIntegrationStatus = () =>
     refetchInterval: 60_000,
   });
 
-export const useInstagramAuthUrl = () =>
-  useMutation({ mutationFn: () => api.get('/integrations/instagram/auth-url') });
+export const useConnectInstagramByHandle = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (handle) => api.post('/integrations/instagram/connect-by-handle', { handle }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['integration-status'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+};
 
 export const useYoutubeAuthUrl = () =>
   useMutation({ mutationFn: () => api.get('/integrations/youtube/auth-url') });

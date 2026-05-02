@@ -540,28 +540,44 @@ function StepConnect({ data, onChange, onNext, onBack }) {
     }
     if (errorParam) {
       const messages = {
-        instagram_denied:           'Instagram access was denied. Please try again.',
-        instagram_not_professional: 'Your Instagram account must be a Professional account (Business or Creator). Go to Instagram Settings → Account → Switch to Professional Account — it\'s free!',
-        instagram_token_failed:     'Could not connect Instagram. Please try again.',
-        instagram_failed:           'Instagram connection failed. Please try again.',
-        youtube_denied:             'YouTube access was denied. Please try again.',
-        youtube_failed:             'YouTube connection failed. Please try again.',
-        invalid_state:              'Session expired. Please try connecting again.',
+        youtube_denied: 'YouTube access was denied. Please try again.',
+        youtube_failed: 'YouTube connection failed. Please try again.',
+        invalid_state:  'Session expired. Please try connecting again.',
       };
       setError(messages[errorParam] || 'Connection failed. Please try again.');
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
 
+  const [instagramHandle, setInstagramHandle] = useState('');
+
   const handleConnect = async (platform) => {
     setError('');
+
+    if (platform === 'instagram') {
+      // Instagram: direct username connect — no OAuth redirect
+      const cleanHandle = instagramHandle.replace(/^@/, '').trim();
+      if (!cleanHandle) { setError('Please enter your Instagram username.'); return; }
+      setConnecting('instagram');
+      try {
+        const res = await api.post('/integrations/instagram/connect-by-handle', { handle: cleanHandle });
+        const ok = res?.data?.connected || res?.connected;
+        if (!ok) throw new Error(res?.data?.message || 'Could not connect Instagram');
+        setConnected(prev => ({ ...prev, instagram: cleanHandle }));
+      } catch (err) {
+        setError(err.response?.data?.message || err.message || 'Could not connect Instagram. Please check your username.');
+      } finally {
+        setConnecting(null);
+      }
+      return;
+    }
+
+    // YouTube: OAuth redirect
     setConnecting(platform);
     try {
-      // Pass flow=register
       const res = await api.get(`/integrations/${platform}/auth-url?flow=register`);
       const url = res?.data?.url || res?.url;
       if (!url) throw new Error('No auth URL returned');
-
       persistRegisterProgress(4, { ...data, _resumeFromOAuth: true });
       window.location.href = url;
     } catch (err) {
@@ -630,6 +646,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
           const isConnected  = !!connected[platform];
           const isConnecting = connecting === platform;
           const Icon = cfg.icon;
+          const isInstagram = platform === 'instagram';
 
           return (
             <div
@@ -653,7 +670,8 @@ function StepConnect({ data, onChange, onNext, onBack }) {
                     <p className="font-body text-xs text-muted-foreground mt-0.5 truncate">{cfg.sub}</p>
                   )}
                 </div>
-                {!isConnected && (
+                {/* YouTube: standard OAuth connect button */}
+                {!isInstagram && !isConnected && (
                   <button
                     type="button"
                     onClick={() => handleConnect(platform)}
@@ -666,6 +684,30 @@ function StepConnect({ data, onChange, onNext, onBack }) {
                   </button>
                 )}
               </div>
+              {/* Instagram: username input row */}
+              {isInstagram && !isConnected && (
+                <div className="flex gap-2 mt-3">
+                  <input
+                    type="text"
+                    placeholder="@yourusername"
+                    value={instagramHandle}
+                    onChange={(e) => setInstagramHandle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleConnect('instagram')}
+                    disabled={!!connecting}
+                    className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleConnect('instagram')}
+                    disabled={!!connecting || !instagramHandle.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-xs font-body font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    {isConnecting
+                      ? <><Loader2 size={12} className="animate-spin" /> Connecting</>
+                      : <>Connect <ArrowRight size={12} /></>}
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
