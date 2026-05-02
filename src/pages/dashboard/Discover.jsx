@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RefreshCw, Sparkles, TrendingUp, Users } from 'lucide-react';
 import { niches } from '@/lib/mockData';
-import { useDiscoverIntelligence, useCompetitorMoves, useProfile, useOpportunities } from '@/hooks/useApi';
+import { useDiscoverIntelligence, useCompetitorMoves, useProfile } from '@/hooks/useApi';
 
 const badges = ['ALL', 'HOT', 'RISING', 'NEW'];
 const badgeStyles = {
@@ -46,10 +46,7 @@ export default function Discover() {
   const { data: competitorData } = useCompetitorMoves();
   // Backend returns: { data: { weeklyWinners: [], gaps: [] } }
   const weeklyWinners = competitorData?.data?.weeklyWinners || [];
-
-  // Opportunities from the dedicated endpoint
-  const { data: opportunitiesData } = useOpportunities();
-  const opportunities = opportunitiesData?.data?.opportunities || [];
+  const gaps = competitorData?.data?.gaps || [];
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -164,14 +161,14 @@ export default function Discover() {
         </motion.div>
       )}
 
-      {/* Opportunities section */}
-      {opportunities.length > 0 && (
+      {/* Opportunities section (from intelligence feed) */}
+      {trends.length > 0 && (
         <motion.div variants={item}>
           <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
             Opportunities
           </h3>
           <div className="space-y-3">
-            {opportunities.slice(0, 3).map((opp, idx) => (
+            {trends.slice(0, 3).map((opp, idx) => (
               <div key={opp.id || idx} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <TrendingUp size={18} className="text-primary" />
@@ -199,9 +196,32 @@ export default function Discover() {
                   <Users size={18} className="text-rising" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-body font-semibold text-sm text-foreground">{w.handle || w.creator}</p>
-                  <p className="text-muted-foreground font-body text-xs mt-0.5">{w.insight || w.gap}</p>
+                  <p className="font-body font-semibold text-sm text-foreground">
+                    {w.format || w.creator || 'Winning content format'}
+                  </p>
+                  <p className="text-muted-foreground font-body text-xs mt-0.5">
+                    {w.angle || w.whyItWorked || w.estimatedViews || 'High-performing competitor pattern'}
+                  </p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Competitor gaps */}
+      {gaps.length > 0 && (
+        <motion.div variants={item}>
+          <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
+            Competitor Gaps You Can Capture
+          </h3>
+          <div className="space-y-3">
+            {gaps.map((g, idx) => (
+              <div key={idx} className="bg-card border border-border rounded-xl p-4">
+                <p className="font-body text-sm text-foreground">{g.opportunity}</p>
+                <p className="text-muted-foreground font-body text-xs mt-1">
+                  {g.estimatedViews ? `Potential: ${g.estimatedViews}` : g.difficulty ? `Difficulty: ${g.difficulty}` : ''}
+                </p>
               </div>
             ))}
           </div>
@@ -217,7 +237,9 @@ export default function Discover() {
           <div className="space-y-3">
             {inlineCompetitorMoves.map((m, idx) => (
               <div key={idx} className="bg-card border border-border rounded-xl p-4">
-                <p className="font-body text-sm text-foreground">{m.move || m.title || m}</p>
+                <p className="font-body text-sm text-foreground">
+                  {m.move || m.title || m.description || m.gap || 'Competitor signal'}
+                </p>
               </div>
             ))}
           </div>
