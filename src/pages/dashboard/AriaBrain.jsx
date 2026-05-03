@@ -109,7 +109,7 @@ const chatFallback = async (message, sessionId, messages, dbUser) => {
 };
 
 export default function AriaBrain() {
-  const [messages, setMessages] = useState([greetingMessage]);
+  const [messages, setMessages] = useState([]);          // start empty, not hardcoded
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -118,6 +118,72 @@ export default function AriaBrain() {
   const { user, dbUser, syncWithBackend } = useFirebaseAuth();
   const chatEndRef = useRef(null);
   const navigate = useNavigate();
+
+  // ── Load greeting on mount ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const loadGreeting = async () => {
+      setIsTyping(true);
+      try {
+        // Check if user just came from Settings with fresh analysis
+        const freshAnalysis = sessionStorage.getItem('aria_fresh_analysis');
+        const entryScreen = freshAnalysis ? 'fresh_analysis' : 'direct';
+
+        const res = await api.get(
+          `/brain/greet?sessionId=${sessionId}&entryScreen=${entryScreen}`
+        );
+        const greeting = res?.data?.greeting || res?.greeting;
+
+        if (greeting) {
+          setMessages([{ role: 'assistant', content: greeting, tools: [] }]);
+        } else {
+          setMessages([{
+            role: 'assistant',
+            content: "Hey! I'm ARIA — your AI content strategist 🧠\n\nWhat are we working on today?",
+            tools: [],
+          }]);
+        }
+
+        // If fresh analysis, auto-trigger the full analysis message
+        if (freshAnalysis) {
+          sessionStorage.removeItem('aria_fresh_analysis');
+          setTimeout(() => autoSendAnalysis(), 1000);
+        }
+      } catch {
+        setMessages([{
+          role: 'assistant',
+          content: "Hey! I'm ARIA 🧠 What are we working on today?",
+          tools: [],
+        }]);
+      } finally {
+        setIsTyping(false);
+      }
+    };
+
+    loadGreeting();
+  }, [sessionId]);
+
+  // ── Auto-send analysis request after fresh Instagram connect ──────────
+  const autoSendAnalysis = async () => {
+    const analysisPrompt = "Show me my complete profile analysis — my top performing content, niche, archetype, and what I should focus on next.";
+
+    setMessages(prev => [...prev, { role: 'user', content: analysisPrompt, tools: [] }]);
+    setIsTyping(true);
+
+    try {
+      const data = await chatFallback(analysisPrompt, sessionId, [], dbUser);
+      setMessages(prev => [...prev, { role: 'assistant', content: data, tools: [] }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "Let me pull up your analysis — ask me 'what was my best post?' or 'what's my niche?' to get started!",
+        tools: [],
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   const refreshUser = async () => {
     if (user) await syncWithBackend(user);

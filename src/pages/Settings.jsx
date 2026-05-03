@@ -195,7 +195,10 @@ function ConnectedAccounts() {
           </div>
           <button
             type="button"
-            onClick={() => window.location.href = '/dashboard/brain'}
+            onClick={() => {
+              sessionStorage.setItem('aria_fresh_analysis', 'true');
+              window.location.href = '/dashboard/brain';
+            }}
             className="shrink-0 ml-4 px-4 py-2 rounded-xl bg-primary text-white text-xs font-body font-semibold hover:bg-primary/90 transition-colors"
           >
             Open ARIA Brain →
