@@ -21,8 +21,14 @@ const item = {
 
 // ── Niche Picker Modal ────────────────────────────────────────────────────────
 function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
-  const [input, setInput] = useState(currentNiche || '');
-  const [saving, setSaving]   = useState(false);
+  const [input, setInput]   = useState(currentNiche || '');
+  const [saving, setSaving] = useState(false);
+
+  const examples = [
+    'book reels', 'dance', 'mens fashion', 'fitness',
+    'food', 'bollywood edits', 'skincare', 'travel',
+    'startup', 'gaming', 'comedy', 'cricket',
+  ];
 
   const handleSave = async () => {
     if (!input.trim()) return;
@@ -37,17 +43,16 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !isFirstTime) onClose(); }}
+      style={{ background: 'rgba(0,0,0,0.6)' }}
+      onClick={e => { if (e.target === e.currentTarget && !isFirstTime) onClose(); }}
     >
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
+        initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0,  opacity: 1 }}
-        exit={{    y: 40, opacity: 0 }}
+        exit={{    y: 50, opacity: 0 }}
         transition={{ type: 'spring', damping: 28 }}
         className="w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-warm"
       >
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="font-heading text-lg text-foreground">
@@ -55,46 +60,47 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
             </h2>
             <p className="text-muted-foreground font-body text-sm mt-0.5">
               {isFirstTime
-                ? 'Tell ARIA your niche for personalized trend ideas'
-                : 'Update your niche — trends will refresh instantly'}
+                ? 'Tell ARIA your niche for personalized viral ideas'
+                : 'Update your niche — trends refresh instantly'}
             </p>
           </div>
           {!isFirstTime && (
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
-              <X size={18} className="text-muted-foreground" />
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <X size={16} className="text-muted-foreground" />
             </button>
           )}
         </div>
 
-        {/* Input */}
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          placeholder="e.g. book reels, dance, mens fashion, bollywood edits..."
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          placeholder="e.g. book reels, dance, mens fashion..."
           className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 mb-3"
           autoFocus
         />
 
-        {/* Examples */}
         <div className="flex flex-wrap gap-2 mb-5">
-          {['book reels', 'dance', 'mens fashion', 'fitness', 'food', 'bollywood edits', 'skincare', 'travel'].map((ex) => (
+          {examples.map(ex => (
             <button
               key={ex}
               onClick={() => setInput(ex)}
-              className="px-3 py-1 rounded-full bg-muted text-muted-foreground font-body text-xs hover:bg-primary/10 hover:text-primary transition-colors"
+              className={`px-3 py-1 rounded-full font-body text-xs transition-colors ${
+                input === ex
+                  ? 'bg-primary/15 text-primary border border-primary/30'
+                  : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
             >
               {ex}
             </button>
           ))}
         </div>
 
-        {/* Save button */}
         <button
           onClick={handleSave}
           disabled={!input.trim() || saving}
-          className="w-full py-3 rounded-xl bg-primary text-white font-body font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
+          className="w-full py-3 rounded-xl bg-primary text-white font-body font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {saving
             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
@@ -106,22 +112,22 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main Discover Component ───────────────────────────────────────────────────
 export default function Discover() {
-  const queryClient              = useQueryClient();
-  const [isRefreshing, setIsRefreshing]   = useState(false);
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing]     = useState(false);
   const [showNichePicker, setShowNichePicker] = useState(false);
 
-  const { data: profileData } = useProfile();
+  const { data: profileData, refetch: refetchProfile } = useProfile();
   const user      = profileData?.data;
   const userNiche = user?.niches?.[0] || null;
   const hasNiche  = !!userNiche;
 
-  // Update niche mutation
+  // Update niche permanently in DB
   const updateNiche = useMutation({
-    mutationFn: (niche) => api.put('/users/niche', { niche }),
+    mutationFn: niche => api.put('/users/niche', { niche }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await refetchProfile();
       await queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
       setShowNichePicker(false);
       // Force fresh fetch with new niche
@@ -140,7 +146,7 @@ export default function Discover() {
     queryFn:  () => api.get('/trends/viral-ideas'),
     staleTime: 1000 * 60 * 60 * 2,
     retry: 1,
-    enabled:  hasNiche, // Don't fetch if no niche yet
+    enabled: hasNiche,
   });
 
   const handleRefresh = async () => {
@@ -159,18 +165,14 @@ export default function Discover() {
   const topPick = ideas[0] || null;
   const rest    = ideas.slice(1);
 
-  // Show niche picker modal if no niche set
-  const isFirstTime = !hasNiche;
-
   return (
     <>
-      {/* Niche Picker Modal */}
       <AnimatePresence>
-        {(showNichePicker || isFirstTime) && (
+        {(showNichePicker || (!hasNiche && !isLoading)) && (
           <NichePickerModal
             currentNiche={userNiche}
-            isFirstTime={isFirstTime}
-            onSave={(niche) => updateNiche.mutateAsync(niche)}
+            isFirstTime={!hasNiche}
+            onSave={n => updateNiche.mutateAsync(n)}
             onClose={() => setShowNichePicker(false)}
           />
         )}
@@ -199,7 +201,7 @@ export default function Discover() {
           </button>
         </motion.div>
 
-        {/* Niche label — always visible with edit button */}
+        {/* Niche pill — always visible, always editable */}
         {hasNiche && (
           <motion.div variants={item}>
             <button
@@ -209,7 +211,7 @@ export default function Discover() {
               <span className="text-primary font-body text-xs font-semibold capitalize">
                 Trends for: {niche}
               </span>
-              <Pencil size={11} className="text-primary/60 group-hover:text-primary transition-colors" />
+              <Pencil size={10} className="text-primary/60 group-hover:text-primary transition-colors" />
             </button>
           </motion.div>
         )}
@@ -222,7 +224,7 @@ export default function Discover() {
           </motion.div>
         )}
 
-        {/* Loading */}
+        {/* Loading skeleton */}
         {(isLoading || isRefreshing) && (
           <div className="space-y-4">
             {[1, 2, 3, 4].map(i => (
@@ -234,7 +236,7 @@ export default function Discover() {
         {/* No niche state */}
         {!hasNiche && !isLoading && (
           <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 text-center">
-            <p className="text-2xl mb-3">🎯</p>
+            <p className="text-3xl mb-3">🎯</p>
             <p className="font-body font-semibold text-foreground mb-1">Tell ARIA what you create</p>
             <p className="text-muted-foreground font-body text-sm mb-4">
               We need your niche to find the right trending ideas for you
@@ -248,14 +250,14 @@ export default function Discover() {
           </motion.div>
         )}
 
-        {/* Error state */}
+        {/* Error */}
         {error && !isLoading && (
           <motion.div variants={item} className="bg-destructive/10 text-destructive rounded-xl p-4 font-body text-sm">
             Could not load trend ideas. Tap refresh to try again.
           </motion.div>
         )}
 
-        {/* Empty ideas */}
+        {/* Empty */}
         {hasNiche && !isLoading && !isRefreshing && !error && ideas.length === 0 && (
           <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 text-center">
             <p className="text-muted-foreground font-body text-sm">
@@ -289,7 +291,7 @@ export default function Discover() {
           </motion.div>
         )}
 
-        {/* Ideas Grid */}
+        {/* Ideas grid */}
         {rest.length > 0 && !isLoading && !isRefreshing && (
           <AnimatePresence>
             <motion.div variants={container} className="grid sm:grid-cols-2 gap-4">

@@ -108,6 +108,17 @@ export const useViralIdeas = () =>
     retry: 1,
   });
 
+export const useUpdateNiche = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (niche) => api.put('/users/niche', { niche }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['viralIdeas'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+};
+
 
 export const useCompetitorMoves = () =>
   useQuery({ queryKey: ['competitor-moves'], queryFn: () => api.get('/discover/competitors') });
@@ -186,15 +197,4 @@ export const useConnectHandle = () => {
   });
 };
 
-// ── NICHE UPDATE ──────────────────────────────────────────────────────────
-export const useUpdateNiche = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (niche) => api.put('/users/niche', { niche }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['viralIdeas'] });
-      qc.invalidateQueries({ queryKey: ['profile'] });
-    },
-  });
-};
 
