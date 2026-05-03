@@ -1,249 +1,165 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { RefreshCw, Sparkles, TrendingUp, Users } from 'lucide-react';
-import { niches } from '@/lib/mockData';
-import { useDiscoverIntelligence, useCompetitorMoves, useProfile } from '@/hooks/useApi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RefreshCw, Sparkles, TrendingUp, Globe, Zap } from 'lucide-react';
+import { useProfile } from '@/hooks/useApi';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';  // use your existing api client, not apiClient
 
-const badges = ['ALL', 'HOT', 'RISING', 'NEW'];
 const badgeStyles = {
-  HOT: 'bg-primary text-white',
-  RISING: 'bg-rising text-white',
-  NEW: 'bg-new-badge text-white',
+  HOT:    'bg-primary text-white',
+  RISING: 'bg-orange-500 text-white',
+  NEW:    'bg-blue-500 text-white',
 };
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const formatIcon = { Reel: '🎬', Carousel: '🖼️', Short: '⚡', Video: '📹' };
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
 const item = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } }
+  show:   { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
 };
 
 export default function Discover() {
-  const [selectedNiche, setSelectedNiche] = useState('All');
-  const [selectedBadge, setSelectedBadge] = useState('ALL');
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: profileData } = useProfile();
-  const userNiche = profileData?.data?.user?.niches?.[0] || 'lifestyle';
-  const platform = profileData?.data?.user?.primary_platform || 'instagram';
+  const userNiche = profileData?.data?.user?.niches?.[0] || 'general';
 
-  const {
-    data: intelligenceData,
-    isLoading,
-    error,
-    refetch,
-  } = useDiscoverIntelligence({
-    niche: selectedNiche === 'All' ? userNiche : selectedNiche,
-    platform,
-    badge: selectedBadge === 'ALL' ? '' : selectedBadge,
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['viralIdeas', userNiche],
+    queryFn:  () => api.get('/trends/viral-ideas'),
+    staleTime: 1000 * 60 * 60 * 2,
+    retry: 1,
   });
 
-  // Backend returns: { data: { intelligence: { opportunities, ariaTopPick, competitorMoves }, meta } }
-  const intelligence = intelligenceData?.data?.intelligence;
-  const trends = intelligence?.opportunities || [];
-  const topPick = intelligence?.ariaTopPick;
-  const inlineCompetitorMoves = intelligence?.competitorMoves || [];
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await api.get('/trends/viral-ideas?force=true');
+      await queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
-  // Separate competitor moves query
-  const { data: competitorData } = useCompetitorMoves();
-  // Backend returns: { data: { weeklyWinners: [], gaps: [] } }
-  const weeklyWinners = competitorData?.data?.weeklyWinners || [];
-  const gaps = competitorData?.data?.gaps || [];
+  const ideas   = data?.data?.ideas || [];
+  const niche   = data?.data?.niche || userNiche;
+  const cached  = data?.data?.cached;
+  const topPick = ideas[0] || null;
+  const rest    = ideas.slice(1);
 
   if (isLoading) return (
     <div className="space-y-4">
-      {[1, 2, 3].map(i => <div key={i} className="h-40 bg-muted rounded-xl animate-pulse" />)}
+      {[1,2,3,4].map(i => <div key={i} className="h-36 bg-muted rounded-xl animate-pulse" />)}
     </div>
   );
 
   if (error) return (
     <div className="bg-destructive/10 text-destructive rounded-xl p-4 font-body text-sm">
-      Could not load trends. {error.message}
+      Could not load trend ideas. Tap refresh to try again.
     </div>
   );
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      <motion.div variants={item}>
-        <h1 className="font-heading text-2xl text-foreground mb-1">Discover</h1>
-        <p className="text-muted-foreground font-body text-sm">48h early trend radar for your niche</p>
-      </motion.div>
 
-      {/* Niche filter */}
-      <motion.div variants={item} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {['All', ...niches.slice(0, 10)].map((n) => (
-          <button
-            key={n}
-            onClick={() => setSelectedNiche(n)}
-            className={`px-4 py-1.5 rounded-pill text-xs font-body font-semibold whitespace-nowrap transition-colors ${
-              selectedNiche === n
-                ? 'bg-primary text-white'
-                : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-      </motion.div>
-
-      {/* Badge filter */}
-      <motion.div variants={item} className="flex items-center gap-2">
-        {badges.map((b) => (
-          <button
-            key={b}
-            onClick={() => setSelectedBadge(b)}
-            className={`px-3 py-1 rounded-pill text-xs font-body font-semibold transition-colors ${
-              selectedBadge === b
-                ? 'bg-foreground text-background'
-                : 'bg-card border border-border text-muted-foreground'
-            }`}
-          >
-            {b}
-          </button>
-        ))}
+      <motion.div variants={item} className="flex items-start justify-between">
+        <div>
+          <h1 className="font-heading text-2xl text-foreground mb-1">Viral Ideas</h1>
+          <div className="flex items-center gap-2">
+            <Globe size={12} className="text-muted-foreground" />
+            <p className="text-muted-foreground font-body text-sm">
+              Global signals · 48–72h predictions for{' '}
+              <span className="text-primary font-semibold capitalize">{niche}</span>
+            </p>
+          </div>
+        </div>
         <button
-          onClick={() => refetch()}
-          className="ml-auto p-2 rounded-lg bg-card border border-border hover:shadow-warm-sm transition-shadow"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:shadow-warm-sm transition-all text-sm font-body text-muted-foreground disabled:opacity-50"
         >
-          <RefreshCw size={16} className="text-muted-foreground" />
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          {isRefreshing ? 'Fetching...' : 'Refresh'}
         </button>
       </motion.div>
 
-      {/* Top pick */}
+      {cached && (
+        <motion.div variants={item} className="flex items-center gap-2 text-xs text-muted-foreground font-body">
+          <Zap size={11} />
+          Showing cached signals. Refresh for live data.
+        </motion.div>
+      )}
+
+      {ideas.length === 0 && (
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 text-center">
+          <p className="text-muted-foreground font-body text-sm">
+            No signals yet. Tap Refresh to pull live global trends.
+          </p>
+        </motion.div>
+      )}
+
       {topPick && (
         <motion.div variants={item} className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={16} className="text-primary" />
-            <span className="text-primary text-xs font-body font-semibold tracking-wider">AIRA TOP PICK</span>
+            <span className="text-primary text-xs font-body font-semibold tracking-wider">ARIA TOP PICK</span>
+            <span className={`ml-auto px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold ${badgeStyles[topPick.badge] || 'bg-muted'}`}>
+              {topPick.badge}
+            </span>
           </div>
-          <h3 className="font-heading text-xl text-accent-foreground mb-2">{topPick.title}</h3>
-          <p className="text-accent-foreground/70 font-body text-sm leading-relaxed mb-3">
-            {topPick.recommendation || topPick.reason}
-          </p>
-          <div className="flex items-center gap-3">
-            {topPick.badge && (
-              <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[topPick.badge] || 'bg-muted'}`}>
-                {topPick.badge}
-              </span>
-            )}
-            {topPick.score != null && (
-              <span className="text-primary text-sm font-body font-bold">Score: {topPick.score}</span>
-            )}
+          <h3 className="font-heading text-xl text-accent-foreground mb-1">{topPick.title}</h3>
+          <p className="text-accent-foreground/80 font-body text-sm italic mb-2">"{topPick.contentAngle}"</p>
+          <p className="text-accent-foreground/60 font-body text-xs leading-relaxed mb-3">{topPick.whyNow}</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-body text-accent-foreground/60">
+              {formatIcon[topPick.formatSuggestion] || '📱'} {topPick.formatSuggestion}
+            </span>
+            <span className="text-xs font-body font-bold text-primary">{topPick.growthSignal}</span>
+            <span className="text-xs font-body text-accent-foreground/50 flex items-center gap-1">
+              <Globe size={10} /> {topPick.geo}
+            </span>
           </div>
         </motion.div>
       )}
 
-      {/* Trend Grid */}
-      {trends.length > 0 && (
-        <motion.div variants={container} className="grid sm:grid-cols-2 gap-4">
-          {trends.map((trend, idx) => (
-            <motion.div
-              key={trend.id || idx}
-              variants={item}
-              whileHover={{ scale: 1.01, y: -2 }}
-              className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className={`px-2.5 py-0.5 rounded-pill text-[10px] font-body font-semibold ${badgeStyles[trend.badge] || 'bg-muted text-muted-foreground'}`}>
-                  {trend.badge || trend.signal || 'NEW'}
-                </span>
-                {trend.score != null && (
-                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${
-                    trend.score >= 90 ? 'border-primary text-primary' : 'border-rising text-rising'
-                  }`}>
-                    <span className="text-xs font-body font-bold">{trend.score}</span>
+      {rest.length > 0 && (
+        <AnimatePresence>
+          <motion.div variants={container} className="grid sm:grid-cols-2 gap-4">
+            {rest.map((idea, idx) => (
+              <motion.div
+                key={idea.id || idx}
+                variants={item}
+                whileHover={{ scale: 1.01, y: -2 }}
+                className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold ${badgeStyles[idea.badge] || 'bg-muted text-muted-foreground'}`}>
+                    {idea.badge}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-body font-bold text-primary">{idea.growthSignal}</span>
+                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-bold font-body ${
+                      idea.velocityScore >= 90 ? 'border-primary text-primary'
+                      : idea.velocityScore >= 75 ? 'border-orange-500 text-orange-500'
+                      : 'border-muted-foreground text-muted-foreground'
+                    }`}>
+                      {idea.velocityScore}
+                    </div>
                   </div>
-                )}
-              </div>
-              <h4 className="font-body font-semibold text-foreground mb-1">{trend.title}</h4>
-              <p className="text-muted-foreground font-body text-xs leading-relaxed mb-3">{trend.description}</p>
-              <p className="text-muted-foreground font-body text-xs">{trend.niche}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Opportunities section (from intelligence feed) */}
-      {trends.length > 0 && (
-        <motion.div variants={item}>
-          <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
-            Opportunities
-          </h3>
-          <div className="space-y-3">
-            {trends.slice(0, 3).map((opp, idx) => (
-              <div key={opp.id || idx} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <TrendingUp size={18} className="text-primary" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-body font-semibold text-sm text-foreground truncate">{opp.title}</p>
-                  <p className="text-muted-foreground font-body text-xs mt-0.5 line-clamp-1">{opp.description}</p>
+                <h4 className="font-body font-semibold text-foreground mb-1 text-sm">{idea.title}</h4>
+                <p className="text-muted-foreground font-body text-xs italic mb-2 line-clamp-2">"{idea.contentAngle}"</p>
+                <p className="text-muted-foreground font-body text-xs leading-relaxed line-clamp-2 mb-3">{idea.whyNow}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
+                  <span>{formatIcon[idea.formatSuggestion] || '📱'} {idea.formatSuggestion}</span>
+                  <span className="ml-auto flex items-center gap-1"><Globe size={10} /> {idea.geo}</span>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Weekly Winners from competitor moves */}
-      {weeklyWinners.length > 0 && (
-        <motion.div variants={item}>
-          <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
-            Competitor Moves
-          </h3>
-          <div className="space-y-3">
-            {weeklyWinners.map((w, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-rising/10 flex items-center justify-center flex-shrink-0">
-                  <Users size={18} className="text-rising" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-body font-semibold text-sm text-foreground">
-                    {w.format || w.creator || 'Winning content format'}
-                  </p>
-                  <p className="text-muted-foreground font-body text-xs mt-0.5">
-                    {w.angle || w.whyItWorked || w.estimatedViews || 'High-performing competitor pattern'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Competitor gaps */}
-      {gaps.length > 0 && (
-        <motion.div variants={item}>
-          <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
-            Competitor Gaps You Can Capture
-          </h3>
-          <div className="space-y-3">
-            {gaps.map((g, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-xl p-4">
-                <p className="font-body text-sm text-foreground">{g.opportunity}</p>
-                <p className="text-muted-foreground font-body text-xs mt-1">
-                  {g.estimatedViews ? `Potential: ${g.estimatedViews}` : g.difficulty ? `Difficulty: ${g.difficulty}` : ''}
-                </p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Inline competitor moves from intelligence feed */}
-      {inlineCompetitorMoves.length > 0 && weeklyWinners.length === 0 && (
-        <motion.div variants={item}>
-          <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
-            What Competitors Are Doing
-          </h3>
-          <div className="space-y-3">
-            {inlineCompetitorMoves.map((m, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-xl p-4">
-                <p className="font-body text-sm text-foreground">
-                  {m.move || m.title || m.description || m.gap || 'Competitor signal'}
-                </p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+          </motion.div>
+        </AnimatePresence>
       )}
     </motion.div>
   );

@@ -100,6 +100,15 @@ export const useDiscoverIntelligence = (filters = {}) => {
   });
 };
 
+export const useViralIdeas = () =>
+  useQuery({
+    queryKey: ['viralIdeas'],
+    queryFn:  () => api.get('/trends/viral-ideas'),
+    staleTime: 1000 * 60 * 60 * 2,
+    retry: 1,
+  });
+
+
 export const useCompetitorMoves = () =>
   useQuery({ queryKey: ['competitor-moves'], queryFn: () => api.get('/discover/competitors') });
 
