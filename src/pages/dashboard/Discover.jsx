@@ -19,6 +19,14 @@ const item = {
   show:   { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
 };
 
+// Explore niches — user can tap any to get ideas without changing their account niche
+const EXPLORE_NICHES = [
+  'fashion', 'beauty', 'fitness', 'food', 'tech',
+  'gaming', 'travel', 'comedy', 'cricket', 'bollywood',
+  'finance', 'education', 'dance', 'startup', 'wellness',
+  'book reels', 'photography', 'music', 'art', 'cars',
+];
+
 // ── Niche Picker Modal ────────────────────────────────────────────────────────
 function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
   const [input, setInput]   = useState(currentNiche || '');
@@ -61,7 +69,7 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
             <p className="text-muted-foreground font-body text-sm mt-0.5">
               {isFirstTime
                 ? 'Tell ARIA your niche for personalized viral ideas'
-                : 'Update your niche — trends refresh instantly'}
+                : 'This updates your permanent niche across all of ARIA'}
             </p>
           </div>
           {!isFirstTime && (
@@ -104,7 +112,7 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
         >
           {saving
             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-            : <><Check size={16} /> {isFirstTime ? 'Find my trends' : 'Update niche'}</>
+            : <><Check size={16} /> {isFirstTime ? 'Find my trends' : 'Update permanently'}</>
           }
         </button>
       </motion.div>
@@ -115,22 +123,27 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
 // ── Main Discover Component ───────────────────────────────────────────────────
 export default function Discover() {
   const queryClient = useQueryClient();
-  const [isRefreshing, setIsRefreshing]     = useState(false);
+  const [isRefreshing, setIsRefreshing]       = useState(false);
   const [showNichePicker, setShowNichePicker] = useState(false);
+  const [browseNiche, setBrowseNiche]         = useState(null); // null = use account niche
 
   const { data: profileData, refetch: refetchProfile } = useProfile();
   const user      = profileData?.data;
   const userNiche = user?.niches?.[0] || null;
   const hasNiche  = !!userNiche;
 
-  // Update niche permanently in DB
+  // Active niche = browsing niche OR account niche
+  const activeNiche    = browseNiche || userNiche;
+  const isBrowsing     = !!browseNiche && browseNiche !== userNiche;
+
+  // Update permanent niche
   const updateNiche = useMutation({
     mutationFn: niche => api.put('/users/niche', { niche }),
     onSuccess: async () => {
+      setBrowseNiche(null); // reset browsing
       await refetchProfile();
       await queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
       setShowNichePicker(false);
-      // Force fresh fetch with new niche
       setIsRefreshing(true);
       try {
         await api.get('/trends/viral-ideas?force=true');
@@ -141,29 +154,53 @@ export default function Discover() {
     },
   });
 
+  // Fetch ideas — uses browseNiche param when exploring
+  const buildUrl = (force = false) => {
+    const params = new URLSearchParams();
+    if (force) params.set('force', 'true');
+    if (browseNiche) params.set('browseNiche', browseNiche);
+    const qs = params.toString();
+    return `/trends/viral-ideas${qs ? `?${qs}` : ''}`;
+  };
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['viralIdeas', userNiche],
-    queryFn:  () => api.get('/trends/viral-ideas'),
-    staleTime: 1000 * 60 * 60 * 2,
+    queryKey:  ['viralIdeas', activeNiche, isBrowsing],
+    queryFn:   () => api.get(buildUrl()),
+    staleTime: 1000 * 60 * (isBrowsing ? 30 : 120), // 30min browse, 2h permanent
     retry: 1,
-    enabled: hasNiche,
+    enabled: !!activeNiche,
   });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await api.get('/trends/viral-ideas?force=true');
-      await queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
+      await api.get(buildUrl(true));
+      await queryClient.invalidateQueries({ queryKey: ['viralIdeas', activeNiche] });
     } finally {
       setIsRefreshing(false);
     }
   };
 
+  const handleBrowseNiche = (niche) => {
+    if (niche === userNiche) {
+      setBrowseNiche(null); // tap own niche = go back to default
+    } else {
+      setBrowseNiche(niche);
+    }
+    // Invalidate so fresh fetch happens
+    queryClient.invalidateQueries({ queryKey: ['viralIdeas', niche] });
+  };
+
   const ideas   = data?.data?.ideas || [];
-  const niche   = data?.data?.niche || userNiche || '';
+  const niche   = data?.data?.niche || activeNiche || '';
   const cached  = data?.data?.cached;
   const topPick = ideas[0] || null;
   const rest    = ideas.slice(1);
+
+  // Build explore niche list — put user's niche first
+  const exploreList = userNiche
+    ? [userNiche, ...EXPLORE_NICHES.filter(n => n !== userNiche)]
+    : EXPLORE_NICHES;
 
   return (
     <>
@@ -193,7 +230,7 @@ export default function Discover() {
           </div>
           <button
             onClick={handleRefresh}
-            disabled={isRefreshing || !hasNiche}
+            disabled={isRefreshing || !activeNiche}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:shadow-warm-sm transition-all text-sm font-body text-muted-foreground disabled:opacity-50"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
@@ -201,23 +238,60 @@ export default function Discover() {
           </button>
         </motion.div>
 
-        {/* Niche pill — always visible, always editable */}
+        {/* Niche explorer — horizontal scroll */}
         {hasNiche && (
-          <motion.div variants={item}>
-            <button
-              onClick={() => setShowNichePicker(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors group"
-            >
-              <span className="text-primary font-body text-xs font-semibold capitalize">
-                Trends for: {niche}
-              </span>
-              <Pencil size={10} className="text-primary/60 group-hover:text-primary transition-colors" />
-            </button>
+          <motion.div variants={item} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground font-body text-xs">Explore niches</p>
+              {isBrowsing && (
+                <button
+                  onClick={() => setBrowseNiche(null)}
+                  className="flex items-center gap-1 text-xs font-body text-primary hover:underline"
+                >
+                  <X size={10} /> Back to mine
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {exploreList.map(n => {
+                const isActive = (n === userNiche && !isBrowsing) || n === browseNiche;
+                const isOwn    = n === userNiche;
+                return (
+                  <button
+                    key={n}
+                    onClick={() => handleBrowseNiche(n)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-primary text-white shadow-warm-sm'
+                        : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                    }`}
+                  >
+                    {n}
+                    {isOwn && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setShowNichePicker(true); }}
+                        className={`ml-0.5 rounded-full transition-colors ${isActive ? 'text-white/70 hover:text-white' : 'text-muted-foreground/50 hover:text-primary'}`}
+                      >
+                        <Pencil size={9} />
+                      </button>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Browsing notice */}
+            {isBrowsing && (
+              <p className="text-xs font-body text-muted-foreground flex items-center gap-1">
+                <Zap size={10} className="text-primary" />
+                Exploring <span className="text-primary font-semibold">{browseNiche}</span> — not changing your account niche
+              </p>
+            )}
           </motion.div>
         )}
 
         {/* Cache notice */}
-        {cached && (
+        {cached && !isBrowsing && (
           <motion.div variants={item} className="flex items-center gap-2 text-xs text-muted-foreground font-body">
             <Zap size={11} />
             Showing cached signals. Refresh for live data.
@@ -258,10 +332,10 @@ export default function Discover() {
         )}
 
         {/* Empty */}
-        {hasNiche && !isLoading && !isRefreshing && !error && ideas.length === 0 && (
+        {activeNiche && !isLoading && !isRefreshing && !error && ideas.length === 0 && (
           <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 text-center">
             <p className="text-muted-foreground font-body text-sm">
-              No signals yet. Tap Refresh to pull live global trends.
+              No signals yet. Tap Refresh to pull live trends for <span className="text-primary font-semibold">{activeNiche}</span>.
             </p>
           </motion.div>
         )}
@@ -271,7 +345,9 @@ export default function Discover() {
           <motion.div variants={item} className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={16} className="text-primary" />
-              <span className="text-primary text-xs font-body font-semibold tracking-wider">ARIA TOP PICK</span>
+              <span className="text-primary text-xs font-body font-semibold tracking-wider">
+                {isBrowsing ? `TOP PICK · ${browseNiche.toUpperCase()}` : 'ARIA TOP PICK'}
+              </span>
               <span className={`ml-auto px-2.5 py-0.5 rounded-full text-[10px] font-body font-semibold ${badgeStyles[topPick.badge] || 'bg-muted'}`}>
                 {topPick.badge}
               </span>
