@@ -185,3 +185,16 @@ export const useConnectHandle = () => {
     },
   });
 };
+
+// ── NICHE UPDATE ──────────────────────────────────────────────────────────
+export const useUpdateNiche = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (niche) => api.put('/users/niche', { niche }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['viralIdeas'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+};
+
