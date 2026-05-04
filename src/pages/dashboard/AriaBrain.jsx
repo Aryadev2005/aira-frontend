@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { auth } from '@/lib/firebase';
 import { api } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import SessionsSidebar, { apiFetch } from './SessionsSidebar';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -18,18 +18,31 @@ const GREETING = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// Normalize OpenAI content-block arrays (or any type) → plain string
+const extractText = (content) => {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(b => b?.type === 'text')
+      .map(b => b.text ?? '')
+      .join('');
+  }
+  if (content && typeof content === 'object' && typeof content.text === 'string') return content.text;
+  return content ? JSON.stringify(content, null, 2) : '';
+};
+
 const prettifyTool = (n = '') => n.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 const toolColor = (n = '') => {
-  if (n.startsWith('spotify')) return { bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/20' };
-  if (n.startsWith('instagram')) return { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20' };
-  if (n.startsWith('apify')) return { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' };
+  if (n.startsWith('spotify'))  return { bg: 'bg-green-500/10',  text: 'text-green-400',  border: 'border-green-500/20' };
+  if (n.startsWith('instagram')) return { bg: 'bg-pink-500/10',  text: 'text-pink-400',   border: 'border-pink-500/20' };
+  if (n.startsWith('apify'))    return { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' };
   if (n.startsWith('get_db') || n.startsWith('get_user')) return { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' };
   return { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/20' };
 };
 
 // ── SSE stream helper ─────────────────────────────────────────────────────────
-const streamAgent = async ({ message, sessionId, onToolStart, onToolEnd, onToken, onDone, onError }) => {
+const streamAgent = async ({ message, sessionId, entryScreen, context, onToolStart, onToolEnd, onToken, onDone, onError }) => {
   try {
     const token = await auth.currentUser?.getIdToken(true);
     if (!token) throw new Error('Not authenticated');
@@ -37,7 +50,13 @@ const streamAgent = async ({ message, sessionId, onToolStart, onToolEnd, onToken
     const res = await fetch(STREAM_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({
+        message,
+        sessionId,
+        // Bug fix #5: pass entryScreen + context so ARIA opens with the right behaviour
+        entryScreen: entryScreen || 'direct',
+        context: context || {},
+      }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -61,9 +80,17 @@ const streamAgent = async ({ message, sessionId, onToolStart, onToolEnd, onToken
         switch (evt.type) {
           case 'tool_start': onToolStart(evt.tool, evt.input); break;
           case 'tool_end':   onToolEnd(evt.tool); break;
-          case 'token':      full += evt.content ?? ''; onToken(full); break;
-          case 'done':       onDone(evt.message || full); return;
-          case 'error':      throw new Error(evt.message || 'Stream error');
+          case 'token': {
+            // Guard against object tokens from OpenAI content blocks
+            const chunk = typeof evt.content === 'string'
+              ? evt.content
+              : extractText(evt.content);
+            full += chunk;
+            onToken(full);
+            break;
+          }
+          case 'done':  onDone(extractText(evt.message) || full); return;
+          case 'error': throw new Error(evt.message || 'Stream error');
         }
       }
     }
@@ -126,6 +153,9 @@ function Bubble({ msg, isLast, navigate, dbUser }) {
     );
   }
 
+  // Always normalize content to a plain string before rendering
+  const contentStr = extractText(msg.content);
+
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
@@ -136,11 +166,11 @@ function Bubble({ msg, isLast, navigate, dbUser }) {
       <div className="max-w-[82%]">
         <div className={`rounded-2xl px-4 py-3 ${isUser ? 'bg-primary text-white' : 'bg-card border border-border text-foreground'}`}>
           {isUser ? (
-            <p className="text-sm">{msg.content}</p>
+            <p className="text-sm whitespace-pre-wrap">{contentStr}</p>
           ) : (
             <>
               <ReactMarkdown className="text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-p:text-foreground/80 prose-strong:text-foreground prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1 prose-code:rounded">
-                {msg.content}
+                {contentStr}
               </ReactMarkdown>
               {msg._streaming && <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse rounded-sm ml-0.5 align-middle" />}
             </>
@@ -160,100 +190,148 @@ function Bubble({ msg, isLast, navigate, dbUser }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AriaBrain() {
-  const [messages, setMessages] = useState([GREETING]);
-  const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState(false);
-  const [activeTools, setActiveTools] = useState([]);
-  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [messages, setMessages]         = useState([GREETING]);
+  const [input, setInput]               = useState('');
+  const [streaming, setStreaming]        = useState(false);
+  const [activeTools, setActiveTools]   = useState([]);
+  const [sessionId, setSessionId]       = useState(() => crypto.randomUUID());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const { user, dbUser, syncWithBackend } = useFirebaseAuth();
-  const chatEndRef = useRef(null);
-  const navigate = useNavigate();
+  const [loadingHistory, setLoadingHistory]     = useState(false);
 
-  // ── Load greeting on mount ─────────────────────────────────────────────
+  const { user, dbUser, syncWithBackend } = useFirebaseAuth();
+  const chatEndRef    = useRef(null);
+  // When true, the greeting effect will skip for one sessionId change (used when loading history)
+  const skipGreetRef  = useRef(false);
+  const navigate      = useNavigate();
+  const location      = useLocation();
+
+  // Derive entryScreen + session context from navigation state (set by the page that navigated here)
+  // e.g. <Link to="/dashboard/brain" state={{ entryScreen: 'profile' }} />
+  const entryScreen   = location.state?.entryScreen || 'direct';
+  const sessionCtx    = location.state?.context || {};
+
+  // ── Auto-scroll ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ── Load personalized greeting on new session ────────────────────────────
   useEffect(() => {
     if (!sessionId) return;
 
-    const loadGreeting = async () => {
-      setIsTyping(true);
-      try {
-        // Check if user just came from Settings with fresh analysis
-        const freshAnalysis = sessionStorage.getItem('aria_fresh_analysis');
-        const entryScreen = freshAnalysis ? 'fresh_analysis' : 'direct';
+    // If we just loaded a past session, skip the greeting for this run
+    if (skipGreetRef.current) {
+      skipGreetRef.current = false;
+      return;
+    }
 
-        const res = await api.get(
-          `/brain/greet?sessionId=${sessionId}&entryScreen=${entryScreen}`
-        );
+    let cancelled = false;
+
+    const loadGreeting = async () => {
+      try {
+        const freshAnalysis = sessionStorage.getItem('aria_fresh_analysis');
+        const entryScreen   = freshAnalysis ? 'fresh_analysis' : 'direct';
+
+        const res      = await api.get(`/brain/greet?sessionId=${sessionId}&entryScreen=${entryScreen}`);
         const greeting = res?.data?.greeting || res?.greeting;
 
-        if (greeting) {
-          setMessages([{ role: 'assistant', content: greeting, tools: [] }]);
-        } else {
-          setMessages([{
-            role: 'assistant',
-            content: "Hey! I'm ARIA — your AI content strategist 🧠\n\nWhat are we working on today?",
-            tools: [],
-          }]);
-        }
+        if (cancelled) return;
 
-        // If fresh analysis, auto-trigger the full analysis message
-        if (freshAnalysis) {
-          sessionStorage.removeItem('aria_fresh_analysis');
-          setTimeout(() => autoSendAnalysis(), 1000);
-        }
-      } catch {
         setMessages([{
           role: 'assistant',
-          content: "Hey! I'm ARIA 🧠 What are we working on today?",
-          tools: [],
+          content: greeting || "Hey! I'm ARIA — your AI content strategist 🧠\n\nWhat are we working on today?",
+          toolEvents: [],
         }]);
-      } finally {
-        setIsTyping(false);
+
+        if (freshAnalysis) {
+          sessionStorage.removeItem('aria_fresh_analysis');
+          setTimeout(() => autoSendAnalysis(), 800);
+        }
+      } catch {
+        if (!cancelled) {
+          setMessages([{ role: 'assistant', content: "Hey! I'm ARIA 🧠 What are we working on today?", toolEvents: [] }]);
+        }
       }
     };
 
     loadGreeting();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ── Auto-send analysis request after fresh Instagram connect ──────────
-  const autoSendAnalysis = async () => {
+  // ── Shared updateLast helper ─────────────────────────────────────────────
+  const updateLast = useCallback((fn) => {
+    setMessages(prev => {
+      const arr  = [...prev];
+      const last = arr[arr.length - 1];
+      if (last && (last._streaming || last.role === 'assistant')) {
+        arr[arr.length - 1] = fn(last);
+      }
+      return arr;
+    });
+  }, []);
+
+  // ── Auto-send analysis after fresh Instagram connect ─────────────────────
+  const autoSendAnalysis = useCallback(async () => {
     const analysisPrompt = "Show me my complete profile analysis — my top performing content, niche, archetype, and what I should focus on next.";
 
-    setMessages(prev => [...prev, { role: 'user', content: analysisPrompt, tools: [] }]);
-    setIsTyping(true);
+    setMessages(prev => [
+      ...prev,
+      { role: 'user',      content: analysisPrompt, toolEvents: [] },
+      { role: 'assistant', content: '',              toolEvents: [], _streaming: true },
+    ]);
+    setStreaming(true);
 
-    try {
-      const data = await chatFallback(analysisPrompt, sessionId, [], dbUser);
-      setMessages(prev => [...prev, { role: 'assistant', content: data, tools: [] }]);
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Let me pull up your analysis — ask me 'what was my best post?' or 'what's my niche?' to get started!",
-        tools: [],
-      }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
+    await streamAgent({
+      message:  analysisPrompt,
+      sessionId,
+      entryScreen,
+      context: sessionCtx,
+      onToolStart: (tool) => {
+        setActiveTools(p => [...p.filter(t => t !== tool), tool]);
+        updateLast(last => ({ ...last, toolEvents: [...(last.toolEvents || []), { tool, status: 'running' }] }));
+      },
+      onToolEnd: (tool) => {
+        setActiveTools(p => p.filter(t => t !== tool));
+        updateLast(last => ({ ...last, toolEvents: (last.toolEvents || []).map(e => e.tool === tool && e.status === 'running' ? { ...e, status: 'done' } : e) }));
+      },
+      onToken:  (full) => updateLast(last => ({ ...last, content: full })),
+      onDone:   (full) => {
+        setActiveTools([]);
+        setStreaming(false);
+        updateLast(last => ({
+          role: 'assistant',
+          content: full || 'Done!',
+          toolEvents: (last.toolEvents || []).map(e => e.status === 'running' ? { ...e, status: 'done' } : e),
+        }));
+      },
+      onError: () => {
+        setActiveTools([]);
+        setStreaming(false);
+        updateLast(() => ({ role: 'assistant', content: "Let me pull up your analysis — ask me 'what was my best post?' or 'what's my niche?' to get started!", toolEvents: [] }));
+      },
+    });
+  }, [sessionId, updateLast]);
 
-  const refreshUser = async () => {
-    if (user) await syncWithBackend(user);
-  };
-
-  // Load a past session
+  // ── Load a past session ──────────────────────────────────────────────────
   const loadSession = useCallback(async (sid) => {
     if (sid === sessionId) return;
+
     setLoadingHistory(true);
     setMessages([]);
+
     try {
       const data = await apiFetch(`/sessions/${sid}/messages`);
       const msgs = (data?.messages || []).map(m => ({
-        role: m.role,
-        content: m.content,
+        role:       m.role,
+        content:    extractText(m.content),  // normalize any content-block arrays
         toolEvents: (m.tool_calls || []).map(t => ({ tool: t.name || t, status: 'done' })),
       }));
+
+      // Set messages first, then flip the flag, then update sessionId.
+      // The greeting effect fires on sessionId change; the flag ensures it skips once.
       setMessages(msgs.length ? msgs : [GREETING]);
+      skipGreetRef.current = true;
       setSessionId(sid);
     } catch {
       setMessages([GREETING]);
@@ -264,11 +342,13 @@ export default function AriaBrain() {
 
   const startNewChat = useCallback(() => {
     setMessages([GREETING]);
-    setSessionId(crypto.randomUUID());
     setInput('');
     setActiveTools([]);
+    // new UUID triggers greeting effect naturally
+    setSessionId(crypto.randomUUID());
   }, []);
 
+  // ── Send message ─────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!input.trim() || streaming) return;
     const userMsg = input.trim();
@@ -277,21 +357,16 @@ export default function AriaBrain() {
 
     setMessages(prev => [
       ...prev,
-      { role: 'user', content: userMsg, toolEvents: [] },
-      { role: 'assistant', content: '', toolEvents: [], _streaming: true },
+      { role: 'user',      content: userMsg, toolEvents: [] },
+      { role: 'assistant', content: '',      toolEvents: [], _streaming: true },
     ]);
     setStreaming(true);
 
-    const updateLast = (fn) => setMessages(prev => {
-      const arr = [...prev];
-      const last = arr[arr.length - 1];
-      if (last?._streaming || last?.role === 'assistant') arr[arr.length - 1] = fn(last);
-      return arr;
-    });
-
     await streamAgent({
-      message: userMsg,
+      message:  userMsg,
       sessionId,
+      entryScreen,
+      context: sessionCtx,
       onToolStart: (tool) => {
         setActiveTools(p => [...p.filter(t => t !== tool), tool]);
         updateLast(last => ({ ...last, toolEvents: [...(last.toolEvents || []), { tool, status: 'running' }] }));
@@ -300,8 +375,8 @@ export default function AriaBrain() {
         setActiveTools(p => p.filter(t => t !== tool));
         updateLast(last => ({ ...last, toolEvents: (last.toolEvents || []).map(e => e.tool === tool && e.status === 'running' ? { ...e, status: 'done' } : e) }));
       },
-      onToken: (full) => updateLast(last => ({ ...last, content: full })),
-      onDone: (full) => {
+      onToken:  (full) => updateLast(last => ({ ...last, content: full })),
+      onDone:   (full) => {
         setActiveTools([]);
         setStreaming(false);
         updateLast(last => ({
@@ -310,7 +385,7 @@ export default function AriaBrain() {
           toolEvents: (last.toolEvents || []).map(e => e.status === 'running' ? { ...e, status: 'done' } : e),
         }));
         if (user) syncWithBackend(user).catch(() => {});
-        // Niche confirmation check
+        // Niche confirmation
         const confirmPhrases = ['yes', 'correct', "that's right", 'perfect', 'accurate', 'haan', 'bilkul'];
         if (confirmPhrases.some(p => userMsg.toLowerCase().includes(p))) {
           api.put('/users/confirm-niche').catch(() => {});
@@ -325,8 +400,11 @@ export default function AriaBrain() {
     });
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────
+  // True when the last message is already an in-progress streaming bubble
+  const hasStreamingBubble = messages[messages.length - 1]?._streaming === true;
   return (
-    <div className="flex h-[calc(100vh-48px)] -mx-6 -mt-6 overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Sessions Sidebar */}
       <SessionsSidebar
         activeSessionId={sessionId}
@@ -366,8 +444,8 @@ export default function AriaBrain() {
             </AnimatePresence>
           )}
 
-          {/* Thinking indicator */}
-          {streaming && activeTools.length > 0 && (
+          {/* Tool activity indicator — only when no streaming bubble yet */}
+          {streaming && activeTools.length > 0 && !hasStreamingBubble && (
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                 <span className="text-white text-xs font-bold">A</span>
@@ -383,7 +461,8 @@ export default function AriaBrain() {
             </div>
           )}
 
-          {streaming && activeTools.length === 0 && (
+          {/* Thinking indicator — only when no streaming bubble yet */}
+          {streaming && activeTools.length === 0 && !hasStreamingBubble && (
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                 <span className="text-white text-xs font-bold">A</span>

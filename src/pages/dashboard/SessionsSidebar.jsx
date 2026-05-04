@@ -171,7 +171,7 @@ export default function SessionsSidebar({ activeSessionId, onSelectSession, onNe
       className="flex-shrink-0 flex flex-col bg-card border-r border-border overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-4 border-b border-border">
+      <div className={`flex ${collapsed ? 'flex-col justify-center items-center py-4 gap-4 px-0' : 'items-center gap-2 px-3 py-4'} border-b border-border`}>
         {!collapsed && (
           <motion.span
             initial={{ opacity: 0 }}
