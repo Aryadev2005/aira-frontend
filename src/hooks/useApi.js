@@ -36,14 +36,63 @@ export const useOpportunities = () =>
 export const useFestivalBoosts = () =>
   useQuery({ queryKey: ['festival-boosts'], queryFn: () => api.get('/trends/festival-boosts') });
 
-// ── SONGS ─────────────────────────────────────────────────────────────────
+// ── SONGS ─────────────────────────────────────────────────────────────────────
+
 export const useSongs = (filters = {}) => {
   const params = new URLSearchParams(filters).toString();
   return useQuery({
     queryKey: ['songs', filters],
-    queryFn: () => api.get(`/songs${params ? `?${params}` : ''}`),
+    queryFn:  () => api.get(`/songs${params ? `?${params}` : ''}`),
+    staleTime: 1000 * 60 * 30,   // 30 min — matches hot window TTL
+    retry: 1,
   });
 };
+
+export const useTopSongs = (filters = {}) => {
+  const params = new URLSearchParams(filters).toString();
+  return useQuery({
+    queryKey: ['songs-top10', filters],
+    queryFn:  () => api.get(`/songs/top10${params ? `?${params}` : ''}`),
+    staleTime: 1000 * 60 * 30,
+    retry: 1,
+  });
+};
+
+export const usePredictSongs = () =>
+  useQuery({
+    queryKey: ['songs-predict'],
+    queryFn:  () => api.get('/songs/predict'),
+    staleTime: 1000 * 60 * 30,
+    retry: 1,
+  });
+
+export const useSongsByMood = () =>
+  useMutation({
+    mutationFn: (vars) => {
+      const { mood, niche, language } = vars || {};
+      const params = new URLSearchParams({
+        mood: mood || '',
+        niche: niche || 'general',
+        language: language || 'Hindi'
+      }).toString();
+      return api.get(`/songs/by-mood?${params}`);
+    },
+  });
+
+export const useSongLanguages = () =>
+  useQuery({
+    queryKey: ['song-languages'],
+    queryFn:  () => api.get('/songs/languages'),
+    staleTime: 1000 * 60 * 60, // 1h — languages don't change often
+  });
+
+export const useSongTrajectory = (title, language) =>
+  useQuery({
+    queryKey: ['song-trajectory', title, language],
+    queryFn:  () => api.get(`/songs/trajectory/${encodeURIComponent(title)}${language ? `?language=${language}` : ''}`),
+    enabled:  !!title,
+    staleTime: 1000 * 60 * 30,
+  });
 
 // ── CONTENT GENERATION ────────────────────────────────────────────────────
 export const useGenerateContent = () =>

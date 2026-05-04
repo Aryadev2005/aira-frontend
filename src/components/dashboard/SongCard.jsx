@@ -1,15 +1,28 @@
+// src/components/dashboard/SongCard.jsx
+// Updated to use lifecycle + signal fields from the 3-tier architecture.
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Music } from 'lucide-react';
 
 const signalStyles = {
-  postNow: { label: 'Post Now', class: 'bg-rising/10 text-rising' },
-  wait: { label: 'Wait', class: 'bg-primary/10 text-primary' },
-  tooLate: { label: 'Too Late', class: 'bg-muted text-muted-foreground' },
+  postNow:  { label: 'Post Now', class: 'bg-rising/10 text-rising border border-rising/20'               },
+  wait:     { label: 'Wait',     class: 'bg-primary/10 text-primary border border-primary/20'             },
+  tooLate:  { label: 'Too Late', class: 'bg-muted text-muted-foreground border border-border'             },
+};
+
+const lifecycleEmoji = {
+  RISING:    '🚀',
+  PEAKING:   '🔥',
+  DECLINING: '📉',
+  CYCLICAL:  '🔄',
+  DEAD:      '💀',
 };
 
 export default function SongCard({ song }) {
-  const signal = signalStyles[song.signal];
+  const signal    = signalStyles[song.signal]   || signalStyles.postNow;
+  const emoji     = lifecycleEmoji[song.lifecycle] || '';
+  const rankLabel = song.chart_position ? `#${song.chart_position}` : null;
 
   return (
     <motion.div
@@ -27,7 +40,15 @@ export default function SongCard({ song }) {
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-rising text-xs font-body font-semibold">{song.growth}</span>
+        <div className="flex items-center gap-1.5">
+          {emoji && <span className="text-sm">{emoji}</span>}
+          {rankLabel && (
+            <span className="font-body text-xs font-semibold text-muted-foreground">{rankLabel}</span>
+          )}
+          {song.growth && (
+            <span className="font-body text-xs font-semibold text-rising">{song.growth}</span>
+          )}
+        </div>
         <span className={`px-2 py-0.5 rounded-pill text-[10px] font-body font-semibold ${signal.class}`}>
           {signal.label}
         </span>
