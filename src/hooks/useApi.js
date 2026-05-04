@@ -69,7 +69,8 @@ export const usePredictSongs = () =>
 export const useSongsByMood = () =>
   useMutation({
     mutationFn: (vars) => {
-      const { mood, niche, language } = vars || {};
+      const v = /** @type {any} */ (vars);
+      const { mood, niche, language } = v || {};
       const params = new URLSearchParams({
         mood: mood || '',
         niche: niche || 'general',
