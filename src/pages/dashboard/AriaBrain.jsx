@@ -6,6 +6,7 @@ import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { auth } from '@/lib/firebase';
 import { api } from '@/lib/api';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useSuggestionFeedback } from '@/hooks/useApi';
 import SessionsSidebar, { apiFetch } from './SessionsSidebar';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -136,6 +137,65 @@ function ToolBar({ toolEvents, streaming }) {
   );
 }
 
+// Suggestion quick-reply buttons — shown after ARIA messages that have followUpSuggestions
+function SuggestionQuickReply({ suggestions, onFeedback }) {
+  const [submitted, setSubmitted]   = useState(false);
+  const [loading,   setLoading]     = useState(false);
+  const [showThanks, setShowThanks] = useState(false);
+
+  if (!suggestions?.length) return null;
+  if (showThanks) {
+    return (
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="font-body text-xs text-muted-foreground ml-2 mt-1"
+      >
+        Got it — ARIA will remember that.
+      </motion.p>
+    );
+  }
+  if (submitted) return null;
+
+  const suggestion = suggestions[0]; // handle first suggestion only
+
+  const handleFeedback = async (outcome) => {
+    setLoading(true);
+    try {
+      await onFeedback({ suggestionId: suggestion.id, outcome });
+      setSubmitted(true);
+      setShowThanks(true);
+      setTimeout(() => setShowThanks(false), 3000);
+    } catch {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex gap-2 mt-2 ml-2 flex-wrap"
+    >
+      {[
+        { label: '✅ Yes, I tried it', outcome: 'followed',   style: 'border-rising/30 text-rising bg-rising/5' },
+        { label: '🔄 Sort of',         outcome: 'partially', style: 'border-border    text-muted-foreground' },
+        { label: '❌ Didn\'t get to it', outcome: 'ignored',  style: 'border-border    text-muted-foreground' },
+      ].map(btn => (
+        <button
+          key={btn.outcome}
+          onClick={() => handleFeedback(btn.outcome)}
+          disabled={loading}
+          className={`px-3 py-1.5 rounded-pill border text-xs font-body font-semibold transition-colors disabled:opacity-40 ${btn.style}`}
+        >
+          {btn.label}
+        </button>
+      ))}
+    </motion.div>
+  );
+}
+
 function Bubble({ msg, isLast, navigate, dbUser }) {
   const isUser = msg.role === 'user';
 
@@ -199,6 +259,7 @@ export default function AriaBrain() {
   const [loadingHistory, setLoadingHistory]     = useState(false);
 
   const { user, dbUser, syncWithBackend } = useFirebaseAuth();
+  const { mutateAsync: submitFeedback } = useSuggestionFeedback();
   const chatEndRef    = useRef(null);
   // When true, the greeting effect will skip for one sessionId change (used when loading history)
   const skipGreetRef  = useRef(false);
@@ -439,6 +500,12 @@ export default function AriaBrain() {
               {messages.map((msg, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
                   <Bubble msg={msg} isLast={i === messages.length - 1} navigate={navigate} dbUser={dbUser} />
+                  {msg.role === 'assistant' && msg.followUpSuggestions?.length > 0 && (
+                    <SuggestionQuickReply
+                      suggestions={msg.followUpSuggestions}
+                      onFeedback={submitFeedback}
+                    />
+                  )}
                 </motion.div>
               ))}
             </AnimatePresence>

@@ -396,6 +396,16 @@ export default function Discover() {
                   <h4 className="font-body font-semibold text-foreground mb-1 text-sm">{idea.title}</h4>
                   <p className="text-muted-foreground font-body text-xs italic mb-2 line-clamp-2">"{idea.contentAngle}"</p>
                   <p className="text-muted-foreground font-body text-xs leading-relaxed line-clamp-2 mb-3">{idea.whyNow}</p>
+                  {/* Personal reason chip — shown when ARIA has a specific reason for this creator */}
+                  {idea.personalReason && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="font-body text-xs text-primary/80 leading-snug">
+                        <span className="mr-1">✨</span>
+                        <span className="font-semibold">Picked for you:</span>{' '}
+                        {idea.personalReason}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
                     <span>{formatIcon[idea.formatSuggestion] || '📱'} {idea.formatSuggestion}</span>
                     <span className="ml-auto flex items-center gap-1">

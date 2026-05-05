@@ -256,6 +256,9 @@ export const useAriaIdentity = () =>
     retry: 1,
   });
 
+/**
+ * @type {() => import('@tanstack/react-query').UseMutationResult<any, Error, {category: string; key: string; value: string}, unknown>}
+ */
 export const useUpdateAriaMemory = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -266,10 +269,13 @@ export const useUpdateAriaMemory = () => {
   });
 };
 
+/**
+ * @type {() => import('@tanstack/react-query').UseMutationResult<any, Error, {category: string; key: string}, unknown>}
+ */
 export const useDeleteAriaMemory = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data) => api.delete('/profile/aria-identity/memory', data),
+    mutationFn: (data) => api.delete(`/profile/aria-identity/memory?category=${data.category}&key=${data.key}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aria-identity'] });
     },
