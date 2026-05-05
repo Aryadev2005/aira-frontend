@@ -5,7 +5,9 @@ import {
   Brain, BarChart2, Map, Pencil, X, Check, Sparkles,
   RefreshCw, AlertCircle, ChevronDown, ChevronUp, Clock,
   Target, Zap, TrendingUp, User, Mic, Image, Layout,
-  Globe, Lock, CheckCircle2, Circle,
+  Globe, Lock, CheckCircle2, Circle, Heart, Users, Eye, PlayCircle,
+  Sprout, Instagram, Youtube, ExternalLink, Star, Settings, Bell, Compass, History, LinkIcon,
+  Unlink, LogOut, ChevronRight,
 } from 'lucide-react';
 import {
   useAriaIdentity,
@@ -14,6 +16,7 @@ import {
   usePersonalisedRoadmap,
 } from '@/hooks/useApi';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+import { api } from '@/lib/api';
 
 // ── Animation presets ─────────────────────────────────────────────────────────
 
@@ -80,6 +83,127 @@ const categoryLabel = (cat) => ({
   interest_signal:    'Interest',
   hook_language:      'Language',
 }[cat] || cat);
+
+// ── Analytics card ────────────────────────────────────────────────────────────
+function StatCard({ icon: Icon, label, value, color = 'text-primary' }) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon size={14} className="text-muted-foreground" />
+        <span className="text-muted-foreground text-xs font-body">{label}</span>
+      </div>
+      <p className={`font-heading text-xl ${color} truncate`}>{value || '—'}</p>
+    </div>
+  );
+}
+
+// ── Platform analytics section ────────────────────────────────────────────────
+function PlatformAnalytics({ profile, analyticsData }) {
+  const platform = profile?.primary_platform || 'instagram';
+  const hasInstagram = !!profile?.instagram_handle;
+  const hasYoutube = !!profile?.youtube_handle;
+
+  if (!hasInstagram && !hasYoutube) return null;
+
+  const isYoutube = platform === 'youtube';
+
+  const instagramStats = [
+    { icon: Users, label: 'Followers', value: profile?.follower_range },
+    { icon: Heart, label: 'Engagement', value: profile?.engagement_rate ? `${profile.engagement_rate}%` : null },
+    { icon: BarChart2, label: 'Health Score', value: profile?.health_score ? `${profile.health_score}/100` : null },
+    { icon: Sprout, label: 'Growth Stage', value: profile?.growth_stage },
+  ];
+
+  const youtubeStats = analyticsData ? [
+    { icon: Users, label: 'Subscribers', value: analyticsData.followers?.toLocaleString('en-IN') },
+    { icon: Eye, label: 'Avg Views', value: analyticsData.avgViewsPerVideo?.toLocaleString('en-IN') },
+    { icon: PlayCircle, label: 'Total Videos', value: analyticsData.videoCount },
+    { icon: TrendingUp, label: 'Upload Freq', value: analyticsData.uploadFrequency },
+  ] : instagramStats;
+
+  const stats = isYoutube ? youtubeStats : instagramStats;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isYoutube
+            ? <Youtube size={16} className="text-red-500" />
+            : <Instagram size={16} className="text-purple-500" />}
+          <h3 className="font-body font-semibold text-sm text-foreground">
+            {isYoutube ? 'YouTube Analytics' : 'Instagram Analytics'}
+          </h3>
+          <span className="text-muted-foreground text-xs font-body">
+            @{isYoutube ? profile?.youtube_handle : profile?.instagram_handle}
+          </span>
+        </div>
+        {analyticsData?.fromCache && (
+          <span className="text-[10px] text-muted-foreground font-body flex items-center gap-1">
+            <Clock size={10} /> cached
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {stats.map((s) => (
+          <StatCard key={s.label} icon={s.icon} label={s.label} value={s.value} />
+        ))}
+      </div>
+
+      {/* ARIA intelligence insight */}
+      {analyticsData?.ariaIntelligence?.keyInsight && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+          <div className="flex items-start gap-2">
+            <Star size={14} className="text-primary mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-body font-semibold text-primary mb-1">ARIA Insight</p>
+              <p className="text-xs font-body text-foreground/80 leading-relaxed">
+                {analyticsData.ariaIntelligence.keyInsight}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Estimated revenue (YouTube) */}
+      {isYoutube && analyticsData?.estimatedMonthlyRevenue && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs text-muted-foreground font-body mb-1">Est. Monthly Revenue</p>
+          <p className="font-heading text-lg text-foreground">{analyticsData.estimatedMonthlyRevenue}</p>
+          <p className="text-[10px] text-muted-foreground font-body mt-1">CPM: {analyticsData.estimatedCPM}</p>
+        </div>
+      )}
+
+      {/* Top content */}
+      {isYoutube && analyticsData?.topVideos?.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+          <p className="text-xs font-body font-semibold text-foreground mb-2">Top Videos</p>
+          {analyticsData.topVideos.slice(0, 3).map((v, i) => (
+            <div key={i} className="flex items-center justify-between gap-2">
+              <p className="text-xs font-body text-foreground/80 truncate flex-1">{v.title}</p>
+              <span className="text-xs font-body text-muted-foreground shrink-0">
+                {v.views?.toLocaleString('en-IN')} views
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isYoutube && analyticsData?.topHashtags?.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs font-body font-semibold text-foreground mb-2">Top Hashtags</p>
+          <div className="flex flex-wrap gap-1.5">
+            {analyticsData.topHashtags.slice(0, 8).map((tag) => (
+              <span key={tag} className="text-[10px] font-body px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 1 — ARIA KNOWS
@@ -696,7 +820,23 @@ const TABS = [
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState('aria');
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(null);
   const { dbUser } = useFirebaseAuth();
+
+  const handleRefreshAnalytics = async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const res = await api.post('/profile/refresh');
+      setAnalyticsData(res.data);
+    } catch (err) {
+      setAnalyticsError('Refresh failed. Try again in a moment.');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -767,12 +907,58 @@ export default function Profile() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}
             >
-              {/* Your existing analytics content goes here */}
-              {/* Paste whatever was previously rendered in Profile.jsx analytics tab */}
-              <div className="py-8 text-center">
-                <p className="font-body text-sm text-muted-foreground">
-                  Analytics content — paste your existing analytics JSX here.
-                </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground font-body">
+                    {analyticsData?.scrapedAt
+                      ? `Last updated: ${new Date(analyticsData.scrapedAt).toLocaleDateString('en-IN')}`
+                      : 'Real-time analytics from your connected platform'}
+                  </p>
+                  <button
+                    onClick={handleRefreshAnalytics}
+                    disabled={analyticsLoading}
+                    className="flex items-center gap-1 text-xs text-primary font-body font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={analyticsLoading ? 'animate-spin' : ''} />
+                    Refresh
+                  </button>
+                </div>
+
+                {analyticsLoading && (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                )}
+
+                {analyticsError && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-center">
+                    <AlertCircle size={20} className="text-destructive mx-auto mb-2" />
+                    <p className="text-sm font-body text-destructive">{analyticsError}</p>
+                    <button
+                      onClick={handleRefreshAnalytics}
+                      className="text-xs text-primary font-body font-semibold mt-2 hover:underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+
+                {!analyticsLoading && !analyticsError && (
+                  <div className="space-y-4">
+                    {dbUser ? (
+                      <PlatformAnalytics profile={dbUser} analyticsData={analyticsData} />
+                    ) : (
+                      <div className="text-center py-8">
+                        <BarChart2 size={32} className="text-muted-foreground mx-auto mb-3" />
+                        <p className="font-body text-sm text-muted-foreground">
+                          Connect Instagram or YouTube to see your analytics
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

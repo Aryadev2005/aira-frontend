@@ -43,7 +43,7 @@ const toolColor = (n = '') => {
 };
 
 // ── SSE stream helper ─────────────────────────────────────────────────────────
-const streamAgent = async ({ message, sessionId, entryScreen, context, onToolStart, onToolEnd, onToken, onDone, onError }) => {
+const streamAgent = async ({ message, sessionId, entryScreen, context, onToolStart, onToolEnd, onToken, onDone, onSuggestions, onError }) => {
   try {
     const token = await auth.currentUser?.getIdToken(true);
     if (!token) throw new Error('Not authenticated');
@@ -90,6 +90,7 @@ const streamAgent = async ({ message, sessionId, entryScreen, context, onToolSta
             onToken(full);
             break;
           }
+          case 'suggestions': if (onSuggestions) onSuggestions(evt.data ?? []); break;
           case 'done':  onDone(extractText(evt.message) || full); return;
           case 'error': throw new Error(evt.message || 'Stream error');
         }
@@ -357,6 +358,9 @@ export default function AriaBrain() {
         updateLast(last => ({ ...last, toolEvents: (last.toolEvents || []).map(e => e.tool === tool && e.status === 'running' ? { ...e, status: 'done' } : e) }));
       },
       onToken:  (full) => updateLast(last => ({ ...last, content: full })),
+      onSuggestions: (suggestions) => {
+        updateLast(last => ({ ...last, followUpSuggestions: suggestions }));
+      },
       onDone:   (full) => {
         setActiveTools([]);
         setStreaming(false);
@@ -437,6 +441,9 @@ export default function AriaBrain() {
         updateLast(last => ({ ...last, toolEvents: (last.toolEvents || []).map(e => e.tool === tool && e.status === 'running' ? { ...e, status: 'done' } : e) }));
       },
       onToken:  (full) => updateLast(last => ({ ...last, content: full })),
+      onSuggestions: (suggestions) => {
+        updateLast(last => ({ ...last, followUpSuggestions: suggestions }));
+      },
       onDone:   (full) => {
         setActiveTools([]);
         setStreaming(false);
