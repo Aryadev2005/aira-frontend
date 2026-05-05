@@ -247,4 +247,53 @@ export const useConnectHandle = () => {
   });
 };
 
+// ── ARIA IDENTITY (Step 7) ────────────────────────────────────────────────
+export const useAriaIdentity = () =>
+  useQuery({
+    queryKey: ['aria-identity'],
+    queryFn: () => api.get('/profile/aria-identity'),
+    staleTime: 1000 * 60 * 60, // 1 hour
+    retry: 1,
+  });
+
+export const useUpdateAriaMemory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.put('/profile/aria-identity/memory', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aria-identity'] });
+    },
+  });
+};
+
+export const useDeleteAriaMemory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.delete('/profile/aria-identity/memory', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aria-identity'] });
+    },
+  });
+};
+
+// ── ROADMAP (Step 5 on Frontend) ──────────────────────────────────────────
+export const usePersonalisedRoadmap = (force = false) =>
+  useQuery({
+    queryKey: ['roadmap', force],
+    queryFn: () =>
+      api.get(`/analytics/roadmap${force ? '?force=true' : ''}`),
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours — matches server cache
+    retry: 1,
+  });
+
+// ── SUGGESTION FEEDBACK (Step 6 on Frontend) ──────────────────────────────
+export const useSuggestionFeedback = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/brain/suggestion-feedback', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aria-identity'] });
+    },
+  });
+};
 
