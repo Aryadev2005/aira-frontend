@@ -3,12 +3,13 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * @typedef {React.TextareaHTMLAttributes<HTMLTextAreaElement>} TextareaProps
+ * @typedef {React.TextareaHTMLAttributes<HTMLTextAreaElement> & { className?: string }} TextareaProps
  */
 
 const Textarea = React.forwardRef(
   /** @type {React.ForwardRefRenderFunction<HTMLTextAreaElement, TextareaProps>} */
-  ({ className, ...props }, ref) => {
+  (/** @type {TextareaProps} */ props, ref) => {
+    const { className, ...rest } = props;
     return (
       <textarea
         className={cn(
@@ -16,7 +17,7 @@ const Textarea = React.forwardRef(
           className
         )}
         ref={ref}
-        {...props}
+        {...rest}
       />
     );
   }

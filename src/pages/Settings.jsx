@@ -45,7 +45,7 @@ const OAUTH_ERROR_MESSAGES = {
 };
 
 function ConnectedAccounts() {
-  const { data: statusData, isLoading, refetch } = useIntegrationStatus();
+  const { data: statusData, isLoading, refetch } = useIntegrationStatus(true);
   const disconnectMutation = useDisconnectPlatform();
   const connections = statusData?.data?.connections || {};
 

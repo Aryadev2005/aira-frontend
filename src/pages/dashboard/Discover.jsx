@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Sparkles, Globe, Zap, Pencil, X, Check } from 'lucide-react';
-import { useProfile } from '@/hooks/useApi';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useProfile, useViralIdeas } from '@/hooks/useApi';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 const badgeStyles = {
@@ -163,19 +163,16 @@ export default function Discover() {
     return `/trends/viral-ideas${qs ? `?${qs}` : ''}`;
   };
 
-  const { data, isLoading, error } = useQuery({
-    queryKey:  ['viralIdeas', activeNiche, isBrowsing],
-    queryFn:   () => api.get(buildUrl()),
-    staleTime: 1000 * 60 * (isBrowsing ? 30 : 120), // 30min browse, 2h permanent
-    retry: 1,
-    enabled: !!activeNiche,
-  });
+  const { data, isLoading, error, refetch: refetchIdeas } = useViralIdeas(
+    browseNiche ? { browseNiche } : {}
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await api.get(buildUrl(true));
-      await queryClient.invalidateQueries({ queryKey: ['viralIdeas', activeNiche] });
+      await queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
+      await refetchIdeas();
     } finally {
       setIsRefreshing(false);
     }
@@ -188,7 +185,7 @@ export default function Discover() {
       setBrowseNiche(niche);
     }
     // Invalidate so fresh fetch happens
-    queryClient.invalidateQueries({ queryKey: ['viralIdeas', niche] });
+    queryClient.invalidateQueries({ queryKey: ['viralIdeas'] });
   };
 
   const ideas   = data?.data?.ideas || [];

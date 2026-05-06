@@ -131,10 +131,11 @@ export default function Songs() {
     niche,
     language,
     ...(lifecycleTab !== 'all' ? { lifecycle: lifecycleTab } : {}),
-    limit: 30,
+    limit: '30',
   };
 
-  const { data: songsData,   isLoading, error, refetch } = useSongs(filters);
+  // Don't fire until dbUser is loaded — prevents niche=undefined query
+  const { data: songsData, isLoading, error, refetch } = useSongs(filters, !!dbUser);
   const { data: langsData }                               = useSongLanguages();
   const { data: predictData, isLoading: predictLoading }  = usePredictSongs();
 

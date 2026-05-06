@@ -38,13 +38,18 @@ export const useFestivalBoosts = () =>
 
 // ── SONGS ─────────────────────────────────────────────────────────────────────
 
-export const useSongs = (filters = {}) => {
-  const params = new URLSearchParams(filters).toString();
+export const useSongs = (filters = {}, enabled = true) => {
+  const cleanFilters = Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== null)
+  );
+  const params = new URLSearchParams(cleanFilters).toString();
   return useQuery({
-    queryKey: ['songs', filters],
-    queryFn:  () => api.get(`/songs${params ? `?${params}` : ''}`),
-    staleTime: 1000 * 60 * 30,   // 30 min — matches hot window TTL
-    retry: 1,
+    queryKey: ['songs', cleanFilters],
+    queryFn: () => api.get(`/songs${params ? `?${params}` : ''}`),
+    staleTime: 1000 * 60 * 30,
+    retry: 2,
+    retryDelay: 2000,
+    enabled,
   });
 };
 
@@ -150,13 +155,15 @@ export const useDiscoverIntelligence = (filters = {}) => {
   });
 };
 
-export const useViralIdeas = () =>
-  useQuery({
-    queryKey: ['viralIdeas'],
-    queryFn:  () => api.get('/trends/viral-ideas'),
-    staleTime: 1000 * 60 * 60 * 2,
+export const useViralIdeas = (filters = {}) => {
+  const params = new URLSearchParams(filters).toString();
+  return useQuery({
+    queryKey: ['viralIdeas', filters],
+    queryFn: () => api.get(`/trends/viral-ideas${params ? `?${params}` : ''}`),
+    staleTime: 1000 * 60 * 120,
     retry: 1,
   });
+};
 
 export const useUpdateNiche = () => {
   const qc = useQueryClient();
@@ -204,11 +211,13 @@ export const useSavedCalendar = () =>
   useQuery({ queryKey: ['saved-calendar'], queryFn: () => api.get('/calendar/saved') });
 
 // ── INTEGRATIONS ─────────────────────────────────────────────────────────
-export const useIntegrationStatus = () =>
+export const useIntegrationStatus = (enabled = true) =>
   useQuery({
     queryKey: ['integration-status'],
     queryFn: () => api.get('/integrations/status'),
-    refetchInterval: 60_000,
+    refetchInterval: enabled ? 60_000 : false,
+    staleTime: 1000 * 60 * 5,
+    enabled,
   });
 
 export const useConnectInstagramByHandle = () => {

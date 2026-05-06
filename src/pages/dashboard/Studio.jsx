@@ -1,12 +1,204 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pin, PinOff, Clock, Sparkles, ChevronDown, ChevronUp, Save, Brain } from 'lucide-react';
-// ── Main Studio ───────────────────────────────────────────────────────────
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  useScriptStructure,
+  useScriptHistory,
+  useSaveSession,
+  useLearnFromEdit,
+  useTogglePin,
+} from '@/hooks/useApi';
+import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+
+/** @typedef {{ id: string; label: string; duration: string; content: string; bRollIdea: string; ariaTip: string; isEditable: boolean }} Section */
+/** @typedef {{ hookLine: string; hookTip: string; sections: Section[]; shootingTips: string[]; commonMistake: string; estimatedViews: string; viralPotential: number }} ScriptResult */
+
+const INTENT_OPTIONS = [
+  { value: 'tightened_language', label: '✂️ Tightened the language' },
+  { value: 'changed_tone',       label: '🎭 Changed the tone' },
+  { value: 'voice_was_off',      label: '🎙️ My voice was off' },
+  { value: 'facts_were_wrong',   label: '❌ Facts were wrong' },
+  { value: 'restructured',       label: '🔀 Restructured it' },
+  { value: 'other',              label: '💬 Other' },
+];
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
+};
+
+// ── Section Editor ────────────────────────────────────────────────────────────
+function SectionCard({ section, onChange }) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-body font-semibold text-sm text-primary">{section.label}</span>
+          <span className="text-muted-foreground font-body text-xs">{section.duration}</span>
+        </div>
+        {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 pb-5 space-y-3">
+              <Textarea
+                value={section.content}
+                onChange={(e) => onChange(section.id, e.target.value)}
+                className="bg-background border-border rounded-xl font-body text-sm min-h-[80px] resize-none focus:ring-primary"
+              />
+              {section.ariaTip && (
+                <div className="flex items-start gap-2 bg-accent/50 rounded-lg px-3 py-2">
+                  <Brain size={13} className="text-primary mt-0.5 shrink-0" />
+                  <p className="font-body text-xs text-muted-foreground leading-relaxed">{section.ariaTip}</p>
+                </div>
+              )}
+              {section.bRollIdea && (
+                <p className="font-body text-xs text-muted-foreground/60">🎥 {section.bRollIdea}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Intent Modal ──────────────────────────────────────────────────────────────
+function IntentModal({ onSelect, onSkip }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ y: 60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 60, opacity: 0 }}
+        className="bg-card border border-border rounded-2xl w-full max-w-sm p-6 space-y-4"
+      >
+        <div>
+          <h3 className="font-heading text-lg text-foreground">What did you change?</h3>
+          <p className="font-body text-sm text-muted-foreground mt-1">ARIA learns from this to write better scripts for you next time.</p>
+        </div>
+        <div className="space-y-2">
+          {INTENT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onSelect(opt.value)}
+              className="w-full text-left px-4 py-3 rounded-xl bg-muted hover:bg-muted/80 font-body text-sm text-foreground transition-colors"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onSkip}
+          className="w-full text-center font-body text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          Skip — just save
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── History Panel ─────────────────────────────────────────────────────────────
+function HistoryPanel({ onSelect, onClose }) {
+  const { data, isLoading } = useScriptHistory();
+  const { mutate: togglePin } = useTogglePin();
+  const scripts = data?.data || [];
+
+  const pinned = scripts.filter((s) => s.pinned);
+  const recent = scripts.filter((s) => !s.pinned);
+
+  const renderScript = (s) => (
+    <div
+      key={s.id}
+      className="flex items-start justify-between gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors group cursor-pointer"
+      onClick={() => onSelect(s)}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="font-body text-sm text-foreground truncate">{s.idea}</p>
+        <p className="font-body text-xs text-muted-foreground mt-0.5">
+          {s.platform} · {new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+        </p>
+      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); togglePin(s.id); }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-muted"
+      >
+        {s.pinned ? <PinOff size={14} className="text-primary" /> : <Pin size={14} className="text-muted-foreground" />}
+      </button>
+    </div>
+  );
+
+  return (
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+      className="fixed inset-y-0 right-0 w-80 bg-card border-l border-border z-40 flex flex-col shadow-2xl"
+    >
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <h3 className="font-heading text-base text-foreground">Script History</h3>
+        <button onClick={onClose} className="font-body text-sm text-muted-foreground hover:text-foreground">Close</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {!isLoading && pinned.length > 0 && (
+          <div>
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">📌 Pinned</p>
+            {pinned.map(renderScript)}
+          </div>
+        )}
+
+        {!isLoading && recent.length > 0 && (
+          <div>
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">Recent</p>
+            {recent.map(renderScript)}
+          </div>
+        )}
+
+        {!isLoading && scripts.length === 0 && (
+          <p className="font-body text-sm text-muted-foreground text-center py-8">No scripts yet. Generate your first one!</p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Main Studio ───────────────────────────────────────────────────────────────
 export default function Studio() {
   const { dbUser } = useFirebaseAuth();
 
   const [idea, setIdea]                   = useState('');
-  /** @type {[ScriptResult | null, Function]} */
   const [result, setResult]               = useState(null);
   const [editedSections, setEditedSections] = useState([]);
   const [generatedSections, setGeneratedSections] = useState([]);
@@ -17,13 +209,9 @@ export default function Studio() {
   const [saved, setSaved]                 = useState(false);
   const [error, setError]                 = useState(null);
 
-  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, {idea: string; platform: any; niche: any; archetype: any; followerRange: any;}, unknown>} */
   const { mutateAsync: generateScript, isPending } = useScriptStructure();
-  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, {idea: string; platform: any; niche: any; generatedScript: any; editedScript: any}, unknown>} */
   const { mutateAsync: saveSession }               = useSaveSession();
-  /** @type {import('@tanstack/react-query').UseMutationResult<any, Error, {generatedSections: any[]; editedSections: any[]; intentLabel: any; sessionId: any}, unknown>} */
-  const { mutateAsync: learnFromEdit }             = useLearnFromEdit();from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+  const { mutateAsync: learnFromEdit }             = useLearnFromEdit();
 import {
   useScriptStructure,
   useScriptHistory,
