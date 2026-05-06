@@ -303,3 +303,35 @@ export const useSuggestionFeedback = () => {
   });
 };
 
+// ── STUDIO EXTENDED ───────────────────────────────────────────────────────────
+export const useScriptHistory = () =>
+  useQuery({
+    queryKey: ['script-history'],
+    queryFn: () => api.get('/studio/history'),
+    staleTime: 1000 * 60 * 5,
+  });
+
+export const useSaveSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post('/studio/session/save', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['script-history'] });
+    },
+  });
+};
+
+export const useLearnFromEdit = () =>
+  useMutation({
+    mutationFn: (body) => api.post('/studio/learn', body),
+  });
+
+export const useTogglePin = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (scriptId) => api.patch(`/studio/pin/${scriptId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['script-history'] });
+    },
+  });
+};
