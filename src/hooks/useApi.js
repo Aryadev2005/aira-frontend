@@ -301,6 +301,25 @@ export const usePersonalisedRoadmap = (force = false) =>
     retry: 1,
   });
 
+// ── CREATOR ANALYTICS (Full ARIA analysis tab) ────────────────────────────
+export const useCreatorAnalytics = () =>
+  useQuery({
+    queryKey: ['creator-analytics'],
+    queryFn: () => api.get('/profile/creator-analytics'),
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours — matches backend cache
+    retry: 1,
+  });
+
+export const useRefreshCreatorAnalytics = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/profile/creator-analytics/refresh'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['creator-analytics'] });
+    },
+  });
+};
+
 // ── SUGGESTION FEEDBACK (Step 6 on Frontend) ──────────────────────────────
 export const useSuggestionFeedback = () => {
   const qc = useQueryClient();
