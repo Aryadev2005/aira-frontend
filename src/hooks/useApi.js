@@ -165,6 +165,11 @@ export const useViralIdeas = (filters = {}) => {
   });
 };
 
+export const useRecordTrendInteraction = () =>
+  useMutation({
+    mutationFn: (body) => api.post('/trends/interaction', body),
+  });
+
 export const useUpdateNiche = () => {
   const qc = useQueryClient();
   return useMutation({

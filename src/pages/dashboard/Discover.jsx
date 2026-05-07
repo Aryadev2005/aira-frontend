@@ -1,7 +1,32 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Sparkles, Globe, Zap, Pencil, X, Check } from 'lucide-react';
-import { useProfile, useViralIdeas } from '@/hooks/useApi';
+import { RefreshCw, Spar// ── Main Discover Component ───────────────────────────────────────────────
+export default function Discover() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing]       = useState(false);
+  const [showNichePicker, setShowNichePicker] = useState(false);
+  const [browseNiche, setBrowseNiche]         = useState(null); // null = use account niche
+
+  const { data: profileData, refetch: refetchProfile } = useProfile();
+  const user      = profileData?.data;
+  const userNiche = user?.niches?.[0] || null;
+  const hasNiche  = !!userNiche;
+
+  // Active niche = browsing niche OR account niche
+  const activeNiche    = browseNiche || userNiche;
+  const isBrowsing     = !!browseNiche && browseNiche !== userNiche;
+
+  // Mutation for recording trend interactions (non-blocking)
+  const recordInteraction = useRecordTrendInteraction();
+
+  // Helper to track interaction without blocking UI
+  const trackInteraction = (trendTitle, source, niche, action) => {
+    recordInteraction.mutate(
+      { trendTitle, source: source || undefined, niche: niche || undefined, action },
+      { onError: err => console.warn('Failed to track interaction:', err) }
+    );
+  };p, Pencil, X, Check } from 'lucide-react';
+import { useProfile, useViralIdeas, useRecordTrendInteraction } from '@/hooks/useApi';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -339,7 +364,11 @@ export default function Discover() {
 
         {/* ARIA Top Pick */}
         {topPick && !isLoading && !isRefreshing && (
-          <motion.div variants={item} className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm">
+          <motion.div
+            variants={item}
+            onViewportEnter={() => trackInteraction(topPick.title, topPick.sources?.[0], activeNiche, 'viewed')}
+            className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm"
+          >
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={16} className="text-primary" />
               <span className="text-primary text-xs font-body font-semibold tracking-wider">
@@ -373,6 +402,7 @@ export default function Discover() {
                   key={idea.id || idx}
                   variants={item}
                   whileHover={{ scale: 1.01, y: -2 }}
+                  onViewportEnter={() => trackInteraction(idea.title, idea.sources?.[0], activeNiche, 'viewed')}
                   className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
                 >
                   <div className="flex items-center justify-between mb-3">
