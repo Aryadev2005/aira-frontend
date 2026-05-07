@@ -348,6 +348,19 @@ export const useDeleteAriaMemory = () => {
   });
 };
 
+/**
+ * @type {() => import('@tanstack/react-query').UseMutationResult<any, Error, undefined, unknown>}
+ */
+export const useRebuildVoicePortrait = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/profile/voice-portrait/rebuild"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["aria-identity"] });
+    },
+  });
+};
+
 // ── ROADMAP (Step 5 on Frontend) ──────────────────────────────────────────
 export const usePersonalisedRoadmap = (force = false) =>
   useQuery({
