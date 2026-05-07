@@ -1,31 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Spar// ── Main Discover Component ───────────────────────────────────────────────
-export default function Discover() {
-  const queryClient = useQueryClient();
-  const [isRefreshing, setIsRefreshing]       = useState(false);
-  const [showNichePicker, setShowNichePicker] = useState(false);
-  const [browseNiche, setBrowseNiche]         = useState(null); // null = use account niche
-
-  const { data: profileData, refetch: refetchProfile } = useProfile();
-  const user      = profileData?.data;
-  const userNiche = user?.niches?.[0] || null;
-  const hasNiche  = !!userNiche;
-
-  // Active niche = browsing niche OR account niche
-  const activeNiche    = browseNiche || userNiche;
-  const isBrowsing     = !!browseNiche && browseNiche !== userNiche;
-
-  // Mutation for recording trend interactions (non-blocking)
-  const recordInteraction = useRecordTrendInteraction();
-
-  // Helper to track interaction without blocking UI
-  const trackInteraction = (trendTitle, source, niche, action) => {
-    recordInteraction.mutate(
-      { trendTitle, source: source || undefined, niche: niche || undefined, action },
-      { onError: err => console.warn('Failed to track interaction:', err) }
-    );
-  };p, Pencil, X, Check } from 'lucide-react';
+import { RefreshCw, Sparkles, Globe, Pencil, X, Check, Zap } from 'lucide-react';
 import { useProfile, useViralIdeas, useRecordTrendInteraction } from '@/hooks/useApi';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -160,6 +135,20 @@ export default function Discover() {
   // Active niche = browsing niche OR account niche
   const activeNiche    = browseNiche || userNiche;
   const isBrowsing     = !!browseNiche && browseNiche !== userNiche;
+
+  // Mutation for recording trend interactions (non-blocking)
+  const { mutate: recordInteraction } = useRecordTrendInteraction();
+
+  // Helper to track interaction without blocking UI
+  const trackInteraction = useCallback((title, source, niche, action) => {
+    if (!title) return;
+    recordInteraction({
+      trendTitle: String(title).substring(0, 200),
+      source:     source || 'unknown',
+      niche:      niche  || activeNiche || 'general',
+      action,
+    });
+  }, [recordInteraction, activeNiche]);
 
   // Update permanent niche
   const updateNiche = useMutation({
