@@ -1,36 +1,51 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Pin, PinOff, Clock, Sparkles, ChevronDown, ChevronUp, Save, Brain } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Pin,
+  PinOff,
+  Clock,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Save,
+  Brain,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useScriptStructure,
   useScriptHistory,
   useSaveSession,
   useLearnFromEdit,
   useTogglePin,
-} from '@/hooks/useApi';
-import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
+} from "@/hooks/useApi";
+import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 
 /** @typedef {{ id: string; label: string; duration: string; content: string; bRollIdea: string; ariaTip: string; isEditable: boolean }} Section */
 /** @typedef {{ hookLine: string; hookTip: string; sections: Section[]; shootingTips: string[]; commonMistake: string; estimatedViews: string; viralPotential: number }} ScriptResult */
+/** @typedef {{ id: string; idea: string; platform: string; created_at: string; pinned: boolean; generated_script?: ScriptResult; edited_script?: ScriptResult }} ScriptHistoryItem */
+/** @typedef {{ primary_platform?: string; niches?: string[]; archetype?: string; follower_range?: string }} DbUser */
 
 const INTENT_OPTIONS = [
-  { value: 'tightened_language', label: '✂️ Tightened the language' },
-  { value: 'changed_tone',       label: '🎭 Changed the tone' },
-  { value: 'voice_was_off',      label: '🎙️ My voice was off' },
-  { value: 'facts_were_wrong',   label: '❌ Facts were wrong' },
-  { value: 'restructured',       label: '🔀 Restructured it' },
-  { value: 'other',              label: '💬 Other' },
+  { value: "tightened_language", label: "✂️ Tightened the language" },
+  { value: "changed_tone", label: "🎭 Changed the tone" },
+  { value: "voice_was_off", label: "🎙️ My voice was off" },
+  { value: "facts_were_wrong", label: "❌ Facts were wrong" },
+  { value: "restructured", label: "🔀 Restructured it" },
+  { value: "other", label: "💬 Other" },
 ];
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
 const item = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
+  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 25 } },
 };
 
 // ── Section Editor ────────────────────────────────────────────────────────────
+/** @param {{ section: Section; onChange: (id: string, value: string) => void }} props */
 function SectionCard({ section, onChange }) {
   const [open, setOpen] = useState(true);
 
@@ -41,17 +56,25 @@ function SectionCard({ section, onChange }) {
         className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/40 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="font-body font-semibold text-sm text-primary">{section.label}</span>
-          <span className="text-muted-foreground font-body text-xs">{section.duration}</span>
+          <span className="font-body font-semibold text-sm text-primary">
+            {section.label}
+          </span>
+          <span className="text-muted-foreground font-body text-xs">
+            {section.duration}
+          </span>
         </div>
-        {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+        {open ? (
+          <ChevronUp size={16} className="text-muted-foreground" />
+        ) : (
+          <ChevronDown size={16} className="text-muted-foreground" />
+        )}
       </button>
 
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
@@ -65,11 +88,15 @@ function SectionCard({ section, onChange }) {
               {section.ariaTip && (
                 <div className="flex items-start gap-2 bg-accent/50 rounded-lg px-3 py-2">
                   <Brain size={13} className="text-primary mt-0.5 shrink-0" />
-                  <p className="font-body text-xs text-muted-foreground leading-relaxed">{section.ariaTip}</p>
+                  <p className="font-body text-xs text-muted-foreground leading-relaxed">
+                    {section.ariaTip}
+                  </p>
                 </div>
               )}
               {section.bRollIdea && (
-                <p className="font-body text-xs text-muted-foreground/60">🎥 {section.bRollIdea}</p>
+                <p className="font-body text-xs text-muted-foreground/60">
+                  🎥 {section.bRollIdea}
+                </p>
               )}
             </div>
           </motion.div>
@@ -80,6 +107,7 @@ function SectionCard({ section, onChange }) {
 }
 
 // ── Intent Modal ──────────────────────────────────────────────────────────────
+/** @param {{ onSelect: (label: string) => void; onSkip: () => void }} props */
 function IntentModal({ onSelect, onSkip }) {
   return (
     <motion.div
@@ -95,8 +123,12 @@ function IntentModal({ onSelect, onSkip }) {
         className="bg-card border border-border rounded-2xl w-full max-w-sm p-6 space-y-4"
       >
         <div>
-          <h3 className="font-heading text-lg text-foreground">What did you change?</h3>
-          <p className="font-body text-sm text-muted-foreground mt-1">ARIA learns from this to write better scripts for you next time.</p>
+          <h3 className="font-heading text-lg text-foreground">
+            What did you change?
+          </h3>
+          <p className="font-body text-sm text-muted-foreground mt-1">
+            ARIA learns from this to write better scripts for you next time.
+          </p>
         </div>
         <div className="space-y-2">
           {INTENT_OPTIONS.map((opt) => (
@@ -121,14 +153,17 @@ function IntentModal({ onSelect, onSkip }) {
 }
 
 // ── History Panel ─────────────────────────────────────────────────────────────
+/** @param {{ onSelect: (script: ScriptHistoryItem) => void; onClose: () => void }} props */
 function HistoryPanel({ onSelect, onClose }) {
-  const { data, isLoading } = useScriptHistory();
-  const { mutate: togglePin } = useTogglePin();
+  const { data, isLoading } = /** @type {any} */ (useScriptHistory());
+  const { mutate: togglePin } = /** @type {any} */ (useTogglePin());
+  /** @type {ScriptHistoryItem[]} */
   const scripts = data?.data || [];
 
   const pinned = scripts.filter((s) => s.pinned);
   const recent = scripts.filter((s) => !s.pinned);
 
+  /** @param {ScriptHistoryItem} s */
   const renderScript = (s) => (
     <div
       key={s.id}
@@ -138,238 +173,47 @@ function HistoryPanel({ onSelect, onClose }) {
       <div className="flex-1 min-w-0">
         <p className="font-body text-sm text-foreground truncate">{s.idea}</p>
         <p className="font-body text-xs text-muted-foreground mt-0.5">
-          {s.platform} · {new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+          {s.platform} ·{" "}
+          {new Date(s.created_at).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+          })}
         </p>
       </div>
       <button
-        onClick={(e) => { e.stopPropagation(); togglePin(s.id); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePin(s.id);
+        }}
         className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-muted"
       >
-        {s.pinned ? <PinOff size={14} className="text-primary" /> : <Pin size={14} className="text-muted-foreground" />}
+        {s.pinned ? (
+          <PinOff size={14} className="text-primary" />
+        ) : (
+          <Pin size={14} className="text-muted-foreground" />
+        )}
       </button>
     </div>
   );
 
   return (
     <motion.div
-      initial={{ x: '100%' }}
+      initial={{ x: "100%" }}
       animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 30, stiffness: 300 }}
       className="fixed inset-y-0 right-0 w-80 bg-card border-l border-border z-40 flex flex-col shadow-2xl"
     >
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <h3 className="font-heading text-base text-foreground">Script History</h3>
-        <button onClick={onClose} className="font-body text-sm text-muted-foreground hover:text-foreground">Close</button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-        {isLoading && (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />
-            ))}
-          </div>
-        )}
-
-        {!isLoading && pinned.length > 0 && (
-          <div>
-            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">📌 Pinned</p>
-            {pinned.map(renderScript)}
-          </div>
-        )}
-
-        {!isLoading && recent.length > 0 && (
-          <div>
-            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">Recent</p>
-            {recent.map(renderScript)}
-          </div>
-        )}
-
-        {!isLoading && scripts.length === 0 && (
-          <p className="font-body text-sm text-muted-foreground text-center py-8">No scripts yet. Generate your first one!</p>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Main Studio ───────────────────────────────────────────────────────────────
-export default function Studio() {
-  const { dbUser } = useFirebaseAuth();
-
-  const [idea, setIdea]                   = useState('');
-  const [result, setResult]               = useState(null);
-  const [editedSections, setEditedSections] = useState([]);
-  const [generatedSections, setGeneratedSections] = useState([]);
-  const [sessionId, setSessionId]         = useState(null);
-  const [showHistory, setShowHistory]     = useState(false);
-  const [showIntent, setShowIntent]       = useState(false);
-  const [saving, setSaving]               = useState(false);
-  const [saved, setSaved]                 = useState(false);
-  const [error, setError]                 = useState(null);
-
-  const { mutateAsync: generateScript, isPending } = useScriptStructure();
-  const { mutateAsync: saveSession }               = useSaveSession();
-  const { mutateAsync: learnFromEdit }             = useLearnFromEdit();
-import {
-  useScriptStructure,
-  useScriptHistory,
-  useSaveSession,
-  useLearnFromEdit,
-  useTogglePin,
-} from '@/hooks/useApi';
-import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
-
-/** @typedef {{ id: string; label: string; duration: string; content: string; bRollIdea: string; ariaTip: string; isEditable: boolean }} Section */
-/** @typedef {{ hookLine: string; hookTip: string; sections: Section[]; shootingTips: string[]; commonMistake: string; estimatedViews: string; viralPotential: number }} ScriptResult */
-
-const INTENT_OPTIONS = [
-  { value: 'tightened_language', label: '✂️ Tightened the language' },
-  { value: 'changed_tone',       label: '🎭 Changed the tone' },
-  { value: 'voice_was_off',      label: '🎙️ My voice was off' },
-  { value: 'facts_were_wrong',   label: '❌ Facts were wrong' },
-  { value: 'restructured',       label: '🔀 Restructured it' },
-  { value: 'other',              label: '💬 Other' },
-];
-
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
-};
-
-// ── Section Editor ────────────────────────────────────────────────────────────
-function SectionCard({ section, onChange }) {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/40 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <span className="font-body font-semibold text-sm text-primary">{section.label}</span>
-          <span className="text-muted-foreground font-body text-xs">{section.duration}</span>
-        </div>
-        {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 space-y-3">
-              <Textarea
-                value={section.content}
-                onChange={(e) => onChange(section.id, e.target.value)}
-                className="bg-background border-border rounded-xl font-body text-sm min-h-[80px] resize-none focus:ring-primary"
-              />
-              {section.ariaTip && (
-                <div className="flex items-start gap-2 bg-accent/50 rounded-lg px-3 py-2">
-                  <Brain size={13} className="text-primary mt-0.5 shrink-0" />
-                  <p className="font-body text-xs text-muted-foreground leading-relaxed">{section.ariaTip}</p>
-                </div>
-              )}
-              {section.bRollIdea && (
-                <p className="font-body text-xs text-muted-foreground/60">🎥 {section.bRollIdea}</p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Intent Modal ──────────────────────────────────────────────────────────────
-function IntentModal({ onSelect, onSkip }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        className="bg-card border border-border rounded-2xl w-full max-w-sm p-6 space-y-4"
-      >
-        <div>
-          <h3 className="font-heading text-lg text-foreground">What did you change?</h3>
-          <p className="font-body text-sm text-muted-foreground mt-1">ARIA learns from this to write better scripts for you next time.</p>
-        </div>
-        <div className="space-y-2">
-          {INTENT_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => onSelect(opt.value)}
-              className="w-full text-left px-4 py-3 rounded-xl bg-muted hover:bg-muted/80 font-body text-sm text-foreground transition-colors"
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <h3 className="font-heading text-base text-foreground">
+          Script History
+        </h3>
         <button
-          onClick={onSkip}
-          className="w-full text-center font-body text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          onClick={onClose}
+          className="font-body text-sm text-muted-foreground hover:text-foreground"
         >
-          Skip — just save
+          Close
         </button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── History Panel ─────────────────────────────────────────────────────────────
-function HistoryPanel({ onSelect, onClose }) {
-  const { data, isLoading } = useScriptHistory();
-  const { mutate: togglePin } = useTogglePin();
-  const scripts = data?.data || [];
-
-  const pinned = scripts.filter((s) => s.pinned);
-  const recent = scripts.filter((s) => !s.pinned);
-
-  const renderScript = (s) => (
-    <div
-      key={s.id}
-      className="flex items-start justify-between gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors group cursor-pointer"
-      onClick={() => onSelect(s)}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="font-body text-sm text-foreground truncate">{s.idea}</p>
-        <p className="font-body text-xs text-muted-foreground mt-0.5">
-          {s.platform} · {new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-        </p>
-      </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); togglePin(s.id); }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-muted"
-      >
-        {s.pinned ? <PinOff size={14} className="text-primary" /> : <Pin size={14} className="text-muted-foreground" />}
-      </button>
-    </div>
-  );
-
-  return (
-    <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed inset-y-0 right-0 w-80 bg-card border-l border-border z-40 flex flex-col shadow-2xl"
-    >
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <h3 className="font-heading text-base text-foreground">Script History</h3>
-        <button onClick={onClose} className="font-body text-sm text-muted-foreground hover:text-foreground">Close</button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
@@ -383,20 +227,26 @@ function HistoryPanel({ onSelect, onClose }) {
 
         {!isLoading && pinned.length > 0 && (
           <div>
-            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">📌 Pinned</p>
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+              📌 Pinned
+            </p>
             {pinned.map(renderScript)}
           </div>
         )}
 
         {!isLoading && recent.length > 0 && (
           <div>
-            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">Recent</p>
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+              Recent
+            </p>
             {recent.map(renderScript)}
           </div>
         )}
 
         {!isLoading && scripts.length === 0 && (
-          <p className="font-body text-sm text-muted-foreground text-center py-8">No scripts yet. Generate your first one!</p>
+          <p className="font-body text-sm text-muted-foreground text-center py-8">
+            No scripts yet. Generate your first one!
+          </p>
         )}
       </div>
     </motion.div>
@@ -405,22 +255,36 @@ function HistoryPanel({ onSelect, onClose }) {
 
 // ── Main Studio ───────────────────────────────────────────────────────────────
 export default function Studio() {
-  const { dbUser } = useFirebaseAuth();
+  const { dbUser } = /** @type {{ dbUser: DbUser | null }} */ (
+    useFirebaseAuth()
+  );
 
-  const [idea, setIdea]                   = useState('');
-  const [result, setResult]               = useState(null);
-  const [editedSections, setEditedSections] = useState([]);
-  const [generatedSections, setGeneratedSections] = useState([]);
-  const [sessionId, setSessionId]         = useState(null);
-  const [showHistory, setShowHistory]     = useState(false);
-  const [showIntent, setShowIntent]       = useState(false);
-  const [saving, setSaving]               = useState(false);
-  const [saved, setSaved]                 = useState(false);
-  const [error, setError]                 = useState(null);
+  const [idea, setIdea] = useState("");
+  const [result, setResult] = useState(
+    /** @type {ScriptResult | null} */ (null),
+  );
+  const [editedSections, setEditedSections] = useState(
+    /** @type {Section[]} */ ([]),
+  );
+  const [generatedSections, setGeneratedSections] = useState(
+    /** @type {Section[]} */ ([]),
+  );
+  const [sessionId, setSessionId] = useState(
+    /** @type {string | null} */ (null),
+  );
+  const [showHistory, setShowHistory] = useState(false);
+  const [showIntent, setShowIntent] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(/** @type {string | null} */ (null));
 
-  const { mutateAsync: generateScript, isPending } = useScriptStructure();
-  const { mutateAsync: saveSession }               = useSaveSession();
-  const { mutateAsync: learnFromEdit }             = useLearnFromEdit();
+  const { mutateAsync: generateScript, isPending } = /** @type {any} */ (
+    useScriptStructure()
+  );
+  const { mutateAsync: saveSession } = /** @type {any} */ (useSaveSession());
+  const { mutateAsync: learnFromEdit } = /** @type {any} */ (
+    useLearnFromEdit()
+  );
 
   const handleGenerate = async () => {
     if (!idea.trim()) return;
@@ -432,10 +296,10 @@ export default function Studio() {
     try {
       const res = await generateScript({
         idea,
-        platform: dbUser?.primary_platform || 'instagram',
-        niche: dbUser?.niches?.[0] || 'general',
-        archetype: dbUser?.archetype || 'CREATOR',
-        followerRange: dbUser?.follower_range || '1K-10K',
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
+        archetype: dbUser?.archetype || "CREATOR",
+        followerRange: dbUser?.follower_range || "1K-10K",
       });
 
       const data = res.data;
@@ -446,21 +310,22 @@ export default function Studio() {
       // Auto-save initial generation
       const saved = await saveSession({
         idea,
-        platform: dbUser?.primary_platform || 'instagram',
-        niche: dbUser?.niches?.[0] || 'general',
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
         generatedScript: data,
         editedScript: {},
       });
       setSessionId(saved?.data?.sessionId || null);
     } catch (e) {
-      console.error('Generation failed', e);
-      setError('Could not generate script. Please try again.');
+      console.error("Generation failed", e);
+      setError("Could not generate script. Please try again.");
     }
   };
 
+  /** @param {string} sectionId @param {string} newContent */
   const handleSectionChange = (sectionId, newContent) => {
     setEditedSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, content: newContent } : s))
+      prev.map((s) => (s.id === sectionId ? { ...s, content: newContent } : s)),
     );
     setSaved(false);
   };
@@ -479,6 +344,7 @@ export default function Studio() {
     }
   };
 
+  /** @param {string | null} intentLabel */
   const handleSaveFinal = async (intentLabel) => {
     setShowIntent(false);
     setSaving(true);
@@ -495,31 +361,30 @@ export default function Studio() {
 
       await saveSession({
         idea,
-        platform: dbUser?.primary_platform || 'instagram',
-        niche: dbUser?.niches?.[0] || 'general',
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
         generatedScript: result,
         editedScript: { sections: editedSections },
       });
 
       setSaved(true);
     } catch (e) {
-      console.error('Save failed', e);
+      console.error("Save failed", e);
     } finally {
       setSaving(false);
     }
   };
 
+  /** @param {ScriptHistoryItem} script */
   const handleHistorySelect = (script) => {
     const activeScript = script.edited_script?.sections?.length
       ? script.edited_script
-      : script.generated_script;
+      : script.generated_script || null;
 
     setIdea(script.idea);
     setResult(activeScript);
     setGeneratedSections(script.generated_script?.sections || []);
-    setEditedSections(
-      JSON.parse(JSON.stringify(activeScript?.sections || []))
-    );
+    setEditedSections(JSON.parse(JSON.stringify(activeScript?.sections || [])));
     setSessionId(script.id);
     setShowHistory(false);
     setSaved(false);
@@ -542,20 +407,33 @@ export default function Studio() {
         )}
       </AnimatePresence>
 
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-20">
-
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="space-y-6 pb-20"
+      >
         {/* Header */}
-        <motion.div variants={item} className="flex items-center justify-between">
+        <motion.div
+          variants={item}
+          className="flex items-center justify-between"
+        >
           <div>
-            <h1 className="font-heading text-2xl text-foreground mb-1">Studio</h1>
-            <p className="text-muted-foreground font-body text-sm">Write your idea. ARIA builds the script.</p>
+            <h1 className="font-heading text-2xl text-foreground mb-1">
+              Studio
+            </h1>
+            <p className="text-muted-foreground font-body text-sm">
+              Write your idea. ARIA builds the script.
+            </p>
           </div>
           <button
             onClick={() => setShowHistory(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
           >
             <Clock size={15} className="text-muted-foreground" />
-            <span className="font-body text-sm text-muted-foreground">History</span>
+            <span className="font-body text-sm text-muted-foreground">
+              History
+            </span>
           </button>
         </motion.div>
 
@@ -567,7 +445,9 @@ export default function Studio() {
             onChange={(e) => setIdea(e.target.value)}
             className="bg-card border-border rounded-xl font-body text-sm min-h-[100px] resize-none focus:ring-primary"
           />
-          {error && <p className="text-destructive font-body text-sm">{error}</p>}
+          {error && (
+            <p className="text-destructive font-body text-sm">{error}</p>
+          )}
           <Button
             onClick={handleGenerate}
             disabled={isPending || !idea.trim()}
@@ -606,10 +486,16 @@ export default function Studio() {
               {/* Hook highlight */}
               {result.hookLine && (
                 <div className="bg-primary/10 border border-primary/20 rounded-xl px-5 py-4">
-                  <p className="font-body text-xs font-semibold text-primary uppercase tracking-wider mb-1">Hook Line</p>
-                  <p className="font-heading text-lg text-foreground">"{result.hookLine}"</p>
+                  <p className="font-body text-xs font-semibold text-primary uppercase tracking-wider mb-1">
+                    Hook Line
+                  </p>
+                  <p className="font-heading text-lg text-foreground">
+                    "{result.hookLine}"
+                  </p>
                   {result.hookTip && (
-                    <p className="font-body text-xs text-muted-foreground mt-2">{result.hookTip}</p>
+                    <p className="font-body text-xs text-muted-foreground mt-2">
+                      {result.hookTip}
+                    </p>
                   )}
                 </div>
               )}
@@ -628,10 +514,17 @@ export default function Studio() {
               {/* Shooting tips */}
               {result.shootingTips?.length > 0 && (
                 <div className="bg-card border border-border rounded-xl p-5">
-                  <p className="font-body font-semibold text-sm text-foreground mb-3">📱 Shooting Tips</p>
+                  <p className="font-body font-semibold text-sm text-foreground mb-3">
+                    📱 Shooting Tips
+                  </p>
                   <div className="space-y-2">
                     {result.shootingTips.map((tip, i) => (
-                      <p key={i} className="font-body text-sm text-muted-foreground">• {tip}</p>
+                      <p
+                        key={i}
+                        className="font-body text-sm text-muted-foreground"
+                      >
+                        • {tip}
+                      </p>
                     ))}
                   </div>
                 </div>
@@ -642,14 +535,22 @@ export default function Studio() {
                 <div className="flex gap-3">
                   {result.estimatedViews && (
                     <div className="flex-1 bg-card border border-border rounded-xl p-4 text-center">
-                      <p className="font-body text-xs text-muted-foreground mb-1">Estimated Views</p>
-                      <p className="font-heading text-lg text-foreground">{result.estimatedViews}</p>
+                      <p className="font-body text-xs text-muted-foreground mb-1">
+                        Estimated Views
+                      </p>
+                      <p className="font-heading text-lg text-foreground">
+                        {result.estimatedViews}
+                      </p>
                     </div>
                   )}
                   {result.viralPotential && (
                     <div className="flex-1 bg-card border border-border rounded-xl p-4 text-center">
-                      <p className="font-body text-xs text-muted-foreground mb-1">Viral Score</p>
-                      <p className="font-heading text-lg text-primary">{result.viralPotential}%</p>
+                      <p className="font-body text-xs text-muted-foreground mb-1">
+                        Viral Score
+                      </p>
+                      <p className="font-heading text-lg text-primary">
+                        {result.viralPotential}%
+                      </p>
                     </div>
                   )}
                 </div>
@@ -658,8 +559,12 @@ export default function Studio() {
               {/* Common mistake */}
               {result.commonMistake && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-5 py-4">
-                  <p className="font-body text-xs font-semibold text-destructive uppercase tracking-wider mb-1">Common Mistake</p>
-                  <p className="font-body text-sm text-foreground">{result.commonMistake}</p>
+                  <p className="font-body text-xs font-semibold text-destructive uppercase tracking-wider mb-1">
+                    Common Mistake
+                  </p>
+                  <p className="font-body text-sm text-foreground">
+                    {result.commonMistake}
+                  </p>
                 </div>
               )}
 
@@ -670,8 +575,8 @@ export default function Studio() {
                   disabled={saving || saved}
                   className={`rounded-pill px-8 font-body font-semibold ${
                     saved
-                      ? 'bg-rising/20 text-rising border border-rising/30'
-                      : 'bg-card border border-border text-foreground hover:bg-muted'
+                      ? "bg-rising/20 text-rising border border-rising/30"
+                      : "bg-card border border-border text-foreground hover:bg-muted"
                   }`}
                 >
                   {saving ? (
