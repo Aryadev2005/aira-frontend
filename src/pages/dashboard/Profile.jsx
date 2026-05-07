@@ -7,13 +7,15 @@ import {
   Target, Zap, TrendingUp, User, Mic, Image, Layout,
   Globe, Lock, CheckCircle2, Circle, Heart, Users, Eye, PlayCircle,
   Sprout, Instagram, Youtube, ExternalLink, Star, Settings, Bell, Compass, History, LinkIcon,
-  Unlink, LogOut, ChevronRight,
+  Unlink, LogOut, ChevronRight, Award, Hash, CheckCircle, ArrowRight, IndianRupee, Flame, MessageCircle
 } from 'lucide-react';
 import {
   useAriaIdentity,
   useUpdateAriaMemory,
   useDeleteAriaMemory,
   usePersonalisedRoadmap,
+  useCreatorAnalytics,
+  useRefreshCreatorAnalytics
 } from '@/hooks/useApi';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { api } from '@/lib/api';
@@ -809,6 +811,485 @@ function RoadmapTab() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SCORE RING COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function ScoreRing({ score, label, size = 72, color = 'text-primary' }) {
+  const r = size * 0.38;
+  const circ = 2 * Math.PI * r;
+  const fill = circ * (score / 100);
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="currentColor"
+            className="text-muted/30" strokeWidth={size * 0.08} />
+          <circle cx={size/2} cy={size/2} r={r} fill="none"
+            stroke="currentColor"
+            className={color}
+            strokeWidth={size * 0.08}
+            strokeDasharray={`${fill} ${circ - fill}`}
+            strokeLinecap="round" />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`font-heading text-base font-bold ${color}`}>{score}</span>
+        </div>
+      </div>
+      <p className="font-body text-[10px] text-muted-foreground text-center leading-tight">{label}</p>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANALYTICS TAB — MAIN
+// ══════════════════════════════════════════════════════════════════════════════
+
+function AnalyticsTab() {
+  const { data, isLoading, error } = useCreatorAnalytics();
+  const { mutateAsync: doRefresh, isPending: refreshing } = useRefreshCreatorAnalytics();
+  const [expandedPost, setExpandedPost] = useState(null);
+
+  const analytics = data?.data;
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="space-y-3 pt-2">
+        <div className="h-32 bg-muted rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-20 bg-muted rounded-2xl animate-pulse" />
+          <div className="h-20 bg-muted rounded-2xl animate-pulse" />
+        </div>
+        <div className="h-48 bg-muted rounded-2xl animate-pulse" />
+        <div className="h-36 bg-muted rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  // ── No Instagram connected ───────────────────────────────────────────────────
+  if (!analytics) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+          <BarChart2 size={28} className="text-primary" />
+        </div>
+        <p className="font-heading text-lg text-foreground mb-2">No analytics yet</p>
+        <p className="font-body text-sm text-muted-foreground leading-relaxed">
+          Connect your Instagram account to get your full ARIA analysis — better than Social Status, better than VidIQ.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Error ────────────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+        <AlertCircle size={32} className="text-destructive mb-3" />
+        <p className="font-body text-sm text-muted-foreground">Could not load analytics.</p>
+        <button onClick={() => doRefresh()}
+          className="mt-3 px-4 py-2 rounded-xl bg-primary text-white text-sm font-body font-semibold">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const scoreColor = (s) => s >= 75 ? 'text-green-500' : s >= 50 ? 'text-primary' : s >= 30 ? 'text-yellow-500' : 'text-destructive';
+
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4 pt-1 pb-8">
+
+      {/* ── Header row ──────────────────────────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="flex items-center justify-between px-1">
+        <div>
+          <p className="font-body text-xs text-muted-foreground">
+            @{analytics.handle} · {analytics.followerRange}
+          </p>
+          <p className="font-body text-[10px] text-muted-foreground/60">
+            {analytics.isFromCache ? 'Cached' : 'Live'} · {analytics.scrapedAt ? new Date(analytics.scrapedAt).toLocaleDateString('en-IN') : '—'}
+          </p>
+        </div>
+        <button
+          onClick={() => doRefresh()}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-body font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
+          {refreshing ? 'Analysing...' : 'Refresh'}
+        </button>
+      </motion.div>
+
+      {/* ── Health Score hero ────────────────────────────────────────────────── */}
+      <motion.div variants={fadeUp}
+        className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5">
+        <p className="font-body text-xs text-primary font-semibold uppercase tracking-wider mb-4">
+          Account Health
+        </p>
+        <div className="flex items-center justify-around">
+          <ScoreRing score={analytics.healthScore} label="Overall" size={80} color={scoreColor(analytics.healthScore)} />
+          <ScoreRing score={analytics.engagementScore} label="Engagement" size={64} color={scoreColor(analytics.engagementScore)} />
+          <ScoreRing score={analytics.consistencyScore} label="Consistency" size={64} color={scoreColor(analytics.consistencyScore)} />
+          <ScoreRing score={analytics.growthScore} label="Growth" size={64} color={scoreColor(analytics.growthScore)} />
+        </div>
+        {/* Niche benchmark bar */}
+        {analytics.nicheBenchmarks && (
+          <div className="mt-4 bg-background/60 rounded-xl px-3 py-2.5">
+            <p className="font-body text-[10px] text-muted-foreground mb-1.5">
+              {analytics.nicheBenchmarks.label}
+            </p>
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-700"
+                style={{ width: `${analytics.nicheBenchmarks.percentile}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <p className="font-body text-[10px] text-muted-foreground">Niche avg: {analytics.nicheBenchmarks.avgER}%</p>
+              <p className="font-body text-[10px] text-primary font-semibold">Your ER: {analytics.engagementRate}%</p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* ── ARIA Diagnosis ───────────────────────────────────────────────────── */}
+      {analytics.ariaDiagnosis && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Zap size={13} className="text-primary" />
+            </div>
+            <p className="font-body text-xs font-semibold text-foreground uppercase tracking-wider">
+              ARIA's Diagnosis
+            </p>
+          </div>
+          <p className="font-body text-sm text-foreground leading-relaxed">
+            {analytics.ariaDiagnosis}
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Key Stats grid ───────────────────────────────────────────────────── */}
+      <motion.div variants={fadeUp}>
+        <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+          Key Numbers
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { icon: Users,         label: 'Followers',    value: analytics.followers?.toLocaleString('en-IN') },
+            { icon: Heart,         label: 'Avg Likes',    value: Math.round(analytics.avgLikes)?.toLocaleString('en-IN') },
+            { icon: MessageCircle, label: 'Avg Comments', value: Math.round(analytics.avgComments)?.toLocaleString('en-IN') },
+            { icon: Eye,           label: 'Avg Views',    value: Math.round(analytics.avgViews)?.toLocaleString('en-IN') },
+            { icon: TrendingUp,    label: 'Eng. Rate',    value: `${analytics.engagementRate}%` },
+            { icon: Clock,         label: 'Posts/Week',   value: `${analytics.postsPerWeek}x` },
+          ].map(s => (
+            <div key={s.label} className="bg-card border border-border rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <s.icon size={12} className="text-muted-foreground" />
+                <p className="font-body text-[10px] text-muted-foreground">{s.label}</p>
+              </div>
+              <p className="font-heading text-lg text-foreground leading-none">{s.value || '—'}</p>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* ── Top Insights ─────────────────────────────────────────────────────── */}
+      {analytics.ariaInsights?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            5 Key Insights
+          </p>
+          <div className="space-y-2.5">
+            {analytics.ariaInsights.map((insight, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="font-heading text-[10px] text-primary font-bold">{i + 1}</span>
+                </div>
+                <p className="font-body text-sm text-foreground leading-snug">{insight}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Action Items ─────────────────────────────────────────────────────── */}
+      {analytics.ariaActionItems?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Target size={13} className="text-primary" />
+            <p className="font-body text-xs font-semibold text-primary uppercase tracking-wider">
+              Do These Now
+            </p>
+          </div>
+          <div className="space-y-2">
+            {analytics.ariaActionItems.map((action, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <CheckCircle size={14} className="text-primary flex-shrink-0 mt-0.5" />
+                <p className="font-body text-sm text-foreground leading-snug">{action}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Format Breakdown ─────────────────────────────────────────────────── */}
+      {analytics.formatBreakdown && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Content Format Mix
+          </p>
+          <div className="space-y-2.5">
+            {[
+              { label: 'Reels',    data: analytics.formatBreakdown.reels,    color: 'bg-primary' },
+              { label: 'Photos',   data: analytics.formatBreakdown.photos,   color: 'bg-blue-500' },
+              { label: 'Carousels',data: analytics.formatBreakdown.carousels,color: 'bg-purple-500' },
+            ].filter(f => f.data?.count > 0 || f.data?.pct > 0).map(f => (
+              <div key={f.label}>
+                <div className="flex justify-between mb-1">
+                  <p className="font-body text-xs text-foreground">{f.label}</p>
+                  <p className="font-body text-xs text-muted-foreground">
+                    {f.data.count} posts · {f.data.avgLikes?.toLocaleString('en-IN')} avg likes
+                  </p>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full ${f.color} rounded-full`} style={{ width: `${f.data.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="font-body text-xs text-muted-foreground mt-3 bg-muted/50 rounded-lg px-2.5 py-2">
+            {analytics.formatBreakdown.insight}
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Best Posting Times ───────────────────────────────────────────────── */}
+      {analytics.bestPostingTimes?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={13} className="text-muted-foreground" />
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Best Times to Post
+            </p>
+          </div>
+          <div className="space-y-2">
+            {analytics.bestPostingTimes.map((t, i) => (
+              <div key={i} className="flex items-center justify-between bg-muted/40 rounded-xl px-3 py-2.5">
+                <div>
+                  <p className="font-body text-sm text-foreground font-semibold">{t.day}</p>
+                  <p className="font-body text-[10px] text-muted-foreground">{t.timeWindow}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-body text-xs text-foreground">{t.avgLikes?.toLocaleString('en-IN')} avg likes</p>
+                  <p className={`font-body text-[10px] ${t.confidence === 'high' ? 'text-green-500' : 'text-yellow-500'}`}>
+                    {t.confidence} confidence
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Top Hashtags ─────────────────────────────────────────────────────── */}
+      {analytics.topHashtags?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Hash size={13} className="text-muted-foreground" />
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Your Top Hashtags
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {analytics.topHashtags.slice(0, 12).map(tag => (
+              <span key={tag}
+                className="text-[11px] font-body px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Top Posts ────────────────────────────────────────────────────────── */}
+      {analytics.topPosts?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Flame size={13} className="text-orange-500" />
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Top Performing Posts
+            </p>
+          </div>
+          <div className="space-y-2">
+            {analytics.topPosts.slice(0, 5).map((post, i) => {
+              const isExpanded = expandedPost === i;
+              return (
+                <div key={i}
+                  className="border border-border rounded-xl overflow-hidden cursor-pointer"
+                  onClick={() => setExpandedPost(isExpanded ? null : i)}>
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="font-heading text-[10px] text-primary font-bold">{i + 1}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-body text-xs text-foreground truncate">
+                        {post.caption || `${post.type} post`}
+                      </p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Heart size={9} /> {post.likes?.toLocaleString('en-IN')}
+                        </span>
+                        <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
+                          <MessageCircle size={9} /> {post.comments?.toLocaleString('en-IN')}
+                        </span>
+                        {post.views > 0 && (
+                          <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Eye size={9} /> {post.views?.toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {isExpanded ? <ChevronUp size={14} className="text-muted-foreground flex-shrink-0" /> : <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />}
+                  </div>
+                  {isExpanded && (
+                    <div className="border-t border-border px-3 py-2.5 bg-muted/30 space-y-2">
+                      {post.hashtags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {post.hashtags.map(h => (
+                            <span key={h} className="text-[10px] font-body px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                              #{h}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <a href={post.url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 text-[10px] font-body text-primary font-semibold">
+                        View on Instagram <ArrowRight size={10} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Growth Projection ────────────────────────────────────────────────── */}
+      {analytics.growthProjection && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Growth Projection
+          </p>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-muted/40 rounded-xl p-3 text-center">
+              <p className="font-body text-[10px] text-muted-foreground mb-1">Conservative (30d)</p>
+              <p className="font-heading text-sm text-foreground font-semibold">
+                {analytics.growthProjection.conservative}
+              </p>
+            </div>
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-center">
+              <p className="font-body text-[10px] text-primary mb-1">Optimistic (30d)</p>
+              <p className="font-heading text-sm text-foreground font-semibold">
+                {analytics.growthProjection.optimistic}
+              </p>
+            </div>
+          </div>
+          {analytics.growthProjection.daysToMilestone && (
+            <div className="bg-muted/40 rounded-xl px-3 py-2.5">
+              <p className="font-body text-xs text-foreground">
+                Next milestone: <span className="font-semibold text-primary">
+                  {analytics.growthProjection.milestone} followers
+                </span>
+              </p>
+              <p className="font-body text-[10px] text-muted-foreground mt-0.5">
+                Est. {analytics.growthProjection.daysToMilestone} days at current pace
+              </p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Monetisation ─────────────────────────────────────────────────────── */}
+      {analytics.monetisation && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <IndianRupee size={13} className="text-green-500" />
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Monetisation
+            </p>
+            <div className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-body font-semibold ${
+              analytics.monetisation.isReadyForBrands
+                ? 'bg-green-500/10 text-green-500'
+                : 'bg-yellow-500/10 text-yellow-600'
+            }`}>
+              {analytics.monetisation.isReadyForBrands ? '✓ Brand Ready' : `Unlock at ${analytics.monetisation.unlockAt}`}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-muted/40 rounded-xl p-3">
+              <p className="font-body text-[10px] text-muted-foreground mb-1">Brand Deal Range</p>
+              <p className="font-heading text-sm text-foreground font-semibold">
+                ₹{analytics.monetisation.brandDeal?.min?.toLocaleString('en-IN')} –
+                ₹{analytics.monetisation.brandDeal?.max?.toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div className="bg-muted/40 rounded-xl p-3">
+              <p className="font-body text-[10px] text-muted-foreground mb-1">Est. Monthly</p>
+              <p className="font-heading text-sm text-foreground font-semibold">
+                ₹{analytics.monetisation.estimatedMonthlyRevenue?.min?.toLocaleString('en-IN')} –
+                ₹{analytics.monetisation.estimatedMonthlyRevenue?.max?.toLocaleString('en-IN')}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <p className="font-body text-[10px] text-muted-foreground">CPM estimate: {analytics.monetisation.cpm}</p>
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden ml-auto w-24">
+              <div className="h-full bg-green-500 rounded-full"
+                style={{ width: `${analytics.monetisationScore}%` }} />
+            </div>
+            <p className="font-body text-[10px] text-muted-foreground">{analytics.monetisationScore}/100</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Content Gaps ─────────────────────────────────────────────────────── */}
+      {analytics.ariaContentGaps?.length > 0 && (
+        <motion.div variants={fadeUp}
+          className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle size={13} className="text-yellow-500" />
+            <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Content Gaps ARIA Spotted
+            </p>
+          </div>
+          <div className="space-y-2">
+            {analytics.ariaContentGaps.map((gap, i) => (
+              <div key={i} className="flex items-start gap-2.5 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-3 py-2.5">
+                <ArrowRight size={12} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                <p className="font-body text-sm text-foreground leading-snug">{gap}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+    </motion.div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN PROFILE PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -820,23 +1301,7 @@ const TABS = [
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState('aria');
-  const [analyticsData, setAnalyticsData] = useState(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [analyticsError, setAnalyticsError] = useState(null);
   const { dbUser } = useFirebaseAuth();
-
-  const handleRefreshAnalytics = async () => {
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
-    try {
-      const res = await api.post('/profile/refresh');
-      setAnalyticsData(res.data);
-    } catch (err) {
-      setAnalyticsError('Refresh failed. Try again in a moment.');
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -907,59 +1372,7 @@ export default function Profile() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground font-body">
-                    {analyticsData?.scrapedAt
-                      ? `Last updated: ${new Date(analyticsData.scrapedAt).toLocaleDateString('en-IN')}`
-                      : 'Real-time analytics from your connected platform'}
-                  </p>
-                  <button
-                    onClick={handleRefreshAnalytics}
-                    disabled={analyticsLoading}
-                    className="flex items-center gap-1 text-xs text-primary font-body font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} className={analyticsLoading ? 'animate-spin' : ''} />
-                    Refresh
-                  </button>
-                </div>
-
-                {analyticsLoading && (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
-                    ))}
-                  </div>
-                )}
-
-                {analyticsError && (
-                  <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-center">
-                    <AlertCircle size={20} className="text-destructive mx-auto mb-2" />
-                    <p className="text-sm font-body text-destructive">{analyticsError}</p>
-                    <button
-                      onClick={handleRefreshAnalytics}
-                      className="text-xs text-primary font-body font-semibold mt-2 hover:underline"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                )}
-
-                {!analyticsLoading && !analyticsError && (
-                  <div className="space-y-4">
-                    {dbUser ? (
-                      <PlatformAnalytics profile={dbUser} analyticsData={analyticsData} />
-                    ) : (
-                      <div className="text-center py-8">
-                        <BarChart2 size={32} className="text-muted-foreground mx-auto mb-3" />
-                        <p className="font-body text-sm text-muted-foreground">
-                          Connect Instagram or YouTube to see your analytics
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <AnalyticsTab />
             </motion.div>
           )}
         </AnimatePresence>

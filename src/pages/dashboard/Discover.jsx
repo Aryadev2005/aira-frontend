@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Sparkles, Globe, Zap, Pencil, X, Check } from 'lucide-react';
-import { useProfile, useViralIdeas } from '@/hooks/useApi';
+import { RefreshCw, Sparkles, Globe, Pencil, X, Check, Zap } from 'lucide-react';
+import { useProfile, useViralIdeas, useRecordTrendInteraction } from '@/hooks/useApi';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -135,6 +135,20 @@ export default function Discover() {
   // Active niche = browsing niche OR account niche
   const activeNiche    = browseNiche || userNiche;
   const isBrowsing     = !!browseNiche && browseNiche !== userNiche;
+
+  // Mutation for recording trend interactions (non-blocking)
+  const { mutate: recordInteraction } = useRecordTrendInteraction();
+
+  // Helper to track interaction without blocking UI
+  const trackInteraction = useCallback((title, source, niche, action) => {
+    if (!title) return;
+    recordInteraction({
+      trendTitle: String(title).substring(0, 200),
+      source:     source || 'unknown',
+      niche:      niche  || activeNiche || 'general',
+      action,
+    });
+  }, [recordInteraction, activeNiche]);
 
   // Update permanent niche
   const updateNiche = useMutation({
@@ -339,7 +353,11 @@ export default function Discover() {
 
         {/* ARIA Top Pick */}
         {topPick && !isLoading && !isRefreshing && (
-          <motion.div variants={item} className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm">
+          <motion.div
+            variants={item}
+            onViewportEnter={() => trackInteraction(topPick.title, topPick.sources?.[0], activeNiche, 'viewed')}
+            className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm"
+          >
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={16} className="text-primary" />
               <span className="text-primary text-xs font-body font-semibold tracking-wider">
@@ -373,6 +391,7 @@ export default function Discover() {
                   key={idea.id || idx}
                   variants={item}
                   whileHover={{ scale: 1.01, y: -2 }}
+                  onViewportEnter={() => trackInteraction(idea.title, idea.sources?.[0], activeNiche, 'viewed')}
                   className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
                 >
                   <div className="flex items-center justify-between mb-3">
