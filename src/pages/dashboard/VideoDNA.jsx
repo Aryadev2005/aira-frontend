@@ -210,9 +210,9 @@ export default function VideoDNA() {
                 <span>💬 {result.commentCount}</span>
                 <span>📊 {result.engagementRate}%</span>
                 <span className={`px-2 py-0.5 rounded-full text-white text-xs ${
-                  result.analysisType === 'deep_multimodal' ? 'bg-green-600' : 'bg-yellow-600'
+                  result.analysisEngine?.includes('v2') ? 'bg-green-600' : 'bg-yellow-600'
                 }`}>
-                  {result.analysisType === 'deep_multimodal' ? '⚡ Deep' : '📊 Metadata'}
+                  {result.analysisEngine?.includes('v2') ? '⚡ Deep' : '📊 Metadata'}
                 </span>
               </div>
             </div>
@@ -247,20 +247,26 @@ export default function VideoDNA() {
           <CollapsibleSection title="Hook Analyst" icon={Sparkles} defaultOpen>
             <div className="space-y-3 pt-1">
               <div className="flex gap-4">
-                <ScoreRing score={result.hookAnalysis?.hookScore ?? 0} size={60} />
+                <ScoreRing score={result.hookScore ?? 0} size={60} />
                 <div className="flex-1">
-                  <p className="text-sm font-body text-foreground">{result.hookAnalysis?.ariaVerdict}</p>
+                  <p className="text-sm font-body text-foreground">{result.hookAnalysis}</p>
                   <p className="text-xs text-muted-foreground mt-1 font-body">
-                    Title/Thumb alignment: {result.hookAnalysis?.thumbnailTitleAlignment}/100
+                    Hook Score: {result.hookScore}/100
                   </p>
                 </div>
               </div>
-              {result.hookAnalysis?.improvements?.length > 0 && (
+              {result.improvedHook && (
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground font-body">Improved Hook:</p>
+                  <p className="text-sm font-semibold font-body mt-0.5">{result.improvedHook}</p>
+                </div>
+              )}
+              {result.actionItems?.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-foreground font-body">Fixes:</p>
-                  {result.hookAnalysis.improvements.map((fix, i) => (
+                  <p className="text-xs font-semibold text-foreground font-body">Action Items:</p>
+                  {result.actionItems.map((item, i) => (
                     <div key={i} className="flex gap-2 text-xs font-body text-muted-foreground">
-                      <span className="text-primary">→</span><span>{fix}</span>
+                      <span className="text-primary">→</span><span>{item}</span>
                     </div>
                   ))}
                 </div>
@@ -268,28 +274,17 @@ export default function VideoDNA() {
             </div>
           </CollapsibleSection>
 
-          {/* Retention Analysis */}
-          <CollapsibleSection title="Retention Architect" icon={Eye}>
+          {/* Next Video Suggestion */}
+          <CollapsibleSection title="Next Video Suggestion" icon={Eye}>
             <div className="space-y-3 pt-1">
-              <p className="text-sm font-body text-foreground">{result.retentionAnalysis?.pacingVerdict}</p>
-              {result.retentionAnalysis?.dropOffEvents?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold font-body">Drop-off Events:</p>
-                  {result.retentionAnalysis.dropOffEvents.map((ev, i) => (
-                    <div key={i} className="bg-muted rounded-lg p-3 text-xs font-body">
-                      <p className="font-semibold text-destructive">⬇ At {ev.timestamp}s — {ev.reason}</p>
-                      <p className="text-muted-foreground mt-1">Fix: {ev.fix}</p>
-                    </div>
-                  ))}
+              {result.nextVideoSuggestion && (
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground font-body">Suggested Next Video:</p>
+                  <p className="text-sm font-semibold font-body mt-0.5">{result.nextVideoSuggestion}</p>
                 </div>
               )}
-              {result.retentionAnalysis?.talkingHeadWarning && (
-                <p className="text-xs text-yellow-500 font-body">
-                  ⚠️ Too much talking-head footage. Add B-roll every 15-20 seconds.
-                </p>
-              )}
-              {result.hasHeatmap && (
-                <p className="text-xs text-green-500 font-body">✓ Powered by real YouTube replay heatmap data</p>
+              {result.nextVideoReason && (
+                <p className="text-sm font-body text-foreground">{result.nextVideoReason}</p>
               )}
             </div>
           </CollapsibleSection>
@@ -297,28 +292,21 @@ export default function VideoDNA() {
           {/* SEO & Viral */}
           <CollapsibleSection title="SEO & Viral Strategy" icon={TrendingUp}>
             <div className="space-y-3 pt-1">
-              {result.seoViralAnalysis?.titleOptimization && (
+              {result.betterTitle && (
                 <div className="bg-muted rounded-lg p-3">
                   <p className="text-xs text-muted-foreground font-body">Optimised Title:</p>
-                  <p className="text-sm font-semibold font-body mt-0.5">{result.seoViralAnalysis.titleOptimization}</p>
+                  <p className="text-sm font-semibold font-body mt-0.5">{result.betterTitle}</p>
                 </div>
               )}
-              {result.seoViralAnalysis?.missingKeywords?.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold font-body mb-1">Missing Keywords:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.seoViralAnalysis.missingKeywords.map((kw, i) => (
-                      <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full font-body">{kw}</span>
-                    ))}
-                  </div>
-                </div>
+              {result.titleAnalysis && (
+                <p className="text-sm font-body text-foreground">{result.titleAnalysis}</p>
               )}
-              {result.seoViralAnalysis?.tagSuggestions?.length > 0 && (
+              {result.benchmarkStats?.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold font-body mb-1">Suggested Tags:</p>
+                  <p className="text-xs font-semibold font-body mb-1">Benchmark Stats:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {result.seoViralAnalysis.tagSuggestions.map((tag, i) => (
-                      <span key={i} className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full font-body">{tag}</span>
+                    {result.benchmarkStats.map((stat, i) => (
+                      <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full font-body">{stat}</span>
                     ))}
                   </div>
                 </div>
@@ -326,7 +314,7 @@ export default function VideoDNA() {
             </div>
           </CollapsibleSection>
 
-          {/* Shorts Opportunities */}
+          {/* Shorts Opportunities - hidden in v1, shown only if data exists */}
           {result.shortsOpportunities?.length > 0 && (
             <CollapsibleSection title={`Shorts Opportunities (${result.shortsOpportunities.length})`} icon={Scissors}>
               <div className="space-y-3 pt-1">
@@ -347,27 +335,15 @@ export default function VideoDNA() {
             </CollapsibleSection>
           )}
 
-          {/* Value Density / Cheat Sheet */}
-          <CollapsibleSection title="Value Density Cheat Sheet" icon={Clock}>
+          {/* ARIA Insight */}
+          <CollapsibleSection title="ARIA Insight" icon={Clock}>
             <div className="space-y-2 pt-1">
-              <p className="text-sm font-body text-foreground">{result.valueDensityAnalysis?.contentSummary}</p>
-              {result.valueDensityAnalysis?.cheatSheet?.length > 0 && (
-                <div className="space-y-1.5 mt-2">
-                  {result.valueDensityAnalysis.cheatSheet.map((point, i) => (
-                    <div key={i} className="flex gap-2 text-xs font-body">
-                      <span className="text-muted-foreground w-10 flex-shrink-0">
-                        {Math.floor(point.timestamp / 60)}:{String(point.timestamp % 60).padStart(2,'0')}
-                      </span>
-                      <span className="text-foreground">{point.point}</span>
-                    </div>
-                  ))}
+              <p className="text-sm font-body text-foreground">{result.ariaInsight}</p>
+              {result.benchmarkAnalysis && (
+                <div className="bg-muted rounded-lg p-3 mt-2">
+                  <p className="text-xs text-muted-foreground font-body">Benchmark Analysis:</p>
+                  <p className="text-sm font-body mt-0.5">{result.benchmarkAnalysis}</p>
                 </div>
-              )}
-              {result.valueDensityAnalysis?.fluffTimestamps?.length > 0 && (
-                <p className="text-xs text-yellow-500 font-body">
-                  ⚠️ Fluff detected at: {result.valueDensityAnalysis.fluffTimestamps.map(t =>
-                    `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`).join(', ')}
-                </p>
               )}
             </div>
           </CollapsibleSection>
