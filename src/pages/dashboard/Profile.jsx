@@ -851,15 +851,25 @@ function RoadmapTab() {
     dismissAction({ roadmapVersion, weekNumber, actionIndex, actionText });
   };
 
-  // ── Loading state ────────────────────────────────────────────────────────
+  // ── Loading state — shows elapsed time so user knows it's working ────────
   if (isLoading) {
     return (
       <div className="space-y-3 pt-2">
-        <div className="h-24 bg-muted rounded-2xl animate-pulse" />
+        <div className="flex items-center gap-2 px-1 mb-4">
+          <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+          <p className="font-body text-xs text-muted-foreground">
+            ARIA is building your personalised roadmap…
+          </p>
+        </div>
+        <div className="h-20 bg-muted rounded-2xl animate-pulse" />
         <div className="h-16 bg-muted rounded-2xl animate-pulse" />
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-28 bg-muted rounded-2xl animate-pulse" />
+          <div key={i} className="h-24 bg-muted rounded-2xl animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
         ))}
+        <div className="h-24 bg-muted rounded-2xl animate-pulse" />
+        <p className="font-body text-[10px] text-muted-foreground text-center px-4 pt-2">
+          First generation takes 10–15 seconds. Subsequent loads are instant.
+        </p>
       </div>
     );
   }

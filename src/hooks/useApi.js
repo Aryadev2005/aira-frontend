@@ -170,7 +170,7 @@ export const useBrainGreet = (params = {}) => {
   });
 };
 
-// ── VIDEO DNA ─────────────────────────────────────────────────────────────
+// ── VIDEO DNA (v2 Intelligence Engine) ───────────────────────────────────────
 export const useVideoDNA = () =>
   useMutation({ mutationFn: (body) => api.post("/video-dna/analyse", body) });
 
@@ -179,6 +179,9 @@ export const useVideoDNAHistory = () =>
     queryKey: ["video-dna-history"],
     queryFn: () => api.get("/video-dna/history"),
   });
+
+export const useCompetitorGap = () =>
+  useMutation({ mutationFn: (body) => api.post("/video-dna/competitor-gap", body) });
 
 // ── DISCOVER ──────────────────────────────────────────────────────────────
 export const useDiscoverIntelligence = (filters = {}) => {
