@@ -221,14 +221,26 @@ export default function VideoDNA() {
           {/* Overall Score */}
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
-              <ScoreRing score={result.overallScore} size={100} label={result.scoreVerdict} />
+              <div className="flex flex-col items-center gap-1">
+                <ScoreRing score={result.overallScore} size={100} label={result.scoreVerdict} />
+                <span className="text-xs font-body font-bold text-primary mt-1">{result.grade}</span>
+              </div>
               <div className="flex-1 space-y-3 w-full">
-                <ScoreBar label="Hook Strength"      score={result.hookAnalysis?.hookScore} />
-                <ScoreBar label="Retention Score"    score={result.retentionAnalysis?.retentionScore} />
-                <ScoreBar label="SEO & Viral Score"  score={result.seoViralAnalysis?.seoScore} />
-                <ScoreBar label="Value Density"      score={result.valueDensityAnalysis?.valueDensityScore} />
+                <ScoreBar label="Hook Strength"     score={result.hookScore} />
+                <ScoreBar label="Engagement Score"  score={result.engagementScore} />
+                <ScoreBar label="Content Quality"   score={result.contentQualityScore} />
+                <ScoreBar label="SEO Score"         score={result.seoScore} />
               </div>
             </div>
+            {result.engagementRate && (
+              <div className="mt-4 flex gap-4 text-xs font-body text-muted-foreground flex-wrap">
+                <span>📊 ER: <strong className="text-foreground">{result.engagementRate}%</strong></span>
+                <span>⚡ vs Niche: <strong className="text-foreground">{result.erVsBenchmark}x</strong></span>
+                <span>👁 Velocity: <strong className="text-foreground">{result.viewVelocityScore}/100</strong></span>
+                <span>⏱ Duration: <strong className="text-foreground">{result.durationScore}/100</strong></span>
+                <span className="text-green-500 text-[10px]">v2 deterministic</span>
+              </div>
+            )}
           </div>
 
           {/* Hook Analysis */}
