@@ -361,14 +361,88 @@ export const useRebuildVoicePortrait = () => {
   });
 };
 
-// ── ROADMAP (Step 5 on Frontend) ──────────────────────────────────────────
-export const usePersonalisedRoadmap = (force = false) =>
+// ── ROADMAP ───────────────────────────────────────────────────────────────
+
+/**
+ * usePersonalisedRoadmap
+ *
+ * Normal load  → GET /analytics/roadmap          (serves from cache if available)
+ * Force refresh → GET /analytics/roadmap?force=true  (busts cache, calls AI)
+ *
+ * The `force` flag is intentionally NOT part of the queryKey so React Query
+ * doesn't create a second cache entry. Instead we use queryClient.invalidateQueries
+ * to trigger a re-fetch of the same key after a force refresh.
+ */
+export const usePersonalisedRoadmap = () =>
   useQuery({
-    queryKey: ["roadmap", force],
-    queryFn: () => api.get(`/analytics/roadmap${force ? "?force=true" : ""}`),
-    staleTime: 1000 * 60 * 60 * 6, // 6 hours — matches server cache
-    retry: 1,
+    queryKey: ["roadmap"],
+    queryFn:  () => api.get("/analytics/roadmap"),
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours — matches server cache TTL
+    retry:    1,
   });
+
+/**
+ * useRefreshRoadmap
+ * Calls the dedicated /roadmap/refresh endpoint which deletes the Redis cache
+ * server-side and regenerates fresh from AI. On success, invalidates the
+ * React Query roadmap cache so the UI re-fetches the new data.
+ */
+export const useRefreshRoadmap = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.get("/analytics/roadmap/refresh"),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ["roadmap"] });
+    },
+  });
+};
+
+/**
+ * useRoadmapActionStates
+ * Fetches the persisted complete/dismissed state for all actions of a version.
+ * Only runs when a valid roadmapVersion is available.
+ */
+export const useRoadmapActionStates = (roadmapVersion) =>
+  useQuery({
+    queryKey: ["roadmap-action-states", roadmapVersion],
+    queryFn:  () =>
+      api.get(`/analytics/roadmap/action-states?version=${encodeURIComponent(roadmapVersion)}`),
+    enabled:   !!roadmapVersion,
+    staleTime: 1000 * 60 * 60, // 1 hour
+    retry:     1,
+  });
+
+/**
+ * useCompleteRoadmapAction
+ */
+export const useCompleteRoadmapAction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post("/analytics/roadmap/action/complete", data),
+    onSuccess:  (_res, variables) => {
+      const v = /** @type {any} */ (variables);
+      qc.invalidateQueries({
+        queryKey: ["roadmap-action-states", v.roadmapVersion],
+      });
+    },
+  });
+};
+
+/**
+ * useDismissRoadmapAction
+ */
+export const useDismissRoadmapAction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post("/analytics/roadmap/action/dismiss", data),
+    onSuccess:  (_res, variables) => {
+      const v = /** @type {any} */ (variables);
+      qc.invalidateQueries({
+        queryKey: ["roadmap-action-states", v.roadmapVersion],
+      });
+    },
+  });
+};
 
 // ── CREATOR ANALYTICS (Full ARIA analysis tab) ────────────────────────────
 export const useCreatorAnalytics = () =>

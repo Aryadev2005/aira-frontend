@@ -56,6 +56,10 @@ import {
   useUpdateAriaMemory,
   useDeleteAriaMemory,
   usePersonalisedRoadmap,
+  useRefreshRoadmap,
+  useRoadmapActionStates,
+  useCompleteRoadmapAction,
+  useDismissRoadmapAction,
   useCreatorAnalytics,
   useRefreshCreatorAnalytics,
   useRebuildVoicePortrait,
@@ -812,24 +816,42 @@ function ARIAKnowsTab() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — ROADMAP
 // ══════════════════════════════════════════════════════════════════════════════
 
 function RoadmapTab() {
-  const [forceRefresh, setForceRefresh] = useState(false);
-  const [expandedWeek, setExpandedWeek] = useState(0);
+  const [expandedWeek,   setExpandedWeek]   = useState(0);
   const [expandedAction, setExpandedAction] = useState(null);
 
-  const { data, isLoading, error, refetch } =
-    usePersonalisedRoadmap(forceRefresh);
-  const roadmap = data?.data;
+  // ── Data hooks ──────────────────────────────────────────────────────
+  const { data, isLoading, error } = usePersonalisedRoadmap();
+  const { mutate: doRefresh, isPending: isRefreshing } = useRefreshRoadmap();
 
-  const handleRefresh = async () => {
-    setForceRefresh(true);
-    await refetch();
-    setTimeout(() => setForceRefresh(false), 500);
+  const roadmap        = data?.data;
+  const roadmapVersion = roadmap?.roadmapVersion ?? null;
+
+  const { data: statesData } = useRoadmapActionStates(roadmapVersion);
+  // actionStates: { "1-0": "completed", "1-2": "dismissed", ... }
+  const actionStates = statesData?.data?.states ?? {};
+
+  const { mutate: completeAction } = useCompleteRoadmapAction();
+  const { mutate: dismissAction  } = useDismissRoadmapAction();
+
+  // ── Handlers ────────────────────────────────────────────────────────
+  const handleRefresh = () => doRefresh();
+
+  const handleComplete = (weekNumber, actionIndex, actionText) => {
+    if (!roadmapVersion) return;
+    completeAction({ roadmapVersion, weekNumber, actionIndex, actionText });
   };
 
+  const handleDismiss = (weekNumber, actionIndex, actionText) => {
+    if (!roadmapVersion) return;
+    dismissAction({ roadmapVersion, weekNumber, actionIndex, actionText });
+  };
+
+  // ── Loading state ────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-3 pt-2">
@@ -842,6 +864,7 @@ function RoadmapTab() {
     );
   }
 
+  // ── Error / empty state ──────────────────────────────────────────────
   if (error || !roadmap) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -851,9 +874,10 @@ function RoadmapTab() {
         </p>
         <button
           onClick={handleRefresh}
-          className="mt-3 px-4 py-2 rounded-xl bg-primary text-white text-sm font-body font-semibold"
+          disabled={isRefreshing}
+          className="mt-3 px-4 py-2 rounded-xl bg-primary text-white text-sm font-body font-semibold disabled:opacity-60"
         >
-          Try again
+          {isRefreshing ? "Generating…" : "Try again"}
         </button>
       </div>
     );
@@ -868,24 +892,42 @@ function RoadmapTab() {
       animate="show"
       className="space-y-4 pt-1"
     >
-      {/* Header with refresh */}
+      {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-1">
-        <p className="font-body text-xs text-muted-foreground">
-          {data?.data?.fromCache !== false
-            ? "Personalised for you"
-            : "Just generated"}
-        </p>
+        <div>
+          <p className="font-body text-xs text-muted-foreground">
+            {roadmap.fromCache ? "Personalised for you" : "Just generated"}
+          </p>
+          {roadmap.strategicLens && (
+            <p className="font-body text-[10px] text-primary font-semibold mt-0.5">
+              {roadmap.strategicLens}
+            </p>
+          )}
+        </div>
         <button
           onClick={handleRefresh}
-          disabled={isLoading}
-          className="flex items-center gap-1 text-xs font-body text-primary font-semibold hover:opacity-80 transition-opacity"
+          disabled={isRefreshing}
+          className="flex items-center gap-1 text-xs font-body text-primary font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
         >
-          <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
-          Refresh
+          <RefreshCw size={11} className={isRefreshing ? "animate-spin" : ""} />
+          {isRefreshing ? "Generating…" : "Refresh"}
         </button>
       </div>
 
-      {/* Current situation */}
+      {/* ── Wildcard trend badge ──────────────────────────────────────── */}
+      {roadmap.wildcardTrend && (
+        <motion.div
+          variants={fadeUp}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 flex items-start gap-2"
+        >
+          <Zap size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="font-body text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+            <span className="font-semibold">Trending now:</span> {roadmap.wildcardTrend}
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Current situation ─────────────────────────────────────────── */}
       {roadmap.currentSituation && (
         <motion.div
           variants={fadeUp}
@@ -900,7 +942,7 @@ function RoadmapTab() {
         </motion.div>
       )}
 
-      {/* Core challenge */}
+      {/* ── Core challenge ────────────────────────────────────────────── */}
       {roadmap.coreChallenge && (
         <motion.div
           variants={fadeUp}
@@ -915,216 +957,7 @@ function RoadmapTab() {
         </motion.div>
       )}
 
-      {/* Weekly plan */}
-      {weeks.length > 0 && (
-        <motion.div variants={fadeUp} className="space-y-2">
-          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
-            Your 4-week plan
-          </p>
-          {weeks.map(([weekKey, weekData], idx) => {
-            const isOpen = expandedWeek === idx;
-            const weekNum = idx + 1;
-
-            return (
-              <div
-                key={weekKey}
-                className="rounded-2xl border border-border bg-card overflow-hidden"
-              >
-                <button
-                  onClick={() => setExpandedWeek(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left"
-                >
-                  <div>
-                    <p className="font-body text-xs text-muted-foreground mb-0.5">
-                      Week {weekNum}
-                    </p>
-                    <p className="font-body text-sm text-foreground font-semibold">
-                      {weekData.focus}
-                    </p>
-                  </div>
-                  {isOpen ? (
-                    <ChevronUp
-                      size={16}
-                      className="text-muted-foreground flex-shrink-0"
-                    />
-                  ) : (
-                    <ChevronDown
-                      size={16}
-                      className="text-muted-foreground flex-shrink-0"
-                    />
-                  )}
-                </button>
-
-                <AnimatePresence>
-                  {isOpen && weekData.actions?.length > 0 && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                        {weekData.actions.map((action, aIdx) => {
-                          const actionKey = `${idx}-${aIdx}`;
-                          const actionOpen = expandedAction === actionKey;
-
-                          return (
-                            <div key={aIdx} className="space-y-1">
-                              <div className="flex items-start gap-2">
-                                <Circle
-                                  size={14}
-                                  className="text-muted-foreground mt-0.5 flex-shrink-0"
-                                />
-                                <div className="flex-1">
-                                  <p className="font-body text-sm text-foreground font-medium">
-                                    {action.action}
-                                  </p>
-                                  {action.why && (
-                                    <p className="font-body text-xs text-muted-foreground mt-0.5">
-                                      {action.why}
-                                    </p>
-                                  )}
-                                  {action.howTo && (
-                                    <button
-                                      onClick={() =>
-                                        setExpandedAction(
-                                          actionOpen ? null : actionKey,
-                                        )
-                                      }
-                                      className="mt-1 text-[11px] font-body text-primary font-semibold flex items-center gap-0.5"
-                                    >
-                                      {actionOpen ? "Hide" : "How to do this"}
-                                      {actionOpen ? (
-                                        <ChevronUp size={10} />
-                                      ) : (
-                                        <ChevronDown size={10} />
-                                      )}
-                                    </button>
-                                  )}
-                                  <AnimatePresence>
-                                    {actionOpen && action.howTo && (
-                                      <motion.p
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="font-body text-xs text-foreground/70 mt-1 overflow-hidden"
-                                      >
-                                        {action.howTo}
-                                      </motion.p>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </motion.div>
-      )}
-
-      {/* Milestones */}
-      {roadmap.milestones?.length > 0 && (
-        <motion.div variants={fadeUp} className="space-y-2">
-          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
-            Milestones
-          </p>
-          {roadmap.milestones.map((m, i) => (
-            <div
-              key={i}
-              className="rounded-2xl border border-border bg-card p-4"
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Target size={13} className="text-primary" />
-                  </div>
-                  <p className="font-body text-sm text-foreground font-semibold">
-                    {m.target}
-                  </p>
-                </div>
-                <span className="text-xs font-body text-muted-foreground bg-muted px-2 py-0.5 rounded-pill flex-shrink-0">
-                  {m.eta}
-                </span>
-              </div>
-              {m.unlocks && (
-                <p className="font-body text-xs text-muted-foreground ml-9 mb-2">
-                  Unlocks: {m.unlocks}
-                </p>
-              )}
-              {m.triggerAction && (
-                <div className="ml-9 bg-primary/5 border border-primary/15 rounded-xl px-3 py-2">
-                  <p className="font-body text-[10px] text-primary font-semibold mb-0.5">
-                    Key action
-                  </p>
-                  <p className="font-body text-xs text-foreground">
-                    {m.triggerAction}
-                  </p>
-                </div>
-              )}
-            </div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Content strategy */}
-      {roadmap.contentStrategy && (
-        <motion.div
-          variants={fadeUp}
-          className="bg-card border border-border rounded-2xl p-4"
-        >
-          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Content strategy
-          </p>
-          <div className="space-y-2">
-            {roadmap.contentStrategy.frequency && (
-              <div className="flex items-center justify-between">
-                <p className="font-body text-xs text-muted-foreground">
-                  Posting frequency
-                </p>
-                <p className="font-body text-xs text-foreground font-semibold">
-                  {roadmap.contentStrategy.frequency}
-                </p>
-              </div>
-            )}
-            {roadmap.contentStrategy.bestTimes && (
-              <div className="flex items-center justify-between">
-                <p className="font-body text-xs text-muted-foreground">
-                  Best times
-                </p>
-                <p className="font-body text-xs text-foreground font-semibold">
-                  {roadmap.contentStrategy.bestTimes}
-                </p>
-              </div>
-            )}
-            {roadmap.contentStrategy.topicPillars?.length > 0 && (
-              <div>
-                <p className="font-body text-xs text-muted-foreground mb-1.5">
-                  Topic pillars
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {roadmap.contentStrategy.topicPillars.map((p, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-1 rounded-pill bg-muted text-xs font-body text-foreground"
-                    >
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Immediate action — orange card */}
+      {/* ── Immediate action ──────────────────────────────────────────── */}
       {roadmap.immediateAction && (
         <motion.div
           variants={fadeUp}
@@ -1142,7 +975,227 @@ function RoadmapTab() {
         </motion.div>
       )}
 
-      {/* Growth projection */}
+      {/* ── Weekly plan ───────────────────────────────────────────────── */}
+      {weeks.length > 0 && (
+        <motion.div variants={fadeUp} className="space-y-2">
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
+            Your 4-week plan
+          </p>
+          {weeks.map(([weekKey, weekData], idx) => {
+            const isOpen  = expandedWeek === idx;
+            const weekNum = idx + 1;
+
+            // Count completed actions for this week
+            const completedCount = (weekData.actions || []).filter(
+              (_, aIdx) => actionStates[`${weekNum}-${aIdx}`] === 'completed'
+            ).length;
+            const totalCount = (weekData.actions || []).length;
+
+            return (
+              <div
+                key={weekKey}
+                className="rounded-2xl border border-border bg-card overflow-hidden"
+              >
+                <button
+                  onClick={() => setExpandedWeek(isOpen ? null : idx)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-body text-xs text-muted-foreground">
+                        Week {weekNum}
+                      </p>
+                      {completedCount > 0 && (
+                        <span className="text-[10px] font-body font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                          {completedCount}/{totalCount}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-body text-sm text-foreground font-semibold truncate">
+                      {weekData.focus}
+                    </p>
+                  </div>
+                  {isOpen ? (
+                    <ChevronUp size={16} className="text-muted-foreground flex-shrink-0 ml-2" />
+                  ) : (
+                    <ChevronDown size={16} className="text-muted-foreground flex-shrink-0 ml-2" />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isOpen && weekData.actions?.length > 0 && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+                        {weekData.actions.map((action, aIdx) => {
+                          const actionKey    = `${idx}-${aIdx}`;
+                          const stateKey     = `${weekNum}-${aIdx}`;
+                          const actionOpen   = expandedAction === actionKey;
+                          const isCompleted  = actionStates[stateKey] === 'completed';
+                          const isDismissed  = actionStates[stateKey] === 'dismissed';
+
+                          if (isDismissed) return null; // hide dismissed actions
+
+                          return (
+                            <div
+                              key={aIdx}
+                              className={`space-y-1 transition-opacity ${isCompleted ? "opacity-50" : "opacity-100"}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                {/* Complete toggle */}
+                                <button
+                                  onClick={() =>
+                                    !isCompleted &&
+                                    handleComplete(weekNum, aIdx, action.action)
+                                  }
+                                  className="mt-0.5 flex-shrink-0 focus:outline-none"
+                                  aria-label={isCompleted ? "Completed" : "Mark complete"}
+                                >
+                                  {isCompleted ? (
+                                    <CheckCircle2
+                                      size={16}
+                                      className="text-primary"
+                                    />
+                                  ) : (
+                                    <Circle
+                                      size={16}
+                                      className="text-muted-foreground hover:text-primary transition-colors"
+                                    />
+                                  )}
+                                </button>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <p
+                                      className={`font-body text-sm font-medium leading-snug ${
+                                        isCompleted
+                                          ? "line-through text-muted-foreground"
+                                          : "text-foreground"
+                                      }`}
+                                    >
+                                      {action.action}
+                                    </p>
+                                    {/* Dismiss button */}
+                                    {!isCompleted && (
+                                      <button
+                                        onClick={() =>
+                                          handleDismiss(weekNum, aIdx, action.action)
+                                        }
+                                        className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors ml-1"
+                                        aria-label="Dismiss action"
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {action.why && !isCompleted && (
+                                    <p className="font-body text-xs text-muted-foreground mt-0.5 leading-snug">
+                                      {action.why}
+                                    </p>
+                                  )}
+
+                                  {action.howTo && !isCompleted && (
+                                    <button
+                                      onClick={() =>
+                                        setExpandedAction(
+                                          actionOpen ? null : actionKey
+                                        )
+                                      }
+                                      className="mt-1 text-[11px] font-body text-primary font-semibold flex items-center gap-0.5"
+                                    >
+                                      {actionOpen ? "Hide" : "How to do this"}
+                                      {actionOpen ? (
+                                        <ChevronUp size={10} />
+                                      ) : (
+                                        <ChevronDown size={10} />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  <AnimatePresence>
+                                    {actionOpen && action.howTo && !isCompleted && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden"
+                                      >
+                                        <p className="font-body text-xs text-foreground/70 mt-1 leading-relaxed">
+                                          {action.howTo}
+                                        </p>
+                                        {action.expectedImpact && (
+                                          <p className="font-body text-[11px] text-primary/80 mt-1 font-medium">
+                                            Expected: {action.expectedImpact}
+                                          </p>
+                                        )}
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </motion.div>
+      )}
+
+      {/* ── Content strategy ──────────────────────────────────────────── */}
+      {roadmap.contentStrategy && (
+        <motion.div
+          variants={fadeUp}
+          className="bg-card border border-border rounded-2xl p-4 space-y-3"
+        >
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Content strategy
+          </p>
+          {roadmap.contentStrategy.frequency && (
+            <div>
+              <p className="font-body text-xs text-muted-foreground">Posting frequency</p>
+              <p className="font-body text-xs text-foreground font-semibold">
+                {roadmap.contentStrategy.frequency}
+              </p>
+            </div>
+          )}
+          {roadmap.contentStrategy.bestTimes && (
+            <div>
+              <p className="font-body text-xs text-muted-foreground">Best times</p>
+              <p className="font-body text-xs text-foreground font-semibold">
+                {roadmap.contentStrategy.bestTimes}
+              </p>
+            </div>
+          )}
+          {roadmap.contentStrategy.topicPillars?.length > 0 && (
+            <div>
+              <p className="font-body text-xs text-muted-foreground mb-1.5">Topic pillars</p>
+              <div className="flex flex-wrap gap-1.5">
+                {roadmap.contentStrategy.topicPillars.map((p, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-1 rounded-full bg-muted text-xs font-body text-foreground"
+                  >
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Growth projection ─────────────────────────────────────────── */}
       {roadmap.growthProjection && (
         <motion.div
           variants={fadeUp}
@@ -1153,29 +1206,75 @@ function RoadmapTab() {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-muted rounded-xl p-3 text-center">
-              <p className="font-body text-[10px] text-muted-foreground mb-1">
-                Conservative
-              </p>
-              <p className="font-body text-sm text-foreground font-semibold">
+              <p className="font-body text-base font-bold text-foreground">
                 {roadmap.growthProjection.conservative}
               </p>
-            </div>
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-center">
-              <p className="font-body text-[10px] text-primary mb-1">
-                Optimistic
+              <p className="font-body text-[10px] text-muted-foreground mt-0.5">
+                Conservative
               </p>
-              <p className="font-body text-sm text-foreground font-semibold">
+            </div>
+            <div className="bg-primary/10 rounded-xl p-3 text-center">
+              <p className="font-body text-base font-bold text-primary">
                 {roadmap.growthProjection.optimistic}
+              </p>
+              <p className="font-body text-[10px] text-muted-foreground mt-0.5">
+                Optimistic
               </p>
             </div>
           </div>
           {roadmap.growthProjection.keyAssumption && (
-            <p className="font-body text-xs text-muted-foreground mt-2">
-              Assumes: {roadmap.growthProjection.keyAssumption}
+            <p className="font-body text-[11px] text-muted-foreground mt-3 leading-snug">
+              ⚡ {roadmap.growthProjection.keyAssumption}
             </p>
           )}
         </motion.div>
       )}
+
+      {/* ── Milestones ────────────────────────────────────────────────── */}
+      {roadmap.milestones?.length > 0 && (
+        <motion.div variants={fadeUp} className="space-y-2">
+          <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
+            Milestones
+          </p>
+          {roadmap.milestones.map((m, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-border bg-card p-4"
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="font-body text-xs font-bold text-primary">
+                      {i + 1}
+                    </span>
+                  </div>
+                  <p className="font-body text-sm text-foreground font-semibold">
+                    {m.target}
+                  </p>
+                </div>
+                {m.eta && (
+                  <span className="font-body text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                    {m.eta}
+                  </span>
+                )}
+              </div>
+              {m.unlocks && (
+                <p className="font-body text-xs text-muted-foreground mb-1.5 ml-9">
+                  Unlocks: {m.unlocks}
+                </p>
+              )}
+              {m.triggerAction && (
+                <p className="font-body text-xs text-primary font-medium ml-9">
+                  → {m.triggerAction}
+                </p>
+              )}
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* ── Bottom spacer ────────────────────────────────────────────── */}
+      <div className="h-6" />
     </motion.div>
   );
 }
