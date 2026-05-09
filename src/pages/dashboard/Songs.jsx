@@ -18,6 +18,8 @@ import {
   BarChart2,
   ExternalLink,
   X,
+  LayoutGrid,
+  Disc,
 } from "lucide-react";
 import {
   useSongs,
@@ -27,6 +29,7 @@ import {
 } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
+import { AlmanacSongs } from "@/components/almanac";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -374,6 +377,7 @@ export default function Songs() {
   const [showPredict, setShowPredict] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [niche, setNiche] = useState(dbUser?.niches?.[0] || "general");
+  const [viewMode, setViewMode] = useState("list"); // 'list' | 'almanac'
 
   const filters = {
     niche,
@@ -464,27 +468,67 @@ export default function Songs() {
             )}
           </p>
         </div>
-        <button
-          onClick={async () => {
-            try {
-              // Trigger backend refresh, then bypass the hot-window cache for a fresh read
-              await api.post("/songs/refresh");
-              const freshResponse = await api.get(
-                `/songs${songsQueryParams ? `?${songsQueryParams}&skipCache=true` : "?skipCache=true"}`,
-              );
-              queryClient.setQueryData(songsQueryKey, freshResponse);
-            } catch (err) {
-              // Fallback to the existing query if the refresh fetch fails
-              refetch();
-            }
-          }}
-          className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw size={14} className="text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-card border border-border">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-body font-medium transition-all ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="List view"
+            >
+              <LayoutGrid size={14} />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('almanac')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-body font-medium transition-all ${
+                viewMode === 'almanac'
+                  ? 'bg-primary text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Almanac view"
+            >
+              <Disc size={14} />
+              Vinyl
+            </button>
+          </div>
+
+          <button
+            onClick={async () => {
+              try {
+                // Trigger backend refresh, then bypass the hot-window cache for a fresh read
+                await api.post("/songs/refresh");
+                const freshResponse = await api.get(
+                  `/songs${songsQueryParams ? `?${songsQueryParams}&skipCache=true` : "?skipCache=true"}`,
+                );
+                queryClient.setQueryData(songsQueryKey, freshResponse);
+              } catch (err) {
+                // Fallback to the existing query if the refresh fetch fails
+                refetch();
+              }
+            }}
+            className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw size={14} className="text-muted-foreground" />
+          </button>
+        </div>
       </motion.div>
 
+      {/* Almanac View */}
+      {viewMode === 'almanac' && (
+        <motion.div variants={item}>
+          <AlmanacSongs songs={visibleSongs.slice(0, 4)} />
+        </motion.div>
+      )}
+
+      {/* List View Content */}
+      {viewMode === 'list' && (
+        <>
       {/* Summary stats */}
       {visibleSongs.length > 0 && (
         <motion.div variants={item} className="grid grid-cols-3 gap-3">
@@ -685,13 +729,17 @@ export default function Songs() {
           ))}
         </motion.div>
       )}
+        </>
+      )}
 
-      {/* Song detail modal */}
-      <SongDetailModal
-        song={selectedSong}
-        isOpen={!!selectedSong}
-        onClose={() => setSelectedSong(null)}
-      />
+      {/* Song detail modal - only in list mode */}
+      {viewMode === 'list' && (
+        <SongDetailModal
+          song={selectedSong}
+          isOpen={!!selectedSong}
+          onClose={() => setSelectedSong(null)}
+        />
+      )}
     </motion.div>
   );
 }

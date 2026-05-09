@@ -1,0 +1,1048 @@
+/* ── AIRA Almanac · Component Styles ──────────────────────────────────────── */
+/* Fonts: DM Serif Display, DM Sans, JetBrains Mono */
+
+:root {
+  /* Earth & Ivory palette */
+  --almanac-ivory: #f4ead8;
+  --almanac-ivory-2: #ebe0c7;
+  --almanac-ivory-3: #e3d4b3;
+  --almanac-paper: #f8f0de;
+  --almanac-cream: #fbf5e6;
+  --almanac-cocoa: #1f140c;
+  --almanac-cocoa-2: #2c1d12;
+  --almanac-cocoa-3: #3a281a;
+  --almanac-bark: #5b3d28;
+  --almanac-kraft: #8a6a4a;
+  --almanac-terracotta: #d97a4a;
+  --almanac-terracotta-2: #c45a1a;
+  --almanac-ember: #b9461a;
+  --almanac-sage: #7a9072;
+  --almanac-plum: #8a5d7a;
+  --almanac-gold: #c79a4a;
+  --almanac-ink: #1f140c;
+  --almanac-rule: rgba(31, 20, 12, 0.14);
+  --almanac-rule-strong: rgba(31, 20, 12, 0.32);
+  --almanac-rule-cocoa: rgba(244, 234, 216, 0.14);
+
+  --almanac-serif: 'DM Serif Display', 'Times New Roman', serif;
+  --almanac-sans: 'DM Sans', system-ui, sans-serif;
+  --almanac-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── Section headers ─────────────────────────────────────────────────────── */
+.almanac-section {
+  margin-top: 42px;
+}
+
+.almanac-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.almanac-section-head .num {
+  font-family: var(--almanac-serif);
+  font-size: 38px;
+  line-height: 1;
+  color: var(--almanac-terracotta);
+  font-style: italic;
+}
+
+.almanac-section-head .title {
+  font-family: var(--almanac-serif);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-section-head .title em {
+  font-style: italic;
+  color: var(--almanac-terracotta-2);
+}
+
+.almanac-section-head .blurb {
+  font-family: var(--almanac-sans);
+  font-size: 13px;
+  color: var(--almanac-bark);
+  max-width: 320px;
+  margin-left: auto;
+}
+
+.almanac-section-head .more {
+  font-family: var(--almanac-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--almanac-terracotta-2);
+  text-transform: uppercase;
+  margin-left: 16px;
+  border-bottom: 1px solid var(--almanac-terracotta);
+  padding-bottom: 1px;
+}
+
+.almanac-section-head .more:hover {
+  color: var(--almanac-ember);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.almanac-hero {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 36px;
+  align-items: end;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--almanac-rule);
+  position: relative;
+}
+
+.almanac-hero::after {
+  content: "✦";
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--almanac-ivory);
+  padding: 0 10px;
+  color: var(--almanac-bark);
+  font-size: 14px;
+}
+
+.almanac-kicker {
+  font-family: var(--almanac-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--almanac-bark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.almanac-kicker .rule {
+  flex: 0 0 32px;
+  height: 1px;
+  background: var(--almanac-rule-strong);
+}
+
+.almanac-hero h1 {
+  font-family: var(--almanac-serif);
+  font-size: clamp(56px, 7.4vw, 110px);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  color: var(--almanac-ink);
+  font-weight: 400;
+}
+
+.almanac-hero h1 .name {
+  display: block;
+  font-style: italic;
+  color: var(--almanac-terracotta-2);
+  margin-top: -4px;
+}
+
+.almanac-hero h1 .punc {
+  color: var(--almanac-terracotta);
+}
+
+.almanac-hero-meta {
+  margin-top: 18px;
+  font-family: var(--almanac-sans);
+  font-size: 14.5px;
+  color: var(--almanac-cocoa-2);
+  max-width: 480px;
+}
+
+.almanac-hero-meta em {
+  color: var(--almanac-terracotta-2);
+  font-style: italic;
+  font-family: var(--almanac-serif);
+  font-size: 17px;
+}
+
+/* ── Forecast panel ────────────────────────────────────────────────────── */
+.almanac-forecast {
+  background: var(--almanac-paper);
+  border-radius: 14px;
+  padding: 22px 22px 18px;
+  border: 1px solid var(--almanac-rule);
+  position: relative;
+  overflow: hidden;
+}
+
+.almanac-forecast::before {
+  content: "TODAY'S FORECAST";
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+}
+
+.almanac-forecast-head {
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-forecast-headline {
+  font-family: var(--almanac-serif);
+  font-size: 26px;
+  line-height: 1.05;
+  margin: 6px 0 14px;
+  font-style: italic;
+}
+
+.almanac-forecast-headline .hot {
+  color: var(--almanac-ember);
+  font-style: normal;
+}
+
+.almanac-windrose {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.almanac-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--almanac-rule);
+  border-radius: 8px;
+  background: var(--almanac-cream);
+}
+
+.almanac-dial .num {
+  font-family: var(--almanac-serif);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-dial .num em {
+  color: var(--almanac-terracotta-2);
+  font-style: italic;
+}
+
+.almanac-dial .lbl {
+  font-family: var(--almanac-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  color: var(--almanac-bark);
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+.almanac-dial .arrow {
+  font-size: 14px;
+  color: var(--almanac-sage);
+  margin-top: 4px;
+}
+
+.almanac-dial[data-down="true"] .arrow {
+  color: var(--almanac-plum);
+}
+
+/* ── Ticker ─────────────────────────────────────────────────────────────── */
+.almanac-ticker {
+  position: relative;
+  background: var(--almanac-cocoa);
+  color: var(--almanac-ivory);
+  border-radius: 100px;
+  margin: 18px 0 0;
+  overflow: hidden;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--almanac-cocoa-3);
+}
+
+.almanac-ticker-track {
+  display: flex;
+  gap: 36px;
+  white-space: nowrap;
+  animation: almanac-tick 32s linear infinite;
+  font-family: var(--almanac-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding-left: 36px;
+}
+
+.almanac-ticker-track span em {
+  color: var(--almanac-terracotta);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.almanac-ticker-track span.up::after {
+  content: "▲";
+  color: var(--almanac-sage);
+  margin-left: 6px;
+}
+
+.almanac-ticker-track span.dn::after {
+  content: "▼";
+  color: #c98484;
+  margin-left: 6px;
+}
+
+@keyframes almanac-tick {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ── Journey ─────────────────────────────────────────────────────────────── */
+.almanac-journey {
+  position: relative;
+  padding: 30px 14px 14px;
+  border: 1px solid var(--almanac-rule);
+  border-radius: 16px;
+  background: radial-gradient(120% 100% at 50% 0%, var(--almanac-cream) 0%, var(--almanac-paper) 60%, var(--almanac-ivory-2) 110%);
+  overflow: hidden;
+}
+
+.almanac-journey-path {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  align-items: stretch;
+}
+
+.almanac-journey-track {
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  top: 36px;
+  height: 2px;
+  background: repeating-linear-gradient(to right, var(--almanac-bark) 0 6px, transparent 6px 12px);
+  opacity: 0.35;
+  z-index: 0;
+}
+
+.almanac-stage {
+  position: relative;
+  padding: 0 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: pointer;
+  transition: transform 0.25s;
+  z-index: 1;
+}
+
+.almanac-stage:hover {
+  transform: translateY(-3px);
+}
+
+.almanac-stage .marker {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: var(--almanac-cream);
+  border: 2px solid var(--almanac-cocoa);
+  display: grid;
+  place-items: center;
+  position: relative;
+  margin-bottom: 22px;
+  box-shadow: 0 8px 24px rgba(31, 20, 12, 0.12);
+  font-family: var(--almanac-serif);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-stage .marker .ord {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  background: var(--almanac-cocoa);
+  color: var(--almanac-ivory);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--almanac-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+.almanac-stage[data-active="true"] .marker {
+  background: var(--almanac-terracotta);
+  border-color: var(--almanac-terracotta-2);
+  color: #fff;
+  transform: scale(1.06);
+  box-shadow: 0 14px 36px rgba(217, 122, 74, 0.42);
+}
+
+.almanac-stage[data-active="true"] .marker .ord {
+  background: var(--almanac-cocoa-2);
+}
+
+.almanac-stage .label {
+  font-family: var(--almanac-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.almanac-stage .title {
+  font-family: var(--almanac-serif);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--almanac-ink);
+  margin-bottom: 8px;
+}
+
+.almanac-stage .title em {
+  font-style: italic;
+  color: var(--almanac-terracotta-2);
+}
+
+.almanac-stage .desc {
+  font-family: var(--almanac-sans);
+  font-size: 13px;
+  color: var(--almanac-cocoa-2);
+  max-width: 280px;
+  margin-bottom: 14px;
+}
+
+.almanac-stage .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-chip {
+  padding: 4px 8px;
+  border-radius: 100px;
+  background: var(--almanac-ivory-2);
+  color: var(--almanac-cocoa);
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.almanac-chip.hot {
+  background: var(--almanac-ember);
+  color: var(--almanac-paper);
+}
+
+.almanac-chip.live {
+  background: var(--almanac-cocoa);
+  color: var(--almanac-paper);
+}
+
+.almanac-chip.queue {
+  background: var(--almanac-gold);
+  color: var(--almanac-cocoa);
+}
+
+.almanac-stage .arrow {
+  margin-top: 14px;
+  font-family: var(--almanac-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--almanac-terracotta-2);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.almanac-stage .arrow svg {
+  transition: transform 0.25s;
+}
+
+.almanac-stage:hover .arrow svg {
+  transform: translateX(4px);
+}
+
+.almanac-stage .glyph {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  opacity: 0.18;
+  font-family: var(--almanac-serif);
+  font-size: 56px;
+  font-style: italic;
+  color: var(--almanac-bark);
+  line-height: 1;
+}
+
+/* ── Constellation ──────────────────────────────────────────────────────── */
+.almanac-constellation {
+  position: relative;
+  border: 1px solid var(--almanac-rule);
+  border-radius: 16px;
+  background: radial-gradient(80% 100% at 50% 50%, var(--almanac-cream) 0%, var(--almanac-paper) 70%, var(--almanac-ivory-2) 110%);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+}
+
+.almanac-constellation-map {
+  position: relative;
+  height: 420px;
+  border-right: 1px solid var(--almanac-rule);
+}
+
+.almanac-constellation-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.almanac-node {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--almanac-terracotta);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--almanac-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.25s, box-shadow 0.25s;
+  box-shadow: 0 6px 16px rgba(217, 122, 74, 0.32);
+  border: 2px solid var(--almanac-paper);
+  text-align: center;
+  padding: 4px;
+  user-select: none;
+}
+
+.almanac-node[data-tier="lg"] {
+  width: 88px;
+  height: 88px;
+  font-size: 11.5px;
+}
+
+.almanac-node[data-tier="md"] {
+  width: 62px;
+  height: 62px;
+}
+
+.almanac-node[data-tier="sm"] {
+  width: 44px;
+  height: 44px;
+  font-size: 9px;
+}
+
+.almanac-node[data-kind="rising"] {
+  background: var(--almanac-sage);
+  box-shadow: 0 6px 16px rgba(122, 144, 114, 0.32);
+}
+
+.almanac-node[data-kind="new"] {
+  background: var(--almanac-plum);
+  box-shadow: 0 6px 16px rgba(138, 93, 122, 0.32);
+}
+
+.almanac-node:hover {
+  transform: scale(1.08);
+  box-shadow: 0 12px 30px rgba(31, 20, 12, 0.18);
+}
+
+.almanac-node[data-active="true"] {
+  outline: 3px solid var(--almanac-cocoa);
+  outline-offset: 3px;
+}
+
+.almanac-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  gap: 12px;
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-legend .pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.almanac-legend .pin .sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.almanac-legend .pin .hot {
+  background: var(--almanac-terracotta);
+}
+
+.almanac-legend .pin .ris {
+  background: var(--almanac-sage);
+}
+
+.almanac-legend .pin .new {
+  background: var(--almanac-plum);
+}
+
+.almanac-compass {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.almanac-compass-rose {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--almanac-rule-strong);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.almanac-compass-rose::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 14px solid var(--almanac-terracotta);
+  top: 4px;
+}
+
+.almanac-detail {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.almanac-detail-tag {
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-detail h3 {
+  font-family: var(--almanac-serif);
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-detail h3 em {
+  font-style: italic;
+  color: var(--almanac-terracotta-2);
+}
+
+.almanac-detail p {
+  font-family: var(--almanac-sans);
+  font-size: 13.5px;
+  color: var(--almanac-cocoa-2);
+  max-width: 360px;
+  line-height: 1.55;
+}
+
+.almanac-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  border-top: 1px solid var(--almanac-rule);
+  border-bottom: 1px solid var(--almanac-rule);
+  margin-top: 4px;
+}
+
+.almanac-detail-stats > div {
+  padding: 14px 0;
+  border-right: 1px dashed var(--almanac-rule);
+}
+
+.almanac-detail-stats > div:last-child {
+  border-right: 0;
+}
+
+.almanac-detail-stats .lbl {
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-detail-stats .val {
+  font-family: var(--almanac-serif);
+  font-size: 24px;
+  margin-top: 2px;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-detail-stats .val em {
+  font-style: italic;
+  color: var(--almanac-terracotta-2);
+}
+
+.almanac-detail-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.almanac-btn {
+  padding: 10px 16px;
+  border-radius: 100px;
+  font-family: var(--almanac-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.18s, background 0.18s;
+  cursor: pointer;
+  border: none;
+}
+
+.almanac-btn-primary {
+  background: var(--almanac-terracotta);
+  color: #fff;
+}
+
+.almanac-btn-primary:hover {
+  background: var(--almanac-terracotta-2);
+  transform: translateY(-1px);
+}
+
+.almanac-btn-ghost {
+  background: transparent;
+  color: var(--almanac-cocoa);
+  border: 1px solid var(--almanac-rule-strong);
+}
+
+.almanac-btn-ghost:hover {
+  background: var(--almanac-ivory-2);
+}
+
+/* ── Almanac Stats ──────────────────────────────────────────────────────── */
+.almanac-stats {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--almanac-cocoa);
+  border-radius: 12px;
+  background: var(--almanac-cocoa);
+  color: var(--almanac-ivory);
+  overflow: hidden;
+  font-family: var(--almanac-sans);
+}
+
+.almanac-stats-cell {
+  padding: 22px 22px 20px;
+  border-right: 1px dashed rgba(244, 234, 216, 0.18);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.almanac-stats-cell:last-child {
+  border-right: 0;
+}
+
+.almanac-stats-cell .lbl {
+  font-family: var(--almanac-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: rgba(244, 234, 216, 0.55);
+  text-transform: uppercase;
+}
+
+.almanac-stats-cell .val {
+  font-family: var(--almanac-serif);
+  font-size: 46px;
+  line-height: 1;
+  color: var(--almanac-ivory);
+}
+
+.almanac-stats-cell .val em {
+  font-style: italic;
+  color: var(--almanac-terracotta);
+}
+
+.almanac-stats-cell .unit {
+  font-family: var(--almanac-mono);
+  font-size: 11px;
+  color: rgba(244, 234, 216, 0.55);
+}
+
+.almanac-stats-cell .delta {
+  font-family: var(--almanac-mono);
+  font-size: 10.5px;
+  color: var(--almanac-sage);
+  margin-top: 4px;
+}
+
+.almanac-stats-cell .delta.down {
+  color: #c98484;
+}
+
+.almanac-stats-hero .val {
+  font-size: 52px;
+}
+
+.almanac-stats-hero .sub {
+  font-family: var(--almanac-sans);
+  font-size: 12.5px;
+  color: rgba(244, 234, 216, 0.65);
+  margin-top: 2px;
+  max-width: 240px;
+}
+
+.almanac-spark {
+  width: 100%;
+  height: 36px;
+  margin-top: 8px;
+  display: block;
+  color: var(--almanac-terracotta);
+}
+
+.almanac-ring-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.almanac-ring {
+  width: 64px;
+  height: 64px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.almanac-ring svg {
+  transform: rotate(-90deg);
+}
+
+.almanac-ring .num {
+  position: absolute;
+  font-family: var(--almanac-serif);
+  font-size: 22px;
+  color: var(--almanac-ivory);
+}
+
+/* ── Songs ───────────────────────────────────────────────────────────────── */
+.almanac-songs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.almanac-song {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px 14px 14px;
+  background: var(--almanac-paper);
+  border: 1px solid var(--almanac-rule);
+  border-radius: 14px;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.almanac-song:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(31, 20, 12, 0.08);
+}
+
+.almanac-vinyl {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center,
+    var(--almanac-cocoa) 0 18%,
+    var(--almanac-terracotta) 18% 22%,
+    var(--almanac-cocoa-2) 22% 60%,
+    var(--almanac-cocoa-3) 60% 100%);
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.18);
+  animation: almanac-spin 18s linear infinite;
+}
+
+.almanac-vinyl::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle at center, transparent 0 3px, rgba(0, 0, 0, 0.18) 3px 4px);
+  opacity: 0.4;
+}
+
+.almanac-song:hover .almanac-vinyl {
+  animation-duration: 6s;
+}
+
+@keyframes almanac-spin {
+  to { transform: rotate(360deg); }
+}
+
+.almanac-song-rank {
+  font-family: var(--almanac-serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--almanac-bark);
+}
+
+.almanac-song h4 {
+  font-family: var(--almanac-serif);
+  font-size: 19px;
+  line-height: 1.05;
+  margin-top: 2px;
+  color: var(--almanac-cocoa);
+}
+
+.almanac-song .artist {
+  font-family: var(--almanac-sans);
+  font-size: 12.5px;
+  color: var(--almanac-bark);
+  margin-top: 2px;
+}
+
+.almanac-song-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--almanac-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--almanac-bark);
+  min-width: 92px;
+}
+
+.almanac-song-meta .delta {
+  line-height: 1;
+  color: var(--almanac-sage);
+}
+
+.almanac-song-meta .delta.down {
+  color: var(--almanac-plum);
+}
+
+.almanac-wave {
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  height: 18px;
+}
+
+.almanac-wave i {
+  display: block;
+  width: 2px;
+  background: var(--almanac-terracotta);
+  border-radius: 1px;
+}
+
+/* ── Footer signature ───────────────────────────────────────────────────── */
+.almanac-signature {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--almanac-rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--almanac-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--almanac-bark);
+  text-transform: uppercase;
+}
+
+.almanac-signature .ornament {
+  font-family: var(--almanac-serif);
+  font-size: 16px;
+  color: var(--almanac-terracotta);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .almanac-hero {
+    grid-template-columns: 1fr;
+  }
+  .almanac-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .almanac-constellation {
+    grid-template-columns: 1fr;
+  }
+  .almanac-constellation-map {
+    border-right: 0;
+    border-bottom: 1px solid var(--almanac-rule);
+    height: 360px;
+  }
+  .almanac-songs {
+    grid-template-columns: 1fr;
+  }
+  .almanac-journey-path {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .almanac-journey-track {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .almanac-hero h1 {
+    font-size: 48px;
+  }
+  .almanac-forecast-headline {
+    font-size: 20px;
+  }
+  .almanac-windrose {
+    grid-template-columns: 1fr 1fr;
+  }
+  .almanac-stats {
+    grid-template-columns: 1fr;
+  }
+  .almanac-song {
+    grid-template-columns: 60px 1fr;
+  }
+  .almanac-song-meta {
+    display: none;
+  }
+}

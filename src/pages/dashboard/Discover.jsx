@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Sparkles, Globe, Pencil, X, Check, Zap } from 'lucide-react';
+import { RefreshCw, Sparkles, Globe, Pencil, X, Check, Zap, LayoutGrid, Map } from 'lucide-react';
 import { useProfile, useViralIdeas, useRecordTrendInteraction } from '@/hooks/useApi';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { AlmanacConstellation } from '@/components/almanac';
 
 const badgeStyles = {
   HOT:    'bg-primary text-white',
@@ -126,6 +127,7 @@ export default function Discover() {
   const [isRefreshing, setIsRefreshing]       = useState(false);
   const [showNichePicker, setShowNichePicker] = useState(false);
   const [browseNiche, setBrowseNiche]         = useState(null); // null = use account niche
+  const [viewMode, setViewMode]               = useState('list'); // 'list' | 'constellation'
 
   const { data: profileData, refetch: refetchProfile } = useProfile();
   const user      = profileData?.data;
@@ -239,14 +241,44 @@ export default function Discover() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing || !activeNiche}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:shadow-warm-sm transition-all text-sm font-body text-muted-foreground disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-            {isRefreshing ? 'Fetching...' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-card border border-border">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-body font-medium transition-all ${
+                  viewMode === 'list'
+                    ? 'bg-primary text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="List view"
+              >
+                <LayoutGrid size={14} />
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('constellation')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-body font-medium transition-all ${
+                  viewMode === 'constellation'
+                    ? 'bg-primary text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Constellation view"
+              >
+                <Map size={14} />
+                Map
+              </button>
+            </div>
+
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing || !activeNiche}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:shadow-warm-sm transition-all text-sm font-body text-muted-foreground disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+              {isRefreshing ? 'Fetching...' : 'Refresh'}
+            </button>
+          </div>
         </motion.div>
 
         {/* Niche explorer — horizontal scroll */}
@@ -301,14 +333,16 @@ export default function Discover() {
           </motion.div>
         )}
 
-        {/* Cache notice */}
-        {cached && !isBrowsing && (
-          <motion.div variants={item} className="flex items-center gap-2 text-xs text-muted-foreground font-body">
-            <Zap size={11} />
-            Showing cached signals. Refresh for live data.
+        {/* Constellation View */}
+        {viewMode === 'constellation' && (
+          <motion.div variants={item}>
+            <AlmanacConstellation />
           </motion.div>
         )}
 
+        {/* List View Content */}
+        {viewMode === 'list' && (
+          <>
         {/* Loading skeleton */}
         {(isLoading || isRefreshing) && (
           <div className="space-y-4">
@@ -432,6 +466,8 @@ export default function Discover() {
               ))}
             </motion.div>
           </AnimatePresence>
+        )}
+          </>
         )}
 
       </motion.div>
