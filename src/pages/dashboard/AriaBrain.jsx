@@ -7,7 +7,8 @@ import { auth } from '@/lib/firebase';
 import { api } from '@/lib/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSuggestionFeedback } from '@/hooks/useApi';
-import SessionsSidebar, { apiFetch } from './SessionsSidebar';
+import SessionsSidebar from './SessionsSidebar';
+import { apiFetch } from '@/lib/api';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STREAM_URL = `${import.meta.env.VITE_API_BASE_URL}/api/v1/agent/stream`;

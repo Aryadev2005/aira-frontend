@@ -1,6 +1,7 @@
 import { auth } from "./firebase";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const AGENT_API_URL = `${BASE_URL}/api/v1/agent`;
 
 const isNgrokUrl =
   typeof BASE_URL === "string" &&
@@ -52,9 +53,6 @@ export async function apiRequest(path, options = {}) {
 
       return res.json();
     } catch (error) {
-      if (error.status === 401 && !forceRefresh) {
-        return makeRequest(true);
-      }
       throw error;
     }
   };
@@ -68,3 +66,22 @@ export const api = {
   put: (path, body) => apiRequest(path, { method: "PUT", body }),
   delete: (path, body) => apiRequest(path, { method: "DELETE", body }),
 };
+
+// Agent API helpers (moved from SessionsSidebar.jsx)
+export async function getAgentToken(forceRefresh = true) {
+  const u = auth.currentUser;
+  if (!u) throw new Error('Not authenticated');
+  return u.getIdToken(forceRefresh);
+}
+
+export async function apiFetch(path, opts = {}) {
+  const token = await getAgentToken(true);
+  const res = await fetch(`${AGENT_API_URL}${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+  });
+  if (res.status === 204) return null;
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'Request failed');
+  return json.data;
+}

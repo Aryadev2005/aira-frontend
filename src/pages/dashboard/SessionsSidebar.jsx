@@ -3,27 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, MessageSquare, Trash2, Pencil, Check, X, Loader2, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-
-const API = `${import.meta.env.VITE_API_BASE_URL}/api/v1/agent`;
-
-const getToken = async () => {
-  const u = auth.currentUser;
-  if (!u) throw new Error('Not authenticated');
-  return u.getIdToken(true);
-};
-
-const apiFetch = async (path, opts = {}) => {
-  const token = await getToken();
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
-  });
-  if (res.status === 204) return null;
-  const json = await res.json();
-  if (!json.success) throw new Error(json.message || 'Request failed');
-  return json.data;
-};
+import { apiFetch } from '@/lib/api';
 
 const timeLabel = (iso) => {
   const d = new Date(iso);
@@ -224,6 +204,3 @@ export default function SessionsSidebar({ activeSessionId, onSelectSession, onNe
     </motion.aside>
   );
 }
-
-// Export the apiFetch for use by AriaBrain
-export { apiFetch };

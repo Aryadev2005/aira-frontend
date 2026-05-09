@@ -31,6 +31,27 @@ export default function Launch() {
   const [postingPackage, setPostingPackage] = useState(null);
   const [packageError, setPackageError] = useState(null);
 
+  // Guard: if archetype is missing, show setup prompt instead of empty cards
+  const archetype = profileData?.data?.user?.archetype;
+  if (!timingLoading && !archetype) {
+    return (
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+        <motion.div variants={item}>
+          <h1 className="font-heading text-2xl text-foreground mb-1">Launch</h1>
+          <p className="text-muted-foreground font-body text-sm">Timing intelligence &amp; brand deals</p>
+        </motion.div>
+        <motion.div variants={item} className="rounded-xl border border-border bg-muted/40 p-6 text-center space-y-3">
+          <Sparkles className="mx-auto text-primary" size={32} />
+          <p className="font-heading text-lg text-foreground">Complete your profile first</p>
+          <p className="font-body text-sm text-muted-foreground">
+            ARIA needs your archetype to personalise timing windows and brand deal alerts.<br />
+            Head to <strong>Profile → Setup</strong> to finish onboarding.
+          </p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   // timing data shape: { bestSlots: [...] } or { instagram: { monday: [...] }, bestDay, bestTime }
   const timing = timingData?.data;
   // brand data shape: { brandOpportunities: [...], pitchTemplate: { subject, body } }

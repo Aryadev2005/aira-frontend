@@ -1,5 +1,5 @@
 import React, {
-  createContext, useCallback, useContext, useEffect, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react';
 import {
   signInWithEmailAndPassword,
@@ -45,8 +45,8 @@ export function FirebaseAuthProvider({ children }) {
       }
     } catch (e) {
       console.error('Backend sync failed', e);
+      throw e;
     }
-    return null;
   }, []);
 
   useEffect(() => {
@@ -101,10 +101,12 @@ export function FirebaseAuthProvider({ children }) {
   // A user does NOT need onboarding if:
   // - They have at least one connected account, even if niche isn't detected yet
   // - OR their onboarding_step is 'complete'
-  const needsOnboarding = dbUser &&
+  const needsOnboarding = useMemo(() => (
+    !!dbUser &&
     !dbUser.instagram_handle &&
     !dbUser.youtube_handle &&
-    dbUser.onboarding_step !== 'complete';
+    dbUser.onboarding_step !== 'complete'
+  ), [dbUser]);
 
   const value = {
     user,
