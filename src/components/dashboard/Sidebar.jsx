@@ -1,19 +1,20 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Compass, Clapperboard, Rocket, Music, Brain, BarChart3, User, Zap, LogOut, Settings } from 'lucide-react';
+import { Home, Compass, Clapperboard, Rocket, Music, Brain, BarChart3, User, Zap, LogOut, Settings, CalendarDays } from 'lucide-react';
 import { useFirebaseAuth } from '@/lib/FirebaseAuthContext';
 import { useProfile } from '@/hooks/useApi';
 
 const navItems = [
-  { icon: Home,        label: 'Home',      path: '/dashboard' },
-  { icon: Compass,     label: 'Discover',  path: '/dashboard/discover' },
-  { icon: Clapperboard,label: 'Studio',    path: '/dashboard/studio' },
-  { icon: Rocket,      label: 'Launch',    path: '/dashboard/launch' },
-  { icon: Music,       label: 'Songs',     path: '/dashboard/songs' },
-  { icon: Brain,       label: 'ARIA Brain',path: '/dashboard/brain' },
-  { icon: BarChart3,   label: 'Video DNA', path: '/dashboard/video-dna' },
-  { icon: User,        label: 'Profile',   path: '/dashboard/profile' },
-  { icon: Settings,    label: 'Settings',  path: '/dashboard/settings' },
+  { icon: Home,         label: 'Home',      path: '/dashboard' },
+  { icon: Compass,      label: 'Discover',  path: '/dashboard/discover' },
+  { icon: Clapperboard, label: 'Studio',    path: '/dashboard/studio' },
+  { icon: Rocket,       label: 'Launch',    path: '/dashboard/launch' },
+  { icon: CalendarDays, label: 'Calendar',  path: '/dashboard/calendar' },
+  { icon: Music,        label: 'Songs',     path: '/dashboard/songs' },
+  { icon: Brain,        label: 'ARIA Brain',path: '/dashboard/brain' },
+  { icon: BarChart3,    label: 'Video DNA', path: '/dashboard/video-dna' },
+  { icon: User,         label: 'Profile',   path: '/dashboard/profile' },
+  { icon: Settings,     label: 'Settings',  path: '/dashboard/settings' },
 ];
 
 export default function Sidebar() {
@@ -108,8 +109,8 @@ export default function Sidebar() {
           {[
             navItems[0],   // Home
             navItems[1],   // Discover
-            navItems[5],   // ARIA Brain
-            navItems[4],   // Songs
+            navItems[2],   // Studio
+            navItems[4],   // Calendar
             navItems[7],   // Profile
           ].map((item) => (
             <Link

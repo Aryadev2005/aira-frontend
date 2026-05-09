@@ -509,3 +509,42 @@ export const useTogglePin = () => {
     },
   });
 };
+
+// ── CALENDAR ENTRIES ──────────────────────────────────────────────────────
+export const useCalendarEntries = (month) =>
+  useQuery({
+    queryKey: ['calendar-entries', month],
+    queryFn: () => api.get(`/calendar/entries${month ? `?month=${month}` : ''}`),
+    staleTime: 1000 * 60 * 5, // 5 min — entries change often
+    retry: 1,
+  });
+
+export const useCreateCalendarEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post('/calendar/entries', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+    },
+  });
+};
+
+export const useUpdateCalendarEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }) => api.patch(`/calendar/entries/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+    },
+  });
+};
+
+export const useDeleteCalendarEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete(`/calendar/entries/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+    },
+  });
+};

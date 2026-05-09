@@ -5,6 +5,7 @@ import { useProfile, useViralIdeas, useRecordTrendInteraction } from '@/hooks/us
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { AlmanacConstellation } from '@/components/almanac';
+import IdeaDetailSheet from '@/components/discover/IdeaDetailSheet';
 
 const badgeStyles = {
   HOT:    'bg-primary text-white',
@@ -128,6 +129,7 @@ export default function Discover() {
   const [showNichePicker, setShowNichePicker] = useState(false);
   const [browseNiche, setBrowseNiche]         = useState(null); // null = use account niche
   const [viewMode, setViewMode]               = useState('list'); // 'list' | 'constellation'
+  const [selectedIdea, setSelectedIdea]       = useState(null);
 
   const { data: profileData, refetch: refetchProfile } = useProfile();
   const user      = profileData?.data;
@@ -389,8 +391,12 @@ export default function Discover() {
         {topPick && !isLoading && !isRefreshing && (
           <motion.div
             variants={item}
+            onClick={() => {
+              trackInteraction(topPick.title, topPick.sources?.[0], activeNiche, 'viewed');
+              setSelectedIdea(topPick);
+            }}
             onViewportEnter={() => trackInteraction(topPick.title, topPick.sources?.[0], activeNiche, 'viewed')}
-            className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm"
+            className="bg-accent text-accent-foreground rounded-xl p-6 shadow-warm cursor-pointer hover:shadow-warm-lg transition-shadow"
           >
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={16} className="text-primary" />
@@ -425,6 +431,10 @@ export default function Discover() {
                   key={idea.id || idx}
                   variants={item}
                   whileHover={{ scale: 1.01, y: -2 }}
+                  onClick={() => {
+                    trackInteraction(idea.title, idea.sources?.[0], activeNiche, 'viewed');
+                    setSelectedIdea(idea);
+                  }}
                   onViewportEnter={() => trackInteraction(idea.title, idea.sources?.[0], activeNiche, 'viewed')}
                   className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-warm transition-shadow"
                 >
@@ -467,10 +477,16 @@ export default function Discover() {
             </motion.div>
           </AnimatePresence>
         )}
-          </>
+          </AnimatePresence>
         )}
 
       </motion.div>
+
+      {/* Idea Detail Sheet */}
+      <IdeaDetailSheet
+        idea={selectedIdea}
+        onClose={() => setSelectedIdea(null)}
+      />
     </>
   );
 }
