@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Bell, ArrowRight, Sparkles } from "lucide-react";
-import { useProfile, useAnalyticsDashboard } from "@/hooks/useApi";
+import { useProfile, useAnalyticsDashboard, useViralIdeas } from "@/hooks/useApi";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -22,62 +22,10 @@ const today = () =>
     month: "long",
   });
 
-// ── Static mock data (replace with real API data as available) ────────────────
-const TRENDS = [
-  {
-    id: "t1",
-    badges: ["hot"],
-    title: "GRWM Morning",
-    vel: "+34%",
-    window: "48h",
-    match: "94%",
-  },
-  {
-    id: "t2",
-    badges: ["hot"],
-    title: "Quiet Luxury",
-    vel: "+19%",
-    window: "72h",
-    match: "81%",
-  },
-  {
-    id: "t3",
-    badges: ["rising"],
-    title: "Marathi Reels",
-    vel: "+58%",
-    window: "5d",
-    match: "62%",
-  },
-  {
-    id: "t4",
-    badges: ["rising"],
-    title: "Pomodoro Vlogs",
-    vel: "+22%",
-    window: "7d",
-    match: "58%",
-  },
-  {
-    id: "t5",
-    badges: ["new"],
-    title: "POV Café",
-    vel: "NEW",
-    window: "24h",
-    match: "47%",
-  },
-  {
-    id: "t6",
-    badges: ["new"],
-    title: "The Niche Stack",
-    vel: "NEW",
-    window: "36h",
-    match: "70%",
-  },
-];
-
 const BADGE_STYLES = {
-  hot: "bg-primary/15 text-primary",
-  rising: "bg-amber-500/15 text-amber-600",
-  new: "bg-blue-500/15 text-blue-600",
+  HOT: "bg-primary/15 text-primary",
+  RISING: "bg-amber-500/15 text-amber-600",
+  NEW: "bg-blue-500/15 text-blue-600",
 };
 
 // ── Animation ─────────────────────────────────────────────────────────────────
@@ -106,9 +54,11 @@ function StatCell({ label, value, suffix, delta, accent = false }) {
           </span>
         )}
       </p>
-      <p className="font-body text-[11px] text-muted-foreground mt-1">
-        {delta}
-      </p>
+      {delta && (
+        <p className="font-body text-[11px] text-muted-foreground mt-1">
+          {delta}
+        </p>
+      )}
     </div>
   );
 }
@@ -157,26 +107,23 @@ function WorkflowCard({ step, title, desc, chips, cta, active, onClick }) {
   );
 }
 
-function TrendCard({ badges, title, vel, window: win, match }) {
+function TrendCard({ title, badge, growthSignal, velocityScore }) {
   return (
     <div className="flex-shrink-0 w-44 bg-card border border-border rounded-2xl p-4 space-y-2">
       <div className="flex gap-1.5">
-        {badges.map((b) => (
-          <span
-            key={b}
-            className={`font-body text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${BADGE_STYLES[b] || ""}`}
-          >
-            {b}
-          </span>
-        ))}
+        <span
+          className={`font-body text-[10px] font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[badge] || "bg-muted text-muted-foreground"}`}
+        >
+          {badge}
+        </span>
       </div>
       <p className="font-heading text-sm text-foreground leading-snug">
         {title}
       </p>
       <div className="flex items-center gap-1.5 font-body text-xs text-muted-foreground">
-        <span className="text-primary font-semibold">{vel}</span>
+        <span className="text-primary font-semibold">{growthSignal}</span>
         <span>·</span>
-        <span>{match} match</span>
+        <span>{velocityScore ?? 0}% vel</span>
       </div>
     </div>
   );
@@ -191,39 +138,43 @@ export default function DashboardHome() {
 
   const displayName =
     dbUser?.name || profileData?.data?.user?.name || "Creator";
-  const analytics = analyticsData?.data;
 
-  // Derive stats (real data where available, sensible defaults otherwise)
+  const { data: ideasData, isLoading: ideasLoading } = useViralIdeas({});
+  const liveIdeas = ideasData?.data?.ideas?.slice(0, 6) ?? [];
+
+  const analytics = analyticsData?.data;
   const growth = analytics?.growthRate ?? "+18.2";
   const health = analytics?.currentHealthScore ?? 84;
-  const ideas = analytics?.contentIdeas ?? 27;
+  const ideas = liveIdeas.length > 0 ? liveIdeas.length : (analytics?.contentIdeas ?? 27);
   const bestTime = analytics?.bestWindow ?? "8:42";
+  const growthDelta = analytics?.growthDelta ? `▲ ${analytics.growthDelta} vs last week` : null;
+  const healthDelta = analytics?.healthDelta ? `▲ ${analytics.healthDelta} vs last week` : null;
 
   const STATS = [
     {
       label: "7-day growth",
       value: growth,
       suffix: "%",
-      delta: "▲ +4.1 vs last week",
+      delta: growthDelta,
       accent: true,
     },
     {
       label: "Health score",
       value: health,
       suffix: "",
-      delta: "▲ +6 vs last week",
+      delta: healthDelta,
     },
     {
       label: "Content ideas",
       value: ideas,
       suffix: "",
-      delta: "▲ 9 fresh today",
+      delta: null,
     },
     {
       label: "Best window",
       value: bestTime,
       suffix: " PM",
-      delta: "▲ 32% lift vs avg",
+      delta: null,
     },
   ];
 
@@ -235,14 +186,9 @@ export default function DashboardHome() {
       active: true,
       title: "What to make",
       desc: "Niche trends, viral angles, competitor moves — surfaced 48h before the algorithm.",
-      chips: [
-        <span
-          key="c"
-          className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
-        >
-          Hot · 12
-        </span>,
-      ],
+      chips: liveIdeas.length > 0
+        ? [<span key="hot" className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">Hot · {liveIdeas.length}</span>]
+        : [],
       cta: "Browse brief",
       path: "/dashboard/discover",
     },
@@ -345,9 +291,24 @@ export default function DashboardHome() {
           </button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
-          {TRENDS.map((t) => (
-            <TrendCard key={t.id} {...t} />
-          ))}
+          {ideasLoading
+            ? [1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="w-44 h-28 bg-muted rounded-2xl animate-pulse flex-shrink-0" />
+              ))
+            : liveIdeas.length === 0
+            ? (
+                <div
+                  onClick={() => navigate("/dashboard/settings")}
+                  className="flex-shrink-0 w-64 bg-card border border-border rounded-2xl p-4 flex items-center justify-center cursor-pointer hover:bg-muted/40 transition-colors"
+                >
+                  <p className="font-body text-sm text-muted-foreground text-center">
+                    Connect Instagram to see personalized trends →
+                  </p>
+                </div>
+              )
+            : liveIdeas.map((idea, i) => (
+                <TrendCard key={idea.title + i} {...idea} />
+              ))}
         </div>
       </motion.div>
 

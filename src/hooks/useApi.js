@@ -190,8 +190,9 @@ export const useDiscoverIntelligence = (filters = {}) => {
   const params = new URLSearchParams(filters).toString();
   return useQuery({
     queryKey: ["discover-intelligence", filters],
-    queryFn: () =>
-      api.get(`/discover/intelligence${params ? `?${params}` : ""}`),
+    queryFn: () => api.get(`/trends/viral-ideas${params ? `?${params}` : ""}`),
+    staleTime: 1000 * 60 * 30,
+    retry: 1,
   });
 };
 

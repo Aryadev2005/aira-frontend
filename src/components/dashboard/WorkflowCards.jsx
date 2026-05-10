@@ -2,9 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useViralIdeas } from '@/hooks/useApi';
 
 const steps = [
   {
+    id: 'discover',
     emoji: '🔍',
     label: 'DISCOVER',
     badge: 'HOT',
@@ -14,6 +16,7 @@ const steps = [
     path: '/dashboard/discover',
   },
   {
+    id: 'studio',
     emoji: '🎬',
     label: 'STUDIO',
     badge: 'START DISCOVER',
@@ -23,6 +26,7 @@ const steps = [
     path: '/dashboard/studio',
   },
   {
+    id: 'launch',
     emoji: '🚀',
     label: 'LAUNCH',
     badge: 'FINISH STUDIO',
@@ -40,6 +44,11 @@ const item = {
 };
 
 export default function WorkflowCards() {
+  const { data: ideasData } = useViralIdeas({});
+  const hotCount = ideasData?.data?.ideas?.filter(
+    (i) => i.badge === 'HOT' || i.badge === 'RISING'
+  ).length ?? 0;
+
   return (
     <div>
       <h3 className="font-body font-semibold text-sm text-muted-foreground tracking-wider uppercase mb-4">
@@ -52,7 +61,7 @@ export default function WorkflowCards() {
         className="grid sm:grid-cols-3 gap-4"
       >
         {steps.map((step) => (
-          <motion.div key={step.label} variants={item}>
+          <motion.div key={step.id} variants={item}>
             <Link to={step.path}>
               <motion.div
                 whileHover={{ scale: 1.02, y: -2 }}
@@ -66,8 +75,8 @@ export default function WorkflowCards() {
                       {step.label}
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-pill text-[10px] font-body font-semibold ${step.badgeClass}`}>
-                    {step.badge}
+                  <span className={`px-2 py-0.5 rounded-pill text-[10px] font-body font-semibold ${step.id === 'discover' && hotCount > 0 ? 'bg-primary text-white' : step.badgeClass}`}>
+                    {step.id === 'discover' && hotCount > 0 ? `${hotCount} HOT` : step.badge}
                   </span>
                 </div>
                 <h4 className="font-heading text-lg text-foreground mb-1">{step.title}</h4>
