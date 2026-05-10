@@ -181,7 +181,9 @@ export const useVideoDNAHistory = () =>
   });
 
 export const useCompetitorGap = () =>
-  useMutation({ mutationFn: (body) => api.post("/video-dna/competitor-gap", body) });
+  useMutation({
+    mutationFn: (body) => api.post("/video-dna/competitor-gap", body),
+  });
 
 // ── DISCOVER ──────────────────────────────────────────────────────────────
 export const useDiscoverIntelligence = (filters = {}) => {
@@ -379,9 +381,9 @@ export const useRebuildVoicePortrait = () => {
 export const usePersonalisedRoadmap = () =>
   useQuery({
     queryKey: ["roadmap"],
-    queryFn:  () => api.get("/analytics/roadmap"),
+    queryFn: () => api.get("/analytics/roadmap"),
     staleTime: 1000 * 60 * 60 * 6, // 6 hours — matches server cache TTL
-    retry:    1,
+    retry: 1,
   });
 
 /**
@@ -394,7 +396,7 @@ export const useRefreshRoadmap = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.get("/analytics/roadmap/refresh"),
-    onSuccess:  () => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roadmap"] });
     },
   });
@@ -408,11 +410,13 @@ export const useRefreshRoadmap = () => {
 export const useRoadmapActionStates = (roadmapVersion) =>
   useQuery({
     queryKey: ["roadmap-action-states", roadmapVersion],
-    queryFn:  () =>
-      api.get(`/analytics/roadmap/action-states?version=${encodeURIComponent(roadmapVersion)}`),
-    enabled:   !!roadmapVersion,
+    queryFn: () =>
+      api.get(
+        `/analytics/roadmap/action-states?version=${encodeURIComponent(roadmapVersion)}`,
+      ),
+    enabled: !!roadmapVersion,
     staleTime: 1000 * 60 * 60, // 1 hour
-    retry:     1,
+    retry: 1,
   });
 
 /**
@@ -422,7 +426,7 @@ export const useCompleteRoadmapAction = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data) => api.post("/analytics/roadmap/action/complete", data),
-    onSuccess:  (_res, variables) => {
+    onSuccess: (_res, variables) => {
       const v = /** @type {any} */ (variables);
       qc.invalidateQueries({
         queryKey: ["roadmap-action-states", v.roadmapVersion],
@@ -438,7 +442,7 @@ export const useDismissRoadmapAction = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data) => api.post("/analytics/roadmap/action/dismiss", data),
-    onSuccess:  (_res, variables) => {
+    onSuccess: (_res, variables) => {
       const v = /** @type {any} */ (variables);
       qc.invalidateQueries({
         queryKey: ["roadmap-action-states", v.roadmapVersion],
@@ -513,8 +517,9 @@ export const useTogglePin = () => {
 // ── CALENDAR ENTRIES ──────────────────────────────────────────────────────
 export const useCalendarEntries = (month) =>
   useQuery({
-    queryKey: ['calendar-entries', month],
-    queryFn: () => api.get(`/calendar/entries${month ? `?month=${month}` : ''}`),
+    queryKey: ["calendar-entries", month],
+    queryFn: () =>
+      api.get(`/calendar/entries${month ? `?month=${month}` : ""}`),
     staleTime: 1000 * 60 * 5, // 5 min — entries change often
     retry: 1,
   });
@@ -522,9 +527,9 @@ export const useCalendarEntries = (month) =>
 export const useCreateCalendarEntry = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body) => api.post('/calendar/entries', body),
+    mutationFn: (body) => api.post("/calendar/entries", body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+      qc.invalidateQueries({ queryKey: ["calendar-entries"] });
     },
   });
 };
@@ -534,7 +539,7 @@ export const useUpdateCalendarEntry = () => {
   return useMutation({
     mutationFn: ({ id, ...body }) => api.patch(`/calendar/entries/${id}`, body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+      qc.invalidateQueries({ queryKey: ["calendar-entries"] });
     },
   });
 };
@@ -544,7 +549,69 @@ export const useDeleteCalendarEntry = () => {
   return useMutation({
     mutationFn: (id) => api.delete(`/calendar/entries/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['calendar-entries'] });
+      qc.invalidateQueries({ queryKey: ["calendar-entries"] });
+    },
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CREDITS HOOKS — Add these to src/hooks/useApi.js
+// Place them after the existing INTEGRATIONS section, before the end of the file
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── CREDITS ───────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/credits/wallet
+ * Returns: { wallet, plan, planLimit, recentTransactions, topupPacks }
+ * Refetches every 60s so sidebar credit count stays fresh.
+ */
+export const useCreditsWallet = () =>
+  useQuery({
+    queryKey: ["credits-wallet"],
+    queryFn: () => api.get("/credits/wallet"),
+    staleTime: 1000 * 60, // 1 min — matches backend WALLET_TTL
+    refetchInterval: 1000 * 60, // auto-refresh in background
+    retry: 1,
+  });
+
+/**
+ * GET /api/v1/credits/history?limit=20&offset=0
+ * Returns: { transactions, total, limit, offset }
+ */
+export const useCreditsHistory = ({ limit = 20, offset = 0 } = {}) =>
+  useQuery({
+    queryKey: ["credits-history", limit, offset],
+    queryFn: () => api.get(`/credits/history?limit=${limit}&offset=${offset}`),
+    staleTime: 1000 * 30, // 30s — transactions update after each AI action
+    retry: 1,
+  });
+
+/**
+ * GET /api/v1/credits/packs
+ * Returns: { packs }
+ */
+export const useCreditsPacks = () =>
+  useQuery({
+    queryKey: ["credits-packs"],
+    queryFn: () => api.get("/credits/packs"),
+    staleTime: 1000 * 60 * 60 * 24, // 24h — pack pricing rarely changes
+    retry: 1,
+  });
+
+/**
+ * POST /api/v1/credits/topup
+ * Body: { packId, paymentId }
+ * Call this AFTER verifying payment with Razorpay on the client.
+ */
+export const useBuyTopup = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post("/credits/topup", body),
+    onSuccess: () => {
+      // Invalidate wallet so balance updates immediately
+      qc.invalidateQueries({ queryKey: ["credits-wallet"] });
+      qc.invalidateQueries({ queryKey: ["credits-history"] });
     },
   });
 };

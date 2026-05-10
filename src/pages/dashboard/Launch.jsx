@@ -1,49 +1,69 @@
 // src/pages/dashboard/Launch.jsx
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
-  Clock, Zap, Handshake, Sparkles, ArrowRight,
-  CheckCircle2, Edit3, Calendar, ChevronDown, X
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+  Clock,
+  Zap,
+  Sparkles,
+  ArrowRight,
+  CheckCircle2,
+  Calendar,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
-  useLaunchTiming, useLaunchPackage, useBrandAlert,
-  useProfile, useCreateCalendarEntry
-} from '@/hooks/useApi';
-import useCreatorFlow from '@/store/creatorFlow';
+  useLaunchTiming,
+  useLaunchPackage,
+  useBrandAlert,
+  useProfile,
+  useCreateCalendarEntry,
+} from "@/hooks/useApi";
+import useCreatorFlow from "@/store/creatorFlow";
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
 const item = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
+  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 25 } },
 };
 
 // Convert "Fri 7:30 PM" to next occurrence date string "YYYY-MM-DD"
-function nextDateForSlot(slotStr = '') {
+function nextDateForSlot(slotStr = "") {
   try {
-    const dayMap = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
-    const match  = slotStr.match(/^(\w{3})\s+(.+)$/);
-    if (!match) return new Date().toISOString().split('T')[0];
+    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const match = slotStr.match(/^(\w{3})\s+(.+)$/);
+    if (!match) return new Date().toISOString().split("T")[0];
     const targetDay = dayMap[match[1]];
-    const now       = new Date();
-    const current   = now.getDay();
-    let   diff      = (targetDay - current + 7) % 7;
+    const now = new Date();
+    const current = now.getDay();
+    let diff = (targetDay - current + 7) % 7;
     if (diff === 0) diff = 7; // push to next week if same day
     const next = new Date(now);
     next.setDate(now.getDate() + diff);
-    return next.toISOString().split('T')[0];
+    return next.toISOString().split("T")[0];
   } catch {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split("T")[0];
   }
 }
 
 // ── Save to Calendar confirmation modal ───────────────────────────────────────
-function SaveToCalendarModal({ idea, slot, platform, sessionId, onSave, onClose, saving }) {
-  const [date, setDate]   = useState(nextDateForSlot(slot?.day ? `${slot.day} ${slot.time}` : ''));
-  const [time, setTime]   = useState(slot?.time || '');
-  const [status, setStatus] = useState('ready');
+function SaveToCalendarModal({
+  idea,
+  slot,
+  platform,
+  sessionId,
+  onSave,
+  onClose,
+  saving,
+}) {
+  const [date, setDate] = useState(
+    nextDateForSlot(slot?.day ? `${slot.day} ${slot.time}` : ""),
+  );
+  const [time, setTime] = useState(slot?.time || "");
+  const [status, setStatus] = useState("ready");
 
   return (
     <motion.div
@@ -56,16 +76,21 @@ function SaveToCalendarModal({ idea, slot, platform, sessionId, onSave, onClose,
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28 }}
+        transition={{ type: "spring", damping: 28 }}
         className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-primary" />
-            <h3 className="font-heading text-base text-foreground">Save to Calendar</h3>
+            <h3 className="font-heading text-base text-foreground">
+              Save to Calendar
+            </h3>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
             <X size={16} />
           </button>
         </div>
@@ -73,9 +98,15 @@ function SaveToCalendarModal({ idea, slot, platform, sessionId, onSave, onClose,
         {/* Summary card */}
         <div className="px-5 py-4 space-y-4">
           <div className="bg-muted/50 rounded-xl p-4">
-            <p className="font-body text-xs text-muted-foreground mb-1">Content</p>
-            <p className="font-body text-sm font-semibold text-foreground line-clamp-2">{idea}</p>
-            <p className="font-body text-xs text-muted-foreground mt-1 capitalize">{platform}</p>
+            <p className="font-body text-xs text-muted-foreground mb-1">
+              Content
+            </p>
+            <p className="font-body text-sm font-semibold text-foreground line-clamp-2">
+              {idea}
+            </p>
+            <p className="font-body text-xs text-muted-foreground mt-1 capitalize">
+              {platform}
+            </p>
           </div>
 
           {/* Date */}
@@ -96,7 +127,8 @@ function SaveToCalendarModal({ idea, slot, platform, sessionId, onSave, onClose,
           {/* Time */}
           <div>
             <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-              Posting Time <span className="font-normal">(IST · ARIA recommended)</span>
+              Posting Time{" "}
+              <span className="font-normal">(IST · ARIA recommended)</span>
             </label>
             <input
               type="text"
@@ -138,9 +170,14 @@ function SaveToCalendarModal({ idea, slot, platform, sessionId, onSave, onClose,
                        disabled:opacity-50 active:scale-[0.98] transition-all shadow-warm"
           >
             {saving ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                Saving…
+              </>
             ) : (
-              <><Calendar size={15} /> Save to Calendar</>
+              <>
+                <Calendar size={15} /> Save to Calendar
+              </>
             )}
           </button>
         </div>
@@ -154,24 +191,26 @@ export default function Launch() {
   const navigate = useNavigate();
 
   // Zustand flow state
-  const flowIdea        = useCreatorFlow((s) => s.ideaText);
-  const selectedIdea    = useCreatorFlow((s) => s.selectedIdea);
+  const flowIdea = useCreatorFlow((s) => s.ideaText);
+  const selectedIdea = useCreatorFlow((s) => s.selectedIdea);
   const studioSessionId = useCreatorFlow((s) => s.studioSessionId);
-  const setLaunchCtx    = useCreatorFlow((s) => s.setLaunchContext);
+  const setLaunchCtx = useCreatorFlow((s) => s.setLaunchContext);
 
   const { data: profileData } = useProfile();
   const user = profileData?.data?.user;
 
-  const { data: timingData,    isLoading: timingLoading  } = useLaunchTiming();
-  const { data: brandAlertData, isLoading: brandLoading  } = useBrandAlert();
-  const { mutateAsync: generatePackage, isPending: packageLoading } = useLaunchPackage();
-  const { mutateAsync: createEntry, isPending: savingToCalendar   } = useCreateCalendarEntry();
+  const { data: timingData, isLoading: timingLoading } = useLaunchTiming();
+  const { data: brandAlertData, isLoading: brandLoading } = useBrandAlert();
+  const { mutateAsync: generatePackage, isPending: packageLoading } =
+    useLaunchPackage();
+  const { mutateAsync: createEntry, isPending: savingToCalendar } =
+    useCreateCalendarEntry();
 
-  const timing   = timingData?.data;
+  const timing = timingData?.data;
   const brandData = brandAlertData?.data;
-  const bestSlot  = timing?.bestSlots?.[0];
+  const bestSlot = timing?.bestSlots?.[0];
 
-  const [sessionIdea, setSessionIdea] = useState(flowIdea || '');
+  const [sessionIdea, setSessionIdea] = useState(flowIdea || "");
   const [postingPackage, setPostingPackage] = useState(null);
   const [packageError, setPackageError] = useState(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -193,36 +232,36 @@ export default function Launch() {
     setPackageError(null);
     try {
       const data = await generatePackage({
-        idea:     sessionIdea || 'general content',
-        platform: user?.primary_platform || 'instagram',
-        niche:    user?.niches?.[0]       || 'lifestyle',
+        idea: sessionIdea || "general content",
+        platform: user?.primary_platform || "instagram",
+        niche: user?.niches?.[0] || "lifestyle",
       });
       const pkg = data?.data;
       setPostingPackage(pkg);
       setLaunchCtx(pkg, bestSlot ? `${bestSlot.day} ${bestSlot.time}` : null);
     } catch (e) {
-      setPackageError('Could not generate package. Please try again.');
+      setPackageError("Could not generate package. Please try again.");
     }
   };
 
   const handleSaveToCalendar = async ({ date, time, status }) => {
     try {
       await createEntry({
-        title:             sessionIdea || flowIdea || 'Content',
-        idea:              selectedIdea?.contentAngle || sessionIdea,
-        platform:          user?.primary_platform || 'instagram',
-        niche:             user?.niches?.[0] || 'general',
-        format:            selectedIdea?.formatSuggestion || selectedIdea?.format,
-        scheduled_date:    date,
-        scheduled_time:    time,
+        title: sessionIdea || flowIdea || "Content",
+        idea: selectedIdea?.contentAngle || sessionIdea,
+        platform: user?.primary_platform || "instagram",
+        niche: user?.niches?.[0] || "general",
+        format: selectedIdea?.formatSuggestion || selectedIdea?.format,
+        scheduled_date: date,
+        scheduled_time: time,
         status,
         studio_session_id: studioSessionId || undefined,
-        source:            studioSessionId ? 'discovery' : 'manual',
-        hook:              postingPackage?.caption?.split('\n')?.[0] || selectedIdea?.hook,
-        caption:           postingPackage?.caption,
-        hashtags:          [
+        source: studioSessionId ? "discovery" : "manual",
+        hook: postingPackage?.caption?.split("\n")?.[0] || selectedIdea?.hook,
+        caption: postingPackage?.caption,
+        hashtags: [
           ...(postingPackage?.hashtags?.mega || []),
-          ...(postingPackage?.hashtags?.mid  || []),
+          ...(postingPackage?.hashtags?.mid || []),
           ...(postingPackage?.hashtags?.niche || []),
         ],
         aria_tip: timing?.ariaReason,
@@ -235,23 +274,33 @@ export default function Launch() {
   };
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 pb-20">
-
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-5 pb-20"
+    >
       {/* Header */}
       <motion.div variants={item}>
         <h1 className="font-heading text-2xl text-foreground mb-1">Launch</h1>
-        <p className="text-muted-foreground font-body text-sm">Timing intelligence · Brand deals · Schedule</p>
+        <p className="text-muted-foreground font-body text-sm">
+          Timing intelligence · Brand deals · Schedule
+        </p>
       </motion.div>
 
       {/* From flow indicator */}
       {flowIdea && (
-        <motion.div variants={item}
+        <motion.div
+          variants={item}
           className="flex items-center gap-2 px-4 py-3 bg-primary/8 border border-primary/15 rounded-xl"
         >
           <Sparkles size={13} className="text-primary" />
           <p className="font-body text-xs text-primary">
-            <span className="font-semibold">From Studio:</span>{' '}
-            <span className="text-muted-foreground">{flowIdea.slice(0, 60)}{flowIdea.length > 60 ? '…' : ''}</span>
+            <span className="font-semibold">From Studio:</span>{" "}
+            <span className="text-muted-foreground">
+              {flowIdea.slice(0, 60)}
+              {flowIdea.length > 60 ? "…" : ""}
+            </span>
           </p>
         </motion.div>
       )}
@@ -269,18 +318,26 @@ export default function Launch() {
               <div
                 key={i}
                 className={`flex items-center justify-between px-4 py-3.5
-                  ${i < timing.bestSlots.length - 1 ? 'border-b border-border' : ''}`}
+                  ${i < timing.bestSlots.length - 1 ? "border-b border-border" : ""}`}
               >
                 <div>
-                  <span className="font-body text-sm font-semibold text-foreground">{slot.day}</span>
+                  <span className="font-body text-sm font-semibold text-foreground">
+                    {slot.day}
+                  </span>
                   {slot.reason && (
-                    <p className="font-body text-xs text-muted-foreground mt-0.5">{slot.reason}</p>
+                    <p className="font-body text-xs text-muted-foreground mt-0.5">
+                      {slot.reason}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-body text-sm font-bold text-primary">{slot.time}</span>
-                  <div className="text-[10px] font-body font-semibold text-muted-foreground
-                                  bg-muted px-2 py-0.5 rounded-full">
+                  <span className="font-body text-sm font-bold text-primary">
+                    {slot.time}
+                  </span>
+                  <div
+                    className="text-[10px] font-body font-semibold text-muted-foreground
+                                  bg-muted px-2 py-0.5 rounded-full"
+                  >
                     {slot.score}
                   </div>
                 </div>
@@ -290,7 +347,10 @@ export default function Launch() {
               <div className="px-4 py-2.5 bg-primary/5 flex items-center gap-2">
                 <Clock size={12} className="text-primary" />
                 <p className="font-body text-xs text-primary">
-                  Next slot in <span className="font-semibold">{timing.nextBestSlotHoursAway}h</span>
+                  Next slot in{" "}
+                  <span className="font-semibold">
+                    {timing.nextBestSlotHoursAway}h
+                  </span>
                   {timing.platformInsight && ` · ${timing.platformInsight}`}
                 </p>
               </div>
@@ -304,10 +364,15 @@ export default function Launch() {
       </motion.div>
 
       {/* Posting Package */}
-      <motion.div variants={item} className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <motion.div
+        variants={item}
+        className="bg-card border border-border rounded-xl p-5 space-y-4"
+      >
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-primary" />
-          <h3 className="font-heading text-base text-foreground">Posting Package</h3>
+          <h3 className="font-heading text-base text-foreground">
+            Posting Package
+          </h3>
         </div>
 
         <textarea
@@ -321,7 +386,9 @@ export default function Launch() {
                      focus:ring-primary/20 transition-all leading-relaxed"
         />
 
-        {packageError && <p className="text-destructive font-body text-xs">{packageError}</p>}
+        {packageError && (
+          <p className="text-destructive font-body text-xs">{packageError}</p>
+        )}
 
         <Button
           onClick={handleGeneratePackage}
@@ -335,7 +402,9 @@ export default function Launch() {
               Generating…
             </span>
           ) : (
-            <span className="flex items-center gap-2"><Zap size={15} /> Generate Package</span>
+            <span className="flex items-center gap-2">
+              <Zap size={15} /> Generate Package
+            </span>
           )}
         </Button>
 
@@ -359,13 +428,20 @@ export default function Launch() {
             {postingPackage.hashtags && (
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  ...(postingPackage.hashtags.mega  || []),
-                  ...(postingPackage.hashtags.mid   || []),
+                  ...(postingPackage.hashtags.mega || []),
+                  ...(postingPackage.hashtags.mid || []),
                   ...(postingPackage.hashtags.niche || []),
-                ].slice(0, 12).map((h, i) => (
-                  <span key={i} className="font-body text-[11px] px-2 py-0.5 bg-primary/10
-                                           text-primary rounded-full">{h}</span>
-                ))}
+                ]
+                  .slice(0, 12)
+                  .map((h, i) => (
+                    <span
+                      key={i}
+                      className="font-body text-[11px] px-2 py-0.5 bg-primary/10
+                                           text-primary rounded-full"
+                    >
+                      {h}
+                    </span>
+                  ))}
               </div>
             )}
           </motion.div>
@@ -379,27 +455,40 @@ export default function Launch() {
         </h3>
         {brandLoading ? (
           <div className="space-y-2">
-            {[1,2,3].map((i) => <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />)}
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
+            ))}
           </div>
         ) : brandData?.brandOpportunities?.length > 0 ? (
           <div className="space-y-2">
             {brandData.brandOpportunities.map((b, i) => (
-              <div key={i} className="bg-card border border-border rounded-xl p-4">
+              <div
+                key={i}
+                className="bg-card border border-border rounded-xl p-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-body font-semibold text-sm text-foreground">{b.brand}</p>
+                      <p className="font-body font-semibold text-sm text-foreground">
+                        {b.brand}
+                      </p>
                       <span className="font-body text-[10px] px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                         {b.category}
                       </span>
                     </div>
-                    <p className="font-body text-xs text-muted-foreground">{b.timing}</p>
+                    <p className="font-body text-xs text-muted-foreground">
+                      {b.timing}
+                    </p>
                     {b.pitchAngle && (
-                      <p className="font-body text-xs text-primary/80 mt-1 italic">"{b.pitchAngle}"</p>
+                      <p className="font-body text-xs text-primary/80 mt-1 italic">
+                        "{b.pitchAngle}"
+                      </p>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-heading text-sm text-foreground">{b.estimatedDeal}</p>
+                    <p className="font-heading text-sm text-foreground">
+                      {b.estimatedDeal}
+                    </p>
                     <p className="font-body text-[10px] text-muted-foreground mt-0.5">
                       Fit {b.fitScore}%
                     </p>
@@ -416,18 +505,21 @@ export default function Launch() {
       </motion.div>
 
       {/* Save to Calendar CTA */}
-      <motion.div variants={item}
+      <motion.div
+        variants={item}
         className="sticky bottom-4 left-0 right-0 px-0"
       >
         {calendarSaved ? (
-          <div className="flex items-center justify-center gap-2 py-4 bg-emerald-500/15
-                          border border-emerald-500/20 rounded-xl">
+          <div
+            className="flex items-center justify-center gap-2 py-4 bg-emerald-500/15
+                          border border-emerald-500/20 rounded-xl"
+          >
             <CheckCircle2 size={16} className="text-emerald-600" />
             <p className="font-body font-semibold text-sm text-emerald-600">
               Saved to Calendar!
             </p>
             <button
-              onClick={() => navigate('/dashboard/calendar')}
+              onClick={() => navigate("/dashboard/calendar")}
               className="ml-2 font-body text-xs text-emerald-700 underline"
             >
               View
@@ -449,9 +541,9 @@ export default function Launch() {
       <AnimatePresence>
         {showCalendarModal && (
           <SaveToCalendarModal
-            idea={sessionIdea || flowIdea || 'Content'}
+            idea={sessionIdea || flowIdea || "Content"}
             slot={bestSlot}
-            platform={user?.primary_platform || 'instagram'}
+            platform={user?.primary_platform || "instagram"}
             sessionId={studioSessionId}
             onSave={handleSaveToCalendar}
             onClose={() => setShowCalendarModal(false)}
