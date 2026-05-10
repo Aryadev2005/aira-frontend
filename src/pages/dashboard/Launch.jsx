@@ -415,6 +415,16 @@ export default function Launch() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-3 pt-2"
           >
+            {postingPackage.brief && (
+              <div>
+                <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  One-liner
+                </p>
+                <p className="font-body text-sm font-semibold text-primary leading-snug">
+                  {postingPackage.brief}
+                </p>
+              </div>
+            )}
             {postingPackage.caption && (
               <div>
                 <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
@@ -423,6 +433,23 @@ export default function Launch() {
                 <p className="font-body text-sm text-foreground leading-relaxed whitespace-pre-line">
                   {postingPackage.caption}
                 </p>
+              </div>
+            )}
+            {postingPackage.contentKeywords?.length > 0 && (
+              <div>
+                <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Content Keywords
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {postingPackage.contentKeywords.map((kw, i) => (
+                    <span
+                      key={i}
+                      className="font-body text-[11px] px-2 py-0.5 bg-muted text-muted-foreground rounded-full"
+                    >
+                      [{kw}]
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
             {postingPackage.hashtags && (

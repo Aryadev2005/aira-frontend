@@ -13,6 +13,7 @@ import {
   User,
   Settings,
   CalendarDays,
+  StickyNote,
   LogOut,
   Zap,
   ChevronRight,
@@ -42,6 +43,7 @@ const NAV_GROUPS = [
     label: "Create",
     items: [
       { icon: Clapperboard, label: "Studio", path: "/dashboard/studio" },
+      { icon: StickyNote, label: "Notes", path: "/dashboard/notes" },
       { icon: Rocket, label: "Launch", path: "/dashboard/launch" },
       { icon: CalendarDays, label: "Calendar", path: "/dashboard/calendar" },
     ],
@@ -67,7 +69,7 @@ const NAV_FLAT = [
   { icon: Home, label: "Home", path: "/dashboard" },
   { icon: Compass, label: "Discover", path: "/dashboard/discover" },
   { icon: Clapperboard, label: "Studio", path: "/dashboard/studio" },
-  { icon: CalendarDays, label: "Calendar", path: "/dashboard/calendar" },
+  { icon: StickyNote, label: "Notes", path: "/dashboard/notes" },
   { icon: User, label: "Profile", path: "/dashboard/profile" },
 ];
 

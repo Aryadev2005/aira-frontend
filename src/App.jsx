@@ -20,6 +20,7 @@ import VideoDNA from '@/pages/dashboard/VideoDNA';
 import Profile from '@/pages/dashboard/Profile';
 import Launch from '@/pages/dashboard/Launch';
 import CalendarPage from '@/pages/dashboard/Calendar';
+import Notes from '@/pages/dashboard/Notes';
 import Settings from '@/pages/Settings';
 
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
@@ -46,6 +47,7 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="launch" element={<Launch />} />
               <Route path="calendar" element={<CalendarPage />} />
+              <Route path="notes" element={<Notes />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="/privacy" element={<PrivacyPolicy />} />

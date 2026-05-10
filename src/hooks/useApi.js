@@ -635,3 +635,59 @@ export const useBuyTopup = () => {
     },
   });
 };
+
+// ── NOTES ─────────────────────────────────────────────────────────────────────
+
+export const useNotes = (filters = {}) => {
+  const params = new URLSearchParams(
+    Object.fromEntries(
+      Object.entries(filters).filter(
+        ([, v]) => v !== undefined && v !== null && v !== "",
+      ),
+    ),
+  ).toString();
+  return useQuery({
+    queryKey: ["notes", filters],
+    queryFn: () => api.get(`/notes${params ? `?${params}` : ""}`),
+    staleTime: 1000 * 60 * 2,
+    retry: 1,
+    select: (res) => res?.data ?? res,
+  });
+};
+
+export const useCreateNote = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post("/notes", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+  });
+};
+
+export const useUpdateNote = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }) => api.patch(`/notes/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+  });
+};
+
+export const useDeleteNote = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete(`/notes/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+  });
+};
+
+export const useToggleNotePin = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/notes/${id}/pin`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+  });
+};
+
+export const useRewriteHook = () =>
+  useMutation({
+    mutationFn: (body) => api.post("/content/rewrite-hook", body),
+  });

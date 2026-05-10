@@ -15,6 +15,10 @@ import {
   Timer,
   Plus,
   X,
+  Loader2,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 import {
@@ -22,6 +26,8 @@ import {
   useSaveSession,
   useLearnFromEdit,
   useScriptHistory,
+  useCreateNote,
+  useRewriteHook,
 } from "@/hooks/useApi";
 import useCreatorFlow from "@/store/creatorFlow";
 
@@ -213,6 +219,12 @@ function ContextPanel({
   duration,
   platform,
   onClose,
+  hookVariants,
+  showHookVariants,
+  isRewriting,
+  onTryAnotherHook,
+  hookVariantCopied,
+  onCopyVariant,
 }) {
   return (
     <div className="w-60 xl:w-64 shrink-0 border-l border-border bg-muted/20 flex flex-col">
@@ -250,6 +262,52 @@ function ContextPanel({
             {hookTip && (
               <p className="font-body text-[11px] text-muted-foreground mt-1 leading-relaxed">
                 {hookTip}
+              </p>
+            )}
+            <button
+              onClick={onTryAnotherHook}
+              disabled={isRewriting}
+              className="mt-2 flex items-center gap-1.5 font-body text-[11px] text-primary/80
+                         hover:text-primary transition-colors disabled:opacity-50"
+            >
+              {isRewriting
+                ? <Loader2 size={10} className="animate-spin" />
+                : <RefreshCw size={10} />}
+              Try another hook
+            </button>
+
+            {/* Hook variants */}
+            {showHookVariants && hookVariants.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {hookVariants.map((v, i) => (
+                  <div
+                    key={i}
+                    className="bg-primary/6 border border-primary/15 rounded-xl p-2.5 relative group"
+                  >
+                    <p className="font-body text-xs text-foreground leading-snug pr-5">
+                      "{v.text}"
+                    </p>
+                    {v.improvement && (
+                      <p className="font-body text-[10px] text-muted-foreground mt-1">
+                        {v.improvement}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => onCopyVariant(v.text, i)}
+                      className="absolute top-2 right-2 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {hookVariantCopied === i
+                        ? <Check size={11} className="text-emerald-500" />
+                        : <Copy size={11} />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showHookVariants && !isRewriting && hookVariants.length === 0 && (
+              <p className="mt-2 font-body text-[11px] text-muted-foreground">
+                No variants returned. Try again.
               </p>
             )}
           </div>
@@ -361,6 +419,9 @@ export default function Studio() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [hookVariants, setHookVariants] = useState([]);
+  const [showHookVariants, setShowHookVariants] = useState(false);
+  const [hookVariantCopied, setHookVariantCopied] = useState(null);
 
   const sectionRefs = useRef({});
 
@@ -370,6 +431,8 @@ export default function Studio() {
   const { mutateAsync: learnFromEdit } = useLearnFromEdit();
   const { data: historyData } = useScriptHistory();
   const history = historyData?.data || [];
+  const { mutateAsync: createNote } = useCreateNote();
+  const { mutateAsync: rewriteHook, isPending: isRewriting } = useRewriteHook();
 
   // Pre-fill from flow
   useEffect(() => {
@@ -421,6 +484,23 @@ export default function Studio() {
       const sid = savedRes?.data?.sessionId || null;
       setSessionId(sid);
       setStudioSession?.(sid, data, cloned);
+      setShowHookVariants(false);
+      setHookVariants([]);
+
+      // Auto-save hook section to notes silently
+      const hookSection = cloned.find((s) => {
+        const l = (s.label || s.type || "").toLowerCase();
+        return l.includes("hook") || l.includes("open");
+      });
+      if (hookSection?.content) {
+        createNote({
+          title: idea.slice(0, 80),
+          content: hookSection.content,
+          source: "studio_hook",
+          source_meta: { sessionId: sid },
+          tags: ["hook"],
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error(e);
       setError("Could not generate script. Please try again.");
@@ -466,6 +546,29 @@ export default function Studio() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Try another hook
+  const handleTryAnotherHook = async () => {
+    if (!result?.hookLine || !idea) return;
+    setShowHookVariants(true);
+    setHookVariants([]);
+    try {
+      const res = await rewriteHook({
+        originalHook: result.hookLine,
+        idea,
+        platform: dbUser?.primary_platform || "instagram",
+      });
+      setHookVariants(res?.data?.rewrites ?? res?.rewrites ?? []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCopyVariant = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setHookVariantCopied(idx);
+    setTimeout(() => setHookVariantCopied(null), 1500);
   };
 
   // Load from history
@@ -707,6 +810,12 @@ export default function Studio() {
               duration={duration}
               platform={dbUser?.primary_platform || "Instagram"}
               onClose={() => setShowContext(false)}
+              hookVariants={hookVariants}
+              showHookVariants={showHookVariants}
+              isRewriting={isRewriting}
+              onTryAnotherHook={handleTryAnotherHook}
+              hookVariantCopied={hookVariantCopied}
+              onCopyVariant={handleCopyVariant}
             />
           </div>
         )}
