@@ -380,10 +380,27 @@ export default function VideoDNA() {
 
         {gapResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            {/* Platform source badges */}
+            {gapResult.platformsAnalysed?.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground font-body">Analysed from:</span>
+                {gapResult.platformsAnalysed.map((p) => (
+                  <span key={p}
+                    className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-body font-medium">
+                    {p === 'Instagram Reels' ? '🎬' : '📺'} {p}
+                    {p === 'Instagram Reels' && gapResult.instagramReelsCount > 0
+                      ? ` (${gapResult.instagramReelsCount})` : ''}
+                    {p === 'YouTube' && gapResult.youtubeVideosCount > 0
+                      ? ` (${gapResult.youtubeVideosCount})` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <ScoreRing score={gapResult.opportunityScore} size={60} label="Opportunity" />
               <p className="text-sm font-body text-foreground">
-                Analysed <strong>{gapResult.videosAnalysed}</strong> top videos in <strong>{gapResult.niche}</strong>.
+                Analysed <strong>{gapResult.videosAnalysed}</strong> top{gapResult.platformsAnalysed?.length > 1 ? ' posts' : ' videos'} in <strong>{gapResult.niche}</strong>.
                 Avg engagement: <strong>{gapResult.avgEngagementRate}%</strong>
               </p>
             </div>
