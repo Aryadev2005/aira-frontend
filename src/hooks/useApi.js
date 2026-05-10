@@ -555,61 +555,58 @@ export const useDeleteCalendarEntry = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CREDITS HOOKS — Add these to src/hooks/useApi.js
-// Place them after the existing INTEGRATIONS section, before the end of the file
+// CREDITS HOOKS (v2) — Replace the existing credits hooks in src/hooks/useApi.js
+//
+// API now returns usedPct / remainingPct instead of raw credit numbers.
+// These hooks expose ONLY what the frontend needs to render.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── CREDITS ───────────────────────────────────────────────────────────────────
-
-/**
- * GET /api/v1/credits/wallet
- * Returns: { wallet, plan, planLimit, recentTransactions, topupPacks }
- * Refetches every 60s so sidebar credit count stays fresh.
- */
+// ── GET /api/v1/credits/wallet ────────────────────────────────────────────────
+// Returns:
+//   usedPct, remainingPct         — for progress bar
+//   planLabel, planMultiplier     — "Pro", "15× the free plan"
+//   planUsedPct, rolloverPct, topupPct — for breakdown
+//   totalActionsCount, nextResetAt — for stats
+//   topupPacks                    — for upsell
 export const useCreditsWallet = () =>
   useQuery({
     queryKey: ["credits-wallet"],
     queryFn: () => api.get("/credits/wallet"),
-    staleTime: 1000 * 60, // 1 min — matches backend WALLET_TTL
-    refetchInterval: 1000 * 60, // auto-refresh in background
+    staleTime: 1000 * 60, // 1 min
+    refetchInterval: 1000 * 60, // background refresh
     retry: 1,
+    select: (res) => res.data, // unwrap { success, data } envelope
   });
 
-/**
- * GET /api/v1/credits/history?limit=20&offset=0
- * Returns: { transactions, total, limit, offset }
- */
+// ── GET /api/v1/credits/history ───────────────────────────────────────────────
+// Returns shaped transactions: type, description, costLabel ("~1.2% of plan"),
+// featureCharge, aiCharge — no raw credit amounts.
 export const useCreditsHistory = ({ limit = 20, offset = 0 } = {}) =>
   useQuery({
     queryKey: ["credits-history", limit, offset],
     queryFn: () => api.get(`/credits/history?limit=${limit}&offset=${offset}`),
-    staleTime: 1000 * 30, // 30s — transactions update after each AI action
+    staleTime: 1000 * 30,
     retry: 1,
+    select: (res) => res.data,
   });
 
-/**
- * GET /api/v1/credits/packs
- * Returns: { packs }
- */
+// ── GET /api/v1/credits/packs ─────────────────────────────────────────────────
 export const useCreditsPacks = () =>
   useQuery({
     queryKey: ["credits-packs"],
     queryFn: () => api.get("/credits/packs"),
-    staleTime: 1000 * 60 * 60 * 24, // 24h — pack pricing rarely changes
+    staleTime: 1000 * 60 * 60 * 24,
     retry: 1,
+    select: (res) => res.data,
   });
 
-/**
- * POST /api/v1/credits/topup
- * Body: { packId, paymentId }
- * Call this AFTER verifying payment with Razorpay on the client.
- */
+// ── POST /api/v1/credits/topup ────────────────────────────────────────────────
+// Used by useRazorpay hook after payment verification.
 export const useBuyTopup = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body) => api.post("/credits/topup", body),
     onSuccess: () => {
-      // Invalidate wallet so balance updates immediately
       qc.invalidateQueries({ queryKey: ["credits-wallet"] });
       qc.invalidateQueries({ queryKey: ["credits-history"] });
     },

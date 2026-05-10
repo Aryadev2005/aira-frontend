@@ -64,13 +64,14 @@ export const api = {
   get: (path) => apiRequest(path, { method: "GET" }),
   post: (path, body) => apiRequest(path, { method: "POST", body }),
   put: (path, body) => apiRequest(path, { method: "PUT", body }),
+  patch: (path, body) => apiRequest(path, { method: "PATCH", body }),
   delete: (path, body) => apiRequest(path, { method: "DELETE", body }),
 };
 
 // Agent API helpers (moved from SessionsSidebar.jsx)
 export async function getAgentToken(forceRefresh = true) {
   const u = auth.currentUser;
-  if (!u) throw new Error('Not authenticated');
+  if (!u) throw new Error("Not authenticated");
   return u.getIdToken(forceRefresh);
 }
 
@@ -78,10 +79,14 @@ export async function apiFetch(path, opts = {}) {
   const token = await getAgentToken(true);
   const res = await fetch(`${AGENT_API_URL}${path}`, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(opts.headers || {}),
+    },
   });
   if (res.status === 204) return null;
   const json = await res.json();
-  if (!json.success) throw new Error(json.message || 'Request failed');
+  if (!json.success) throw new Error(json.message || "Request failed");
   return json.data;
 }

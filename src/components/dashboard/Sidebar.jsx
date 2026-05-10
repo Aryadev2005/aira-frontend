@@ -66,10 +66,10 @@ const NAV_GROUPS = [
 const NAV_FLAT = NAV_GROUPS.flatMap((g) => g.items);
 
 // ── Credit bar sub-component ──────────────────────────────────────────────────
-function CreditBar({ balance, planLimit, plan }) {
-  const pct = Math.min(100, Math.round((balance / (planLimit || 1)) * 100));
-  const isLow = pct < 20;
-  const isMid = pct < 50 && !isLow;
+function CreditBar({ usedPct, planLabel, planMultiplier, nextResetAt, plan }) {
+  const remaining = Math.max(0, 100 - (usedPct ?? 0));
+  const isLow = remaining < 20;
+  const isMid = remaining >= 20 && remaining < 40;
 
   const barColor = isLow
     ? "bg-red-500"
@@ -77,65 +77,87 @@ function CreditBar({ balance, planLimit, plan }) {
       ? "bg-amber-500"
       : "bg-[hsl(var(--sidebar-primary))]";
 
+  // "Resets Jan 15" label
+  const resetLabel = nextResetAt
+    ? new Date(nextResetAt).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+      })
+    : null;
+
   return (
     <div className="px-3 pb-3">
       <div
-        className="rounded-2xl border border-white/8 bg-white/4 p-3.5 cursor-pointer hover:bg-white/6 transition-colors"
+        className="rounded-2xl border border-white/8 bg-white/4 p-3.5 cursor-pointer
+          hover:bg-white/6 transition-colors"
         onClick={() =>
           (window.location.href = "/dashboard/settings?tab=credits")
         }
       >
-        {/* Header row */}
-        <div className="flex items-center justify-between mb-2.5">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <Zap size={12} className="text-[hsl(var(--sidebar-primary))]" />
             <span className="font-body text-[11px] font-semibold text-sidebar-foreground/70 uppercase tracking-wider">
-              Credits
+              Usage
             </span>
           </div>
           {isLow && <AlertCircle size={12} className="text-red-400" />}
         </div>
 
-        {/* Balance */}
+        {/* Big percentage */}
         <div className="flex items-end gap-1 mb-2">
           <span className="font-heading text-2xl text-sidebar-foreground leading-none">
-            {balance ?? "—"}
+            {usedPct != null ? `${Math.round(usedPct)}%` : "—"}
           </span>
           <span className="font-body text-xs text-sidebar-foreground/40 mb-0.5">
-            / {planLimit}
+            used
           </span>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — shows REMAINING (green → red) */}
         <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-            style={{ width: `${pct}%` }}
+            style={{ width: `${remaining}%` }}
           />
         </div>
 
-        {/* Reset hint */}
-        <p className="font-body text-[10px] text-sidebar-foreground/35 mt-2">
-          {isLow ? "Running low · " : ""}
-          <span className="text-sidebar-foreground/50">Tap to manage</span>
-        </p>
+        {/* Plan label + reset hint */}
+        <div className="flex items-center justify-between mt-2">
+          <p className="font-body text-[10px] text-sidebar-foreground/40">
+            {planLabel ?? "Free"} plan
+          </p>
+          {plan === "free" ? (
+            <p className="font-body text-[10px] text-amber-500/70">
+              Upgrade to refresh
+            </p>
+          ) : resetLabel ? (
+            <p className="font-body text-[10px] text-sidebar-foreground/30">
+              Resets {resetLabel}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );
 }
-
 // ── Desktop sidebar ───────────────────────────────────────────────────────────
 function DesktopSidebar() {
   const location = useLocation();
   const { logout } = useFirebaseAuth();
   const { data: profileData } = useProfile();
   const { data: walletData } = useCreditsWallet();
+  const usedPct = walletData?.usedPct;
+  const planLabel = walletData?.planLabel ?? "Free";
+  const planMultiplier = walletData?.planMultiplier ?? "Free plan";
+  const nextResetAt = walletData?.nextResetAt;
+  const isPro = ["pro", "max", "brand", "starter"].includes(
+    walletData?.plan ?? "free",
+  );
 
   const user = profileData?.data?.user;
-  const wallet = walletData?.data?.wallet;
   const plan = walletData?.data?.plan ?? user?.subscription_tier ?? "free";
-  const planLimit = walletData?.data?.planLimit ?? 50;
-  const isPro = plan === "pro" || plan === "max" || plan === "brand";
 
   const displayName = user?.name || "Creator";
   const initial = displayName[0]?.toUpperCase() || "A";
@@ -289,9 +311,11 @@ function DesktopSidebar() {
       {/* ── Credit widget ── */}
       <div className="mt-3">
         <CreditBar
-          balance={wallet?.balance}
-          planLimit={planLimit}
-          plan={plan}
+          usedPct={usedPct}
+          planLabel={planLabel}
+          planMultiplier={planMultiplier}
+          nextResetAt={nextResetAt}
+          plan={walletData?.plan ?? "free"}
         />
 
         {/* Upgrade CTA — only for free tier */}
@@ -329,6 +353,13 @@ function MobileBar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { logout } = useFirebaseAuth();
   const { data: walletData } = useCreditsWallet();
+  const usedPct = walletData?.usedPct;
+  const planLabel = walletData?.planLabel ?? "Free";
+  const planMultiplier = walletData?.planMultiplier ?? "Free plan";
+  const nextResetAt = walletData?.nextResetAt;
+  const isPro = ["pro", "max", "brand", "starter"].includes(
+    walletData?.plan ?? "free",
+  );
   const balance = walletData?.data?.wallet?.balance;
 
   // Show 5 items in bar; rest in drawer
@@ -427,7 +458,13 @@ function MobileBar() {
 
             {/* Credits + logout at bottom */}
             <div className="px-4 pb-6 pt-3 border-t border-white/8">
-              <CreditBar balance={balance} planLimit={50} plan="free" />
+              <CreditBar
+                usedPct={usedPct}
+                planLabel={planLabel}
+                planMultiplier={planMultiplier}
+                nextResetAt={nextResetAt}
+                plan={walletData?.plan ?? "free"}
+              />
               <div className="flex gap-2 mt-3">
                 <Link
                   to="/dashboard/settings"

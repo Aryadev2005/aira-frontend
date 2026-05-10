@@ -1,5 +1,4 @@
 // src/pages/Settings.jsx
-// ── ARIA Settings — with Credits tab + Razorpay integration ──────────────────
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,14 +11,11 @@ import {
   Instagram,
   Youtube,
   Loader2,
-  CreditCard,
   ArrowDownRight,
   ArrowUpRight,
   RefreshCw,
-  ShoppingCart,
   AlertTriangle,
   History,
-  BarChart2,
   Sparkles,
   CheckCircle,
   X,
@@ -29,11 +25,7 @@ import {
   useDisconnectPlatform,
   useProfile,
 } from "@/hooks/useApi";
-import {
-  useCreditsWallet,
-  useCreditsHistory,
-  useCreditsPacks,
-} from "@/hooks/useApi";
+import { useCreditsWallet, useCreditsHistory } from "@/hooks/useApi";
 import { useRazorpay } from "@/hooks/useRazorpay";
 import { api } from "@/lib/api";
 
@@ -47,7 +39,7 @@ const item = {
   show: { opacity: 1, y: 0, transition: { type: "spring", damping: 22 } },
 };
 
-// ── Platforms config ──────────────────────────────────────────────────────────
+// ── Platforms ─────────────────────────────────────────────────────────────────
 const platforms = [
   {
     id: "instagram",
@@ -74,38 +66,53 @@ const OAUTH_ERROR_MESSAGES = {
   youtube_error: "YouTube connection error. Please try again.",
 };
 
+// ── Plans ─────────────────────────────────────────────────────────────────────
+const PLANS = [
+  {
+    id: "plan_starter",
+    tier: "starter",
+    label: "Starter",
+    price: 249,
+    multiplier: "5×",
+    features: "Content, hooks, songs",
+    popular: false,
+  },
+  {
+    id: "plan_pro",
+    tier: "pro",
+    label: "Pro",
+    price: 499,
+    multiplier: "15×",
+    features: "+ Roadmap, Voice Portrait, Brand Pitch",
+    popular: true,
+  },
+  {
+    id: "plan_max",
+    tier: "max",
+    label: "Max",
+    price: 749,
+    multiplier: "40×",
+    features: "+ Video DNA, Competitor gap",
+    popular: false,
+  },
+  {
+    id: "plan_brand",
+    tier: "brand",
+    label: "Brand",
+    price: 999,
+    multiplier: "100×",
+    features: "Everything, unlimited feel",
+    popular: false,
+  },
+];
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "integrations", label: "Integrations", icon: Link2 },
-  { id: "credits", label: "Credits & Usage", icon: Zap },
+  { id: "credits", label: "Usage & Plan", icon: Zap },
 ];
 
-// ── Action key labels ─────────────────────────────────────────────────────────
-const ACTION_LABELS = {
-  content_generation: "Content Generation",
-  viral_ideas: "Viral Ideas",
-  aria_chat: "ARIA Chat",
-  hook_rewrite: "Hook Rewrite",
-  song_recommendations: "Song Recommendations",
-  caption_analysis: "Caption Analysis",
-  bio_analysis: "Bio Analysis",
-  posting_package: "Posting Package",
-  weekly_report: "Weekly Report",
-  content_calendar: "Content Calendar",
-  brand_alert: "Brand Alert",
-  growth_roadmap: "Growth Roadmap",
-  rate_card: "Rate Card",
-  script_writing: "Script Writing",
-  brand_pitch: "Brand Pitch",
-  archetype_detection: "Archetype Detection",
-  voice_portrait: "Voice Portrait",
-  video_analysis: "Video Analysis",
-  competitor_gap: "Competitor Gap",
-  trend_browse: "Browse Trends",
-  song_browse: "Browse Songs",
-};
-
-// ── Transaction styling ───────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function txStyle(type) {
   switch (type) {
     case "debit":
@@ -113,43 +120,33 @@ function txStyle(type) {
         icon: ArrowDownRight,
         color: "text-red-400",
         bg: "bg-red-500/10",
-        sign: "-",
       };
     case "grant":
       return {
         icon: ArrowUpRight,
         color: "text-emerald-400",
         bg: "bg-emerald-500/10",
-        sign: "+",
       };
     case "topup":
       return {
-        icon: ShoppingCart,
+        icon: ArrowUpRight,
         color: "text-blue-400",
         bg: "bg-blue-500/10",
-        sign: "+",
       };
     case "rollover":
       return {
         icon: RefreshCw,
         color: "text-violet-400",
         bg: "bg-violet-500/10",
-        sign: "+",
       };
     default:
-      return {
-        icon: Zap,
-        color: "text-muted-foreground",
-        bg: "bg-muted",
-        sign: "",
-      };
+      return { icon: Zap, color: "text-muted-foreground", bg: "bg-muted" };
   }
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-IN", {
+  return new Date(dateStr).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -158,10 +155,10 @@ function formatDate(dateStr) {
   });
 }
 
-// ── Toast component ───────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, type = "success", onClose }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 4000);
+    const t = setTimeout(onClose, 5000);
     return () => clearTimeout(t);
   }, [onClose]);
 
@@ -170,7 +167,8 @@ function Toast({ message, type = "success", onClose }) {
       initial={{ opacity: 0, y: -20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -20, scale: 0.95 }}
-      className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border
+      className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3
+        rounded-xl shadow-lg border max-w-sm
         ${
           type === "success"
             ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
@@ -178,12 +176,15 @@ function Toast({ message, type = "success", onClose }) {
         }`}
     >
       {type === "success" ? (
-        <CheckCircle size={16} />
+        <CheckCircle size={16} className="shrink-0" />
       ) : (
-        <AlertTriangle size={16} />
+        <AlertTriangle size={16} className="shrink-0" />
       )}
       <span className="font-body text-sm">{message}</span>
-      <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100">
+      <button
+        onClick={onClose}
+        className="ml-1 opacity-60 hover:opacity-100 shrink-0"
+      >
         <X size={14} />
       </button>
     </motion.div>
@@ -195,88 +196,89 @@ function Toast({ message, type = "success", onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function CreditsTab() {
   const { data: profileData } = useProfile();
-  const user = profileData?.data?.user;
+  const user = profileData?.data?.user ?? profileData?.user;
 
   const {
-    data: walletData,
+    data: wallet,
     isLoading: walletLoading,
     refetch: refetchWallet,
   } = useCreditsWallet();
-  const { data: packsData } = useCreditsPacks();
   const {
-    initiatePayment,
-    isLoading: paymentLoading,
-    error: paymentError,
+    initiatePlanPurchase,
+    isLoading: purchasing,
+    error: purchaseError,
     clearError,
   } = useRazorpay();
 
   const [page, setPage] = useState(0);
+  const [buyingPlan, setBuyingPlan] = useState(null); // planId being purchased
+  const [toast, setToast] = useState(null);
+
   const PAGE_SIZE = 20;
   const { data: historyData, isLoading: historyLoading } = useCreditsHistory({
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
 
-  const [buyingPack, setBuyingPack] = useState(null); // which pack is being purchased
-  const [toast, setToast] = useState(null); // { message, type }
+  // Wallet data — all percentages, no raw credits
+  const usedPct = wallet?.usedPct ?? 0;
+  const remainingPct = wallet?.remainingPct ?? 100;
+  const planLabel = wallet?.planLabel ?? "Free";
+  const planMultiplier = wallet?.planMultiplier ?? "Free plan";
+  const currentPlan = wallet?.plan ?? "free";
+  const nextResetAt = wallet?.nextResetAt;
+  const planUsedPct = wallet?.planUsedPct ?? 0;
+  const rolloverPct = wallet?.rolloverPct ?? 0;
+  const topupPct = wallet?.topupPct ?? 0;
 
-  // Data structure: hooks unwrap backend response
-  // So: packsData.data = { packs: [...] }
-  const wallet = walletData?.data?.wallet;
-  const plan = walletData?.data?.plan ?? "free";
-  const planLimit = walletData?.data?.planLimit ?? 50;
-  const packs = packsData?.data?.packs ?? walletData?.data?.topupPacks ?? [];
-  const transactions =
-    historyData?.data?.transactions ??
-    walletData?.data?.recentTransactions ??
-    [];
-  const totalTx = historyData?.data?.total ?? transactions.length;
+  const transactions = historyData?.transactions ?? [];
+  const totalTx = historyData?.total ?? 0;
 
-  const balance = wallet?.balance ?? 0;
-  const pct =
-    planLimit > 0 ? Math.min(100, Math.round((balance / planLimit) * 100)) : 0;
-  const isLow = pct < 20;
-  const isMid = pct >= 20 && pct < 50;
+  const isLow = remainingPct < 20;
+  const isMid = remainingPct >= 20 && remainingPct < 40;
   const barColor = isLow ? "bg-red-500" : isMid ? "bg-amber-500" : "bg-primary";
+  const ringColor = isLow
+    ? "text-red-500"
+    : isMid
+      ? "text-amber-500"
+      : "text-primary";
 
-  // Usage breakdown from history
-  const spendByAction = {};
-  transactions
-    .filter((t) => t.type === "debit")
-    .forEach((t) => {
-      const key = t.action_key || "other";
-      spendByAction[key] = (spendByAction[key] || 0) + Math.abs(t.amount);
-    });
-  const topActions = Object.entries(spendByAction)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  const resetLabel =
+    nextResetAt && currentPlan !== "free"
+      ? new Date(nextResetAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
 
-  // ── Handle pack purchase ───────────────────────────────────────────────────
-  const handleBuyPack = async (pack) => {
-    if (paymentLoading || buyingPack) return;
-    setBuyingPack(pack.id);
+  // ── Buy plan ──────────────────────────────────────────────────────────────
+  const handleBuyPlan = async (plan) => {
+    if (purchasing || buyingPlan) return;
+    // Don't allow buying current plan
+    if (plan.tier === currentPlan) return;
+
+    setBuyingPlan(plan.id);
     clearError();
 
-    try {
-      await initiatePayment({
-        packId: pack.id,
-        userName: user?.name || "",
-        userEmail: user?.email || "",
-        userPhone: user?.phone || "",
-        onSuccess: (credits) => {
-          setToast({
-            message: `🎉 ${credits} credits added to your wallet!`,
-            type: "success",
-          });
-          refetchWallet();
-        },
-        onFailure: (msg) => {
-          setToast({ message: msg, type: "error" });
-        },
-      });
-    } finally {
-      setBuyingPack(null);
-    }
+    await initiatePlanPurchase({
+      planId: plan.id,
+      userName: user?.name ?? "",
+      userEmail: user?.email ?? "",
+      userPhone: user?.phone ?? "",
+      onSuccess: (data) => {
+        setToast({
+          message: data?.message ?? `${plan.label} plan activated!`,
+          type: "success",
+        });
+        refetchWallet();
+      },
+      onFailure: (msg) => {
+        setToast({ message: msg, type: "error" });
+      },
+    });
+
+    setBuyingPlan(null);
   };
 
   if (walletLoading) {
@@ -289,7 +291,6 @@ function CreditsTab() {
 
   return (
     <>
-      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <Toast
@@ -307,85 +308,106 @@ function CreditsTab() {
         animate="show"
         className="space-y-6"
       >
-        {/* ── Wallet card ── */}
+        {/* ── Usage overview ── */}
         <motion.div
           variants={item}
           className="rounded-2xl border border-border bg-card p-5"
         >
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start justify-between mb-5">
             <div>
               <h3 className="font-heading text-lg text-foreground">
-                Credit Wallet
+                Monthly Usage
               </h3>
-              <p className="font-body text-sm text-muted-foreground capitalize">
-                {plan} plan · {planLimit} credits/month
+              <p className="font-body text-sm text-muted-foreground">
+                {planLabel} plan · {planMultiplier}
               </p>
             </div>
             <button
               onClick={() => refetchWallet()}
               className="p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-              title="Refresh balance"
             >
               <RefreshCw size={14} className="text-muted-foreground" />
             </button>
           </div>
 
-          {/* Balance */}
-          <div className="mb-3">
-            <span className="font-heading text-5xl text-foreground">
-              {balance}
-            </span>
-            <span className="font-body text-lg text-muted-foreground ml-2">
-              credits left
-            </span>
-          </div>
+          {/* Donut + bar */}
+          <div className="flex items-center gap-4 mb-4">
+            <div className="relative w-20 h-20 shrink-0">
+              <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3.2"
+                  className="text-muted/40"
+                />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3.2"
+                  strokeDasharray={`${usedPct} ${100 - usedPct}`}
+                  strokeLinecap="round"
+                  className={ringColor}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-heading text-[17px] text-foreground leading-tight">
+                  {Math.round(remainingPct)}%
+                </span>
+                <span className="font-body text-[9px] text-muted-foreground">
+                  left
+                </span>
+              </div>
+            </div>
 
-          {/* Progress bar */}
-          <div className="w-full h-2.5 rounded-full bg-muted overflow-hidden mb-1.5">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="flex justify-between mb-4">
-            <p className="font-body text-xs text-muted-foreground">
-              {isLow ? "⚠️ Running low" : `${pct}% remaining`}
-            </p>
-            {wallet?.nextResetAt && (
-              <p className="font-body text-xs text-muted-foreground">
-                Resets{" "}
-                {new Date(wallet.nextResetAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </p>
-            )}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-body text-sm text-foreground font-medium">
+                  {Math.round(usedPct)}% used this month
+                </span>
+                {isLow && (
+                  <span className="font-body text-xs text-red-400 font-semibold">
+                    Running low
+                  </span>
+                )}
+              </div>
+              <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                  style={{ width: `${usedPct}%` }}
+                />
+              </div>
+              {currentPlan === "free" ? (
+                <p className="font-body text-xs text-amber-500 mt-1.5">
+                  Upgrade to refresh your allowance
+                </p>
+              ) : resetLabel ? (
+                <p className="font-body text-xs text-muted-foreground mt-1.5">
+                  Resets on {resetLabel}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           {/* Breakdown */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 mt-2">
             {[
-              { label: "Plan", val: wallet?.planCredits ?? 0, icon: Sparkles },
-              {
-                label: "Rollover",
-                val: wallet?.rolloverCredits ?? 0,
-                icon: RefreshCw,
-              },
-              {
-                label: "Top-up",
-                val: wallet?.topupCredits ?? 0,
-                icon: ShoppingCart,
-              },
-            ].map(({ label, val, icon: Icon }) => (
+              { label: "Plan", pct: planUsedPct, color: "text-primary" },
+              { label: "Rollover", pct: rolloverPct, color: "text-violet-400" },
+              { label: "Top-up", pct: topupPct, color: "text-blue-400" },
+            ].map(({ label, pct, color }) => (
               <div
                 key={label}
-                className="rounded-xl bg-muted/50 p-3 text-center"
+                className="rounded-xl bg-muted/50 p-2.5 text-center"
               >
-                <Icon
-                  size={13}
-                  className="text-muted-foreground mx-auto mb-1"
-                />
-                <p className="font-heading text-xl text-foreground">{val}</p>
+                <p className={`font-heading text-base ${color}`}>
+                  {pct > 0 ? `${pct}%` : "—"}
+                </p>
                 <p className="font-body text-[11px] text-muted-foreground">
                   {label}
                 </p>
@@ -393,188 +415,170 @@ function CreditsTab() {
             ))}
           </div>
 
-          {/* Lifetime */}
-          <div className="flex gap-6 mt-4 pt-4 border-t border-border">
-            <div>
-              <p className="font-body text-xs text-muted-foreground">
-                Lifetime earned
-              </p>
-              <p className="font-heading text-base text-emerald-500">
-                +{wallet?.totalGranted ?? 0}
-              </p>
-            </div>
-            <div>
-              <p className="font-body text-xs text-muted-foreground">
-                Lifetime spent
-              </p>
-              <p className="font-heading text-base text-red-400">
-                -{wallet?.totalSpent ?? 0}
+          {wallet?.totalActionsCount > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="font-body text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {wallet.totalActionsCount}
+                </span>{" "}
+                AI actions used all time
               </p>
             </div>
-          </div>
+          )}
         </motion.div>
 
-        {/* ── Usage breakdown ── */}
-        {topActions.length > 0 && (
-          <motion.div
-            variants={item}
-            className="rounded-2xl border border-border bg-card p-5"
-          >
-            <h3 className="font-heading text-base text-foreground mb-4 flex items-center gap-2">
-              <BarChart2 size={16} className="text-primary" /> Usage breakdown
-            </h3>
-            <div className="space-y-3">
-              {topActions.map(([key, spent]) => {
-                const max = topActions[0][1];
-                const barPct = Math.round((spent / max) * 100);
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between mb-1">
-                      <span className="font-body text-sm text-foreground">
-                        {ACTION_LABELS[key] ?? key}
-                      </span>
-                      <span className="font-body text-sm font-semibold text-foreground">
-                        {spent} cr
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary/70 transition-all"
-                        style={{ width: `${barPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Buy credits / Top-up packs ── */}
+        {/* ── Plans ── */}
         <motion.div
           variants={item}
           className="rounded-2xl border border-border bg-card p-5"
         >
           <h3 className="font-heading text-base text-foreground mb-1 flex items-center gap-2">
-            <ShoppingCart size={16} className="text-primary" /> Buy credits
+            <Sparkles size={16} className="text-primary" /> Plans
           </h3>
           <p className="font-body text-sm text-muted-foreground mb-4">
-            Credits never expire · Secure payment via Razorpay
+            Monthly allowance · resets every billing cycle
           </p>
 
           {/* Payment error */}
-          {paymentError && (
-            <div className="mb-4 flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          {purchaseError && (
+            <div
+              className="mb-4 flex items-start gap-2 p-3 rounded-xl
+              bg-red-500/10 border border-red-500/20"
+            >
               <AlertTriangle
                 size={14}
                 className="text-red-400 mt-0.5 shrink-0"
               />
-              <p className="font-body text-sm text-red-400">{paymentError}</p>
+              <p className="font-body text-sm text-red-400 flex-1">
+                {purchaseError}
+              </p>
+              <button onClick={clearError}>
+                <X size={13} className="text-red-400/60" />
+              </button>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            {packs.map((pack) => {
-              const isBuying = buyingPack === pack.id;
-              const isDisabled = paymentLoading || !!buyingPack;
-              // Best value badge for the 1000 pack
-              const isBestValue = pack.id === "pack_1000";
+            {PLANS.map(
+              ({ id, tier, label, price, multiplier, features, popular }) => {
+                const isCurrent = currentPlan === tier;
+                const isBuying = buyingPlan === id;
+                const isDisabled = purchasing || !!buyingPlan;
 
-              return (
-                <button
-                  key={pack.id}
-                  onClick={() => handleBuyPack(pack)}
-                  disabled={isDisabled}
-                  className={`relative flex flex-col items-start p-4 rounded-xl border transition-all text-left
-                    ${
-                      isBestValue
-                        ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
-                        : "border-border bg-muted/30 hover:bg-muted/60 hover:border-primary/20"
-                    }
-                    ${isDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
-                  `}
-                >
-                  {isBestValue && (
-                    <span
-                      className="absolute top-2.5 right-2.5 font-body text-[10px] font-semibold
-                      px-1.5 py-0.5 rounded-full bg-primary/20 text-primary"
-                    >
-                      Best value
-                    </span>
-                  )}
-
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap size={14} className="text-primary" />
-                    <span className="font-heading text-xl text-foreground">
-                      {pack.credits}
-                    </span>
-                    <span className="font-body text-xs text-muted-foreground">
-                      credits
-                    </span>
-                  </div>
-
-                  <div className="w-full flex items-center justify-between mb-3">
-                    <span className="font-heading text-lg text-foreground">
-                      ₹{pack.amountInr}
-                    </span>
-                    <span className="font-body text-[11px] text-muted-foreground">
-                      ₹{(pack.amountInr / pack.credits).toFixed(2)}/cr
-                    </span>
-                  </div>
-
+                return (
                   <div
-                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg
-                    font-body text-sm font-semibold transition-all
+                    key={id}
+                    className={`relative flex flex-col p-4 rounded-xl border transition-all
                     ${
-                      isBestValue
-                        ? "bg-primary text-white"
-                        : "bg-muted text-foreground group-hover:bg-muted/80"
-                    }
-                  `}
+                      isCurrent
+                        ? "border-primary bg-primary/8"
+                        : popular
+                          ? "border-primary/25 bg-primary/4"
+                          : "border-border bg-muted/30"
+                    }`}
                   >
-                    {isBuying ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        Processing…
-                      </>
+                    {/* Badge */}
+                    {isCurrent && (
+                      <span
+                        className="absolute top-2.5 right-2.5 font-body text-[10px]
+                      font-semibold px-1.5 py-0.5 rounded-full bg-primary/20 text-primary"
+                      >
+                        Current
+                      </span>
+                    )}
+                    {!isCurrent && popular && (
+                      <span
+                        className="absolute top-2.5 right-2.5 font-body text-[10px]
+                      font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary"
+                      >
+                        Popular
+                      </span>
+                    )}
+
+                    {/* Plan info */}
+                    <p className="font-body text-xs text-muted-foreground mb-0.5">
+                      {label}
+                    </p>
+                    <p className="font-heading text-xl text-foreground">
+                      ₹{price}
+                    </p>
+                    <p
+                      className={`font-body text-xs font-semibold mb-2
+                    ${isCurrent || popular ? "text-primary" : "text-muted-foreground"}`}
+                    >
+                      {multiplier} free plan
+                    </p>
+                    <p className="font-body text-[11px] text-muted-foreground leading-snug mb-3">
+                      {features}
+                    </p>
+
+                    {/* Buy / Current button */}
+                    {isCurrent ? (
+                      <div
+                        className="mt-auto w-full flex items-center justify-center gap-1.5
+                      py-2 rounded-lg bg-primary/10 font-body text-xs font-semibold text-primary"
+                      >
+                        <CheckCircle size={12} />
+                        Active
+                      </div>
                     ) : (
-                      <>
-                        <CreditCard size={13} />
-                        Buy now
-                      </>
+                      <button
+                        onClick={() =>
+                          handleBuyPlan({ id, tier, label, price })
+                        }
+                        disabled={isDisabled}
+                        className={`mt-auto w-full flex items-center justify-center gap-1.5
+                        py-2 rounded-lg font-body text-xs font-semibold transition-all
+                        ${
+                          isDisabled
+                            ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                            : popular
+                              ? "bg-primary text-white hover:bg-primary/90"
+                              : "bg-muted text-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {isBuying ? (
+                          <>
+                            <Loader2 size={11} className="animate-spin" />{" "}
+                            Processing…
+                          </>
+                        ) : (
+                          `Get ${label}`
+                        )}
+                      </button>
                     )}
                   </div>
-                </button>
-              );
-            })}
+                );
+              },
+            )}
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-2">
             <img
-              src="https://badges.razorpay.com/badge-light.png"
+              src="/razorpay.webp"
               alt="Razorpay"
-              className="h-4 opacity-50"
-              onError={(e) =>
-                /** @type {HTMLElement} */ (e.target.style.display = "none")
-              }
+              className="h-14 "
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
             <p className="font-body text-[11px] text-muted-foreground">
-              Secured by Razorpay · UPI, Cards, Net Banking accepted
+              Secured by Razorpay · UPI, Cards, Net Banking
             </p>
           </div>
         </motion.div>
 
-        {/* ── Transaction history ── */}
+        {/* ── Activity history ── */}
         <motion.div
           variants={item}
           className="rounded-2xl border border-border bg-card p-5"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-heading text-base text-foreground flex items-center gap-2">
-              <History size={16} className="text-primary" /> Transaction history
+              <History size={16} className="text-primary" /> Activity
             </h3>
             <span className="font-body text-xs text-muted-foreground">
-              {totalTx} total
+              {totalTx} actions
             </span>
           </div>
 
@@ -592,10 +596,10 @@ function CreditsTab() {
                 className="text-muted-foreground/30 mx-auto mb-2"
               />
               <p className="font-body text-sm text-muted-foreground">
-                No transactions yet
+                No activity yet
               </p>
               <p className="font-body text-xs text-muted-foreground/50 mt-1">
-                Credits will appear here after your first AI action
+                Your usage history appears here after your first AI action
               </p>
             </div>
           ) : (
@@ -603,7 +607,6 @@ function CreditsTab() {
               {transactions.map((tx) => {
                 const style = txStyle(tx.type);
                 const Icon = style.icon;
-                const absAmt = Math.abs(tx.amount);
                 return (
                   <div key={tx.id} className="flex items-center gap-3 py-3">
                     <div
@@ -613,34 +616,25 @@ function CreditsTab() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-body text-sm text-foreground truncate">
-                        {tx.description ||
-                          ACTION_LABELS[tx.action_key] ||
-                          tx.type}
+                        {tx.description}
                       </p>
                       <p className="font-body text-[11px] text-muted-foreground">
                         {formatDate(tx.created_at)}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
+                    {tx.costLabel && (
                       <p
-                        className={`font-body text-sm font-semibold ${style.color}`}
+                        className={`font-body text-xs shrink-0 ${style.color}`}
                       >
-                        {style.sign}
-                        {absAmt}
+                        {tx.costLabel}
                       </p>
-                      {tx.balance_after != null && (
-                        <p className="font-body text-[10px] text-muted-foreground">
-                          bal: {tx.balance_after}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Pagination */}
           {totalTx > PAGE_SIZE && (
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
               <button
@@ -665,47 +659,6 @@ function CreditsTab() {
             </div>
           )}
         </motion.div>
-
-        {/* ── Credit cost reference ── */}
-        <motion.div
-          variants={item}
-          className="rounded-2xl border border-border bg-card p-5"
-        >
-          <h3 className="font-heading text-base text-foreground mb-4">
-            Credit costs
-          </h3>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            {[
-              { label: "Browse Trends / Songs", cost: 0 },
-              { label: "ARIA Chat", cost: 3 },
-              { label: "Hook Rewrite", cost: 2 },
-              { label: "Viral Ideas Refresh", cost: 5 },
-              { label: "Song Recommendations", cost: 5 },
-              { label: "Caption Analysis", cost: 8 },
-              { label: "Content Generation", cost: 10 },
-              { label: "Weekly Report", cost: 15 },
-              { label: "Voice Portrait", cost: 15 },
-              { label: "Growth Roadmap", cost: 20 },
-              { label: "Brand Pitch", cost: 25 },
-              { label: "Competitor Gap", cost: 30 },
-            ].map(({ label, cost }) => (
-              <div
-                key={label}
-                className="flex items-center justify-between py-1.5 border-b border-border/40"
-              >
-                <span className="font-body text-sm text-foreground">
-                  {label}
-                </span>
-                <span
-                  className={`font-body text-sm font-semibold
-                  ${cost === 0 ? "text-emerald-500" : "text-foreground"}`}
-                >
-                  {cost === 0 ? "Free" : `${cost} cr`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
       </motion.div>
     </>
   );
@@ -715,7 +668,7 @@ function CreditsTab() {
 // INTEGRATIONS TAB
 // ══════════════════════════════════════════════════════════════════════════════
 function IntegrationsTab() {
-  const { data: statusData, isLoading, refetch } = useIntegrationStatus();
+  const { data: statusData, refetch } = useIntegrationStatus();
   const disconnectMutation = useDisconnectPlatform();
   const [searchParams] = useSearchParams();
   const [oauthError, setOauthError] = useState(null);
@@ -770,7 +723,8 @@ function IntegrationsTab() {
       {oauthError && (
         <motion.div
           variants={item}
-          className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20"
+          className="flex items-start gap-3 p-4 rounded-xl
+            bg-destructive/10 border border-destructive/20"
         >
           <AlertTriangle
             size={16}
@@ -784,10 +738,12 @@ function IntegrationsTab() {
           </button>
         </motion.div>
       )}
+
       {oauthSuccess && (
         <motion.div
           variants={item}
-          className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
+          className="flex items-start gap-3 p-4 rounded-xl
+            bg-emerald-500/10 border border-emerald-500/20"
         >
           <CheckCircle2
             size={16}
@@ -845,7 +801,8 @@ function IntegrationsTab() {
                 <button
                   onClick={() => handleDisconnect(id)}
                   disabled={disconnectMutation.isPending}
-                  className="font-body text-sm px-4 py-2 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                  className="font-body text-sm px-4 py-2 rounded-xl bg-destructive/10
+                    text-destructive hover:bg-destructive/20 transition-colors"
                 >
                   Disconnect
                 </button>
@@ -853,7 +810,8 @@ function IntegrationsTab() {
                 <button
                   onClick={() => handleConnect(id)}
                   disabled={connectingPlatform === id}
-                  className="font-body text-sm px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors flex items-center gap-2"
+                  className="font-body text-sm px-4 py-2 rounded-xl bg-primary text-white
+                    hover:bg-primary/90 transition-colors flex items-center gap-2"
                 >
                   {connectingPlatform === id && (
                     <Loader2 size={12} className="animate-spin" />
@@ -879,7 +837,7 @@ function IntegrationsTab() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MAIN SETTINGS PAGE
+// MAIN PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -896,7 +854,6 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8 lg:py-10">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -907,11 +864,10 @@ export default function Settings() {
             <h1 className="font-heading text-2xl text-foreground">Settings</h1>
           </div>
           <p className="font-body text-sm text-muted-foreground">
-            Manage your connections, credits, and account.
+            Manage your connections and plan.
           </p>
         </motion.div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-muted/50 rounded-xl p-1 mb-7">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
@@ -931,7 +887,6 @@ export default function Settings() {
           ))}
         </div>
 
-        {/* Tab content */}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
