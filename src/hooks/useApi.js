@@ -230,7 +230,8 @@ export const useCompetitorMoves = () =>
 // ── STUDIO ────────────────────────────────────────────────────────────────
 export const useScriptStructure = () =>
   useMutation({
-    mutationFn: (body) => api.post("/studio/script/structure", body),
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/studio/script/structure", body),
   });
 
 export const useBGMMatch = () =>
@@ -260,7 +261,10 @@ export const useBrandAlert = () =>
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 export const useGenerateCalendar = () =>
-  useMutation({ mutationFn: (body) => api.post("/calendar/generate", body) });
+  useMutation({
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/calendar/generate", body),
+  });
 
 export const useSavedCalendar = () =>
   useQuery({
@@ -311,6 +315,17 @@ export const useConnectHandle = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["integration-status"] });
+    },
+  });
+};
+
+export const useFetchYouTubeAnalytics = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/integrations/youtube/fetch-analytics"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["integration-status"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 };
@@ -492,7 +507,8 @@ export const useScriptHistory = () =>
 export const useSaveSession = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body) => api.post("/studio/session/save", body),
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/studio/session/save", body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["script-history"] });
     },
@@ -501,7 +517,8 @@ export const useSaveSession = () => {
 
 export const useLearnFromEdit = () =>
   useMutation({
-    mutationFn: (body) => api.post("/studio/learn", body),
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/studio/learn", body),
   });
 
 export const useTogglePin = () => {
@@ -527,7 +544,8 @@ export const useCalendarEntries = (month) =>
 export const useCreateCalendarEntry = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body) => api.post("/calendar/entries", body),
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/calendar/entries", body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["calendar-entries"] });
     },
@@ -537,7 +555,10 @@ export const useCreateCalendarEntry = () => {
 export const useUpdateCalendarEntry = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }) => api.patch(`/calendar/entries/${id}`, body),
+    mutationFn: /** @param {{ id: string, [key: string]: any }} body */ ({
+      id,
+      ...body
+    }) => api.patch(`/calendar/entries/${id}`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["calendar-entries"] });
     },
@@ -547,7 +568,8 @@ export const useUpdateCalendarEntry = () => {
 export const useDeleteCalendarEntry = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id) => api.delete(`/calendar/entries/${id}`),
+    mutationFn: /** @param {string} id */ (id) =>
+      api.delete(`/calendar/entries/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["calendar-entries"] });
     },

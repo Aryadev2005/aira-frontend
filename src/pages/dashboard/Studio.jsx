@@ -1,13 +1,11 @@
 // src/pages/dashboard/Studio.jsx
+// ── v2 redesign: fixed three-panel shell, minimalist section editor ───────────
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
   Clock,
-  ChevronRight,
-  ChevronLeft,
-  RotateCcw,
   Maximize2,
   Minimize2,
   ArrowRight,
@@ -15,6 +13,8 @@ import {
   CheckCircle2,
   Zap,
   Timer,
+  Plus,
+  X,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 import {
@@ -26,13 +26,9 @@ import {
 import useCreatorFlow from "@/store/creatorFlow";
 
 // ── Animations ────────────────────────────────────────────────────────────────
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 26 } },
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 24 } },
 };
 
 // ── Section colour map ────────────────────────────────────────────────────────
@@ -68,17 +64,21 @@ const getSectionColors = (label = "") => {
   if (l.includes("hook") || l.includes("open")) return SECTION_COLORS.hook;
   if (l.includes("cta") || l.includes("call") || l.includes("close"))
     return SECTION_COLORS.cta;
-  if (l.includes("body") || l.includes("value") || l.includes("core"))
+  if (
+    l.includes("body") ||
+    l.includes("value") ||
+    l.includes("step") ||
+    l.includes("story")
+  )
     return SECTION_COLORS.body;
   return SECTION_COLORS.default;
 };
 
-// ── Speaking pace calculator (130 words/min avg) ──────────────────────────────
+// ── Duration helper (130 wpm) ─────────────────────────────────────────────────
 const calcDuration = (text = "") => {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const secs = Math.round((words / 130) * 60);
-  if (secs < 60) return `~${secs}s`;
-  return `~${Math.floor(secs / 60)}m ${secs % 60}s`;
+  const w = text.trim().split(/\s+/).filter(Boolean).length;
+  const s = Math.round((w / 130) * 60);
+  return s < 60 ? `~${s}s` : `~${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
 const totalWordCount = (sections = []) =>
@@ -88,44 +88,32 @@ const totalWordCount = (sections = []) =>
     0,
   );
 
-// ── Outline panel ─────────────────────────────────────────────────────────────
-function OutlinePanel({
-  sections,
-  activeSectionId,
-  onJump,
-  onToggle,
-  visible,
-}) {
-  if (!visible) return null;
+// ── Outline panel (left) ──────────────────────────────────────────────────────
+function OutlinePanel({ sections, activeSectionId, onJump, onAdd }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="w-52 shrink-0 border-r border-border bg-muted/30 flex flex-col"
-    >
-      <div className="px-4 py-3 border-b border-border">
-        <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+    <div className="w-48 xl:w-52 shrink-0 border-r border-border bg-muted/20 flex flex-col">
+      <div className="px-3 py-3 border-b border-border">
+        <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Outline
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto py-2">
-        {sections.map((s, i) => {
-          const colors = getSectionColors(s.label || s.type);
-          const isActive = s.id === activeSectionId;
+      <div className="flex-1 overflow-y-auto py-1.5">
+        {sections.map((s) => {
+          const c = getSectionColors(s.label || s.type);
+          const isAct = s.id === activeSectionId;
           return (
             <button
               key={s.id}
               onClick={() => onJump(s.id)}
-              className={`w-full text-left flex items-center gap-2.5 px-4 py-2.5 transition-colors
-                ${isActive ? "bg-primary/10" : "hover:bg-muted/60"}`}
+              className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 transition-colors
+                ${isAct ? "bg-primary/10" : "hover:bg-muted/60"}`}
             >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+              <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
               <div className="min-w-0">
                 <p
-                  className={`font-body text-xs font-semibold truncate ${isActive ? colors.text : "text-foreground"}`}
+                  className={`font-body text-xs font-semibold truncate ${isAct ? c.text : "text-foreground"}`}
                 >
-                  {s.label || s.type || `Section ${i + 1}`}
+                  {s.label || s.type || "Section"}
                 </p>
                 <p className="font-body text-[10px] text-muted-foreground">
                   {calcDuration(s.content)}
@@ -135,14 +123,16 @@ function OutlinePanel({
           );
         })}
       </div>
-      <button
-        onClick={onToggle}
-        className="flex items-center justify-center gap-1 py-2.5 border-t border-border
-                   text-xs text-muted-foreground hover:text-foreground font-body transition-colors"
-      >
-        <ChevronLeft size={13} /> Hide
-      </button>
-    </motion.div>
+      <div className="border-t border-border p-2">
+        <button
+          onClick={onAdd}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
+                     font-body text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+        >
+          <Plus size={12} /> Add section
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -155,39 +145,36 @@ function SectionBlock({
   onFocus,
   sectionRef,
 }) {
-  const colors = getSectionColors(section.label || section.type);
-  const duration = calcDuration(section.content);
+  const c = getSectionColors(section.label || section.type);
+  const dur = calcDuration(section.content);
 
   return (
     <div
       ref={sectionRef}
-      className={`rounded-2xl border transition-all duration-200 ${
-        isActive
-          ? `${colors.border} ${colors.bg} shadow-sm`
-          : "border-border hover:border-border/80"
-      }`}
+      className={`rounded-2xl border transition-all duration-200
+        ${isActive ? `${c.border} ${c.bg} shadow-sm` : "border-border hover:border-border/80"}`}
     >
-      {/* Section header */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+          <span className={`w-2 h-2 rounded-full ${c.dot}`} />
           <span
-            className={`font-body text-xs font-semibold uppercase tracking-wider ${colors.text}`}
+            className={`font-body text-xs font-semibold uppercase tracking-wider ${c.text}`}
           >
             {section.label || section.type || `Section ${index + 1}`}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
-            <Timer size={10} /> {duration}
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <span className="font-body text-[10px] flex items-center gap-1">
+            <Timer size={10} />
+            {dur}
           </span>
-          <span className="font-body text-[10px] text-muted-foreground">
+          <span className="font-body text-[10px]">
             {(section.content || "").trim().split(/\s+/).filter(Boolean).length}
             w
           </span>
         </div>
       </div>
-
       {/* Textarea */}
       <div className="px-4 pb-4">
         <textarea
@@ -196,21 +183,19 @@ function SectionBlock({
           onFocus={() => onFocus(section.id)}
           placeholder={
             section.placeholder ||
-            `Write your ${section.label || "section"} here...`
+            `Write your ${section.label || "section"} here…`
           }
           rows={4}
           className="w-full bg-transparent font-body text-sm text-foreground
-                     placeholder:text-muted-foreground/50 resize-none outline-none
-                     leading-relaxed"
-          style={{ minHeight: "80px" }}
+                     placeholder:text-muted-foreground/40 resize-none outline-none leading-relaxed"
+          style={{ minHeight: 80 }}
         />
       </div>
-
-      {/* Tip / guidance */}
+      {/* Tip */}
       {section.tip && (
-        <div className="px-4 pb-3 flex items-start gap-2">
+        <div className="px-4 pb-3 flex items-start gap-2 border-t border-border/50 pt-2">
           <Zap size={11} className="text-primary mt-0.5 shrink-0" />
-          <p className="font-body text-[11px] text-muted-foreground leading-relaxed">
+          <p className="font-body text-[11px] text-muted-foreground leading-snug">
             {section.tip}
           </p>
         </div>
@@ -219,95 +204,136 @@ function SectionBlock({
   );
 }
 
-// ── Right context panel ───────────────────────────────────────────────────────
+// ── Context panel (right) ─────────────────────────────────────────────────────
 function ContextPanel({
-  visible,
   idea,
   hookLine,
-  ariaTip,
-  totalWords,
-  totalDuration,
-  onToggle,
+  hookTip,
+  words,
+  duration,
+  platform,
+  onClose,
 }) {
-  if (!visible) return null;
+  return (
+    <div className="w-60 xl:w-64 shrink-0 border-l border-border bg-muted/20 flex flex-col">
+      <div className="flex items-center justify-between px-3 py-3 border-b border-border">
+        <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Context
+        </p>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <X size={13} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-5">
+        {/* Idea */}
+        <div>
+          <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+            Idea
+          </p>
+          <p className="font-body text-xs text-foreground leading-relaxed">
+            {idea || "—"}
+          </p>
+        </div>
+
+        {/* Hook */}
+        {hookLine && (
+          <div>
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Hook line
+            </p>
+            <p className="font-heading text-sm text-primary leading-snug">
+              "{hookLine}"
+            </p>
+            {hookTip && (
+              <p className="font-body text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                {hookTip}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Stats */}
+        <div>
+          <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Script stats
+          </p>
+          <div className="space-y-1.5">
+            {[
+              { l: "Words", v: words, acc: false },
+              { l: "Duration", v: duration, acc: true },
+              { l: "Platform", v: platform, acc: false },
+            ].map((row) => (
+              <div key={row.l} className="flex items-center justify-between">
+                <span className="font-body text-xs text-muted-foreground">
+                  {row.l}
+                </span>
+                <span
+                  className={`font-body text-xs font-semibold ${row.acc ? "text-primary" : "text-foreground"}`}
+                >
+                  {row.v}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ARIA tip */}
+        <div className="flex items-start gap-2 bg-primary/6 border border-primary/15 rounded-xl p-2.5">
+          <Sparkles size={11} className="text-primary mt-0.5 shrink-0" />
+          <p className="font-body text-[11px] text-muted-foreground leading-snug">
+            Add a pattern-interrupt in your hook — try a number or
+            counter-intuitive statement to spike 3-second retention.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── History drawer ────────────────────────────────────────────────────────────
+function HistoryDrawer({ history, onSelect, onClose }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="w-64 shrink-0 border-l border-border bg-muted/20 flex flex-col"
+      className="absolute top-0 right-0 h-full w-72 bg-card border-l border-border z-20 flex flex-col shadow-xl"
     >
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <p className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Context
-        </p>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <p className="font-heading text-sm text-foreground">History</p>
         <button
-          onClick={onToggle}
+          onClick={onClose}
           className="text-muted-foreground hover:text-foreground"
         >
-          <ChevronRight size={13} />
+          <X size={14} />
         </button>
       </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Idea source */}
-        {idea && (
-          <div>
-            <p className="font-body text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-              Idea
-            </p>
-            <p className="font-body text-xs text-foreground leading-relaxed">
-              {idea}
-            </p>
-          </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {history.length === 0 && (
+          <p className="font-body text-xs text-muted-foreground text-center pt-8">
+            No saved scripts yet.
+          </p>
         )}
-
-        {/* Hook line */}
-        {hookLine && (
-          <div>
-            <p className="font-body text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-              Hook Line
+        {history.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onSelect(s)}
+            className="w-full text-left bg-muted/50 hover:bg-muted/80 rounded-xl px-3 py-2.5 transition-colors"
+          >
+            <p className="font-body text-xs font-semibold text-foreground truncate">
+              {s.idea || "Untitled"}
             </p>
-            <p className="font-body text-xs text-primary font-medium leading-relaxed">
-              "{hookLine}"
+            <p className="font-body text-[10px] text-muted-foreground mt-0.5">
+              {new Date(s.created_at || s.createdAt).toLocaleDateString(
+                "en-IN",
+                { day: "numeric", month: "short" },
+              )}
             </p>
-          </div>
-        )}
-
-        {/* Script stats */}
-        <div className="bg-background rounded-xl p-3 space-y-2 border border-border">
-          <div className="flex justify-between">
-            <span className="font-body text-[10px] text-muted-foreground">
-              Words
-            </span>
-            <span className="font-body text-[10px] font-semibold text-foreground">
-              {totalWords}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-body text-[10px] text-muted-foreground">
-              Duration
-            </span>
-            <span className="font-body text-[10px] font-semibold text-primary">
-              {totalDuration}
-            </span>
-          </div>
-        </div>
-
-        {/* ARIA tip */}
-        {ariaTip && (
-          <div>
-            <p className="font-body text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-              ARIA Tip
-            </p>
-            <div className="flex gap-2">
-              <Sparkles size={11} className="text-primary mt-0.5 shrink-0" />
-              <p className="font-body text-xs text-muted-foreground leading-relaxed">
-                {ariaTip}
-              </p>
-            </div>
-          </div>
-        )}
+          </button>
+        ))}
       </div>
     </motion.div>
   );
@@ -315,21 +341,20 @@ function ContextPanel({
 
 // ── Main Studio ───────────────────────────────────────────────────────────────
 export default function Studio() {
-  const { dbUser } = useFirebaseAuth();
   const navigate = useNavigate();
+  const { dbUser } = useFirebaseAuth();
 
-  // ── Zustand flow state ──────────────────────────────────────────────────
-  const ideaFromFlow = useCreatorFlow((s) => s.ideaText);
-  const selectedIdea = useCreatorFlow((s) => s.selectedIdea);
+  // Creator flow pre-fill — use separate selectors to avoid object-literal
+  // returning a new ref on every render (causes getSnapshot infinite loop)
+  const ideaFromFlow = useCreatorFlow((s) => s.selectedIdea?.title || "");
   const setStudioSession = useCreatorFlow((s) => s.setStudioSession);
 
-  // ── Local state ─────────────────────────────────────────────────────────
+  // Local state
   const [idea, setIdea] = useState(ideaFromFlow || "");
   const [result, setResult] = useState(null);
   const [editedSections, setEditedSections] = useState([]);
   const [sessionId, setSessionId] = useState(null);
   const [activeSectionId, setActiveSection] = useState(null);
-  const [showOutline, setShowOutline] = useState(true);
   const [showContext, setShowContext] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -339,19 +364,20 @@ export default function Studio() {
 
   const sectionRefs = useRef({});
 
-  // ── API hooks ───────────────────────────────────────────────────────────
+  // API hooks
   const { mutateAsync: generateScript, isPending } = useScriptStructure();
   const { mutateAsync: saveSession } = useSaveSession();
   const { mutateAsync: learnFromEdit } = useLearnFromEdit();
   const { data: historyData } = useScriptHistory();
   const history = historyData?.data || [];
 
-  // Pre-fill idea from Discovery flow
+  // Pre-fill from flow
   useEffect(() => {
     if (ideaFromFlow && !idea) setIdea(ideaFromFlow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ideaFromFlow]);
 
-  // Computed values
+  // Computed
   const words = totalWordCount(editedSections);
   const duration = calcDuration(editedSections.map((s) => s.content).join(" "));
 
@@ -364,14 +390,13 @@ export default function Studio() {
     });
   }, []);
 
-  // Generate
+  // Generate script
   const handleGenerate = async () => {
     if (!idea.trim()) return;
     setError(null);
     setResult(null);
     setSaved(false);
     setSessionId(null);
-
     try {
       const res = await generateScript({
         idea,
@@ -380,44 +405,39 @@ export default function Studio() {
         archetype: dbUser?.archetype || "CREATOR",
         followerRange: dbUser?.follower_range || "1K-10K",
       });
-
       const data = res.data;
       setResult(data);
       const cloned = JSON.parse(JSON.stringify(data.sections || []));
       setEditedSections(cloned);
       if (cloned.length > 0) setActiveSection(cloned[0].id);
 
-      // Auto-save
-      const saved = await saveSession({
+      const savedRes = await saveSession({
         idea,
         platform: dbUser?.primary_platform || "instagram",
         niche: dbUser?.niches?.[0] || "general",
         generatedScript: data,
         editedScript: {},
       });
-      const sid = saved?.data?.sessionId || null;
+      const sid = savedRes?.data?.sessionId || null;
       setSessionId(sid);
-      // Push to Zustand
-      setStudioSession(sid, data, cloned);
+      setStudioSession?.(sid, data, cloned);
     } catch (e) {
       console.error(e);
       setError("Could not generate script. Please try again.");
     }
   };
 
-  // Edit handler
+  // Section edit
   const handleSectionChange = (sectionId, newContent) => {
-    const updated = editedSections.map((s) =>
-      s.id === sectionId ? { ...s, content: newContent } : s,
+    setEditedSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, content: newContent } : s)),
     );
-    setEditedSections(updated);
     setSaved(false);
-    // Keep Zustand in sync
-    setStudioSession(sessionId, result, updated);
   };
 
-  // Save final
+  // Save
   const handleSave = async () => {
+    if (!sessionId || !result) return;
     setSaving(true);
     try {
       await saveSession({
@@ -427,6 +447,19 @@ export default function Studio() {
         generatedScript: result,
         editedScript: { sections: editedSections },
       });
+      // Learn from edits if content changed
+      const changed = editedSections.filter((s) => {
+        const orig = result.sections?.find((o) => o.id === s.id);
+        return orig && orig.content !== s.content;
+      });
+      if (changed.length > 0) {
+        await learnFromEdit({
+          generatedSections: result.sections,
+          editedSections,
+          intentLabel: "tightened_language",
+          sessionId,
+        }).catch(() => {});
+      }
       setSaved(true);
     } catch (e) {
       console.error(e);
@@ -435,14 +468,8 @@ export default function Studio() {
     }
   };
 
-  // Go to Launch
-  const handleGoToLaunch = () => {
-    setStudioSession(sessionId, result, editedSections);
-    navigate("/dashboard/launch");
-  };
-
-  // History select
-  const handleHistorySelect = (script) => {
+  // Load from history
+  const handleSelectHistory = (script) => {
     const active = script.edited_script?.sections?.length
       ? script.edited_script
       : script.generated_script || null;
@@ -455,184 +482,141 @@ export default function Studio() {
     if (active?.sections?.[0]) setActiveSection(active.sections[0].id);
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] lg:h-screen bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-4 lg:px-6 py-3 border-b border-border bg-card/50 backdrop-blur shrink-0">
+      <div className="flex items-center justify-between px-4 lg:px-5 py-2.5 border-b border-border bg-card/50 backdrop-blur shrink-0">
         <div>
-          <h1 className="font-heading text-xl text-foreground">Studio</h1>
+          <h1 className="font-heading text-lg text-foreground">Studio</h1>
           {result && (
-            <p className="font-body text-xs text-muted-foreground mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground">
               {words} words · {duration}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* History */}
           <button
             onClick={() => setShowHistory(!showHistory)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted
                        font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Clock size={13} /> History
+            <Clock size={12} /> History
           </button>
-
-          {/* Focus mode */}
           {result && (
             <button
               onClick={() => setFocusMode(!focusMode)}
               className="p-2 rounded-xl bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title={focusMode ? "Exit focus mode" : "Focus mode"}
             >
-              {focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {focusMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
           )}
-
-          {/* Save */}
           {result && (
             <button
               onClick={handleSave}
               disabled={saving || saved}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs
-                font-semibold transition-all ${
-                  saved
-                    ? "bg-emerald-500/15 text-emerald-600"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs font-semibold transition-all
+                ${saved ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground hover:text-foreground"}`}
             >
               {saved ? (
                 <>
-                  <CheckCircle2 size={13} /> Saved
+                  <CheckCircle2 size={12} /> Saved
+                </>
+              ) : saving ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />{" "}
+                  Saving…
                 </>
               ) : (
                 <>
-                  <Save size={13} /> Save
+                  <Save size={12} /> Save
                 </>
               )}
             </button>
           )}
-
-          {/* Go to Launch */}
-          {result && (
-            <button
-              onClick={handleGoToLaunch}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary
-                         text-white font-body text-xs font-semibold hover:bg-primary/90
-                         active:scale-[0.98] transition-all shadow-warm"
-            >
-              Go to Launch <ArrowRight size={13} />
-            </button>
-          )}
+          <button
+            onClick={() => navigate("/dashboard/launch")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white font-body text-xs font-semibold
+                       hover:opacity-90 transition-opacity"
+          >
+            Go to Launch <ArrowRight size={12} />
+          </button>
         </div>
       </div>
 
-      {/* ── Three-panel layout ── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left outline panel — hidden in focus mode */}
-        <AnimatePresence>
-          {!focusMode && result && showOutline && (
+      {/* ── Three-panel shell ── */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Left: Outline (hidden in focus mode, desktop only) */}
+        {!focusMode && result && (
+          <div className="hidden lg:flex">
             <OutlinePanel
               sections={editedSections}
               activeSectionId={activeSectionId}
               onJump={jumpToSection}
-              onToggle={() => setShowOutline(false)}
-              visible
+              onAdd={() => {}}
             />
-          )}
-        </AnimatePresence>
-
-        {/* Collapsed outline toggle */}
-        {!focusMode && result && !showOutline && (
-          <button
-            onClick={() => setShowOutline(true)}
-            className="w-8 border-r border-border bg-muted/30 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronRight size={13} />
-          </button>
+          </div>
         )}
 
-        {/* ── Centre editor ── */}
+        {/* Centre: Editor */}
         <div className="flex-1 overflow-y-auto">
-          <div
-            className={`mx-auto py-6 px-4 ${focusMode ? "max-w-2xl" : "max-w-3xl"}`}
-          >
-            {/* Idea input */}
-            {(!result || focusMode === false) && (
-              <motion.div
-                variants={container}
-                initial="hidden"
-                animate="show"
-                className="space-y-4 mb-6"
-              >
-                {/* Source chip — if arrived from Discovery */}
-                {selectedIdea && (
-                  <motion.div
-                    variants={item}
-                    className="flex items-center gap-2 px-3 py-2 bg-primary/8 border border-primary/15
-                               rounded-xl text-xs font-body text-primary"
-                  >
-                    <Sparkles size={12} />
-                    <span className="font-semibold">From Discovery:</span>
-                    <span className="truncate text-muted-foreground">
-                      {selectedIdea.whyNow?.slice(0, 60)}…
-                    </span>
-                  </motion.div>
-                )}
+          <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
+            {/* Idea textarea */}
+            <div>
+              <textarea
+                className="w-full bg-muted/40 border border-border rounded-2xl px-4 py-3.5
+                           font-body text-sm text-foreground placeholder:text-muted-foreground/50
+                           resize-none outline-none focus:border-primary/40 transition-colors"
+                rows={2}
+                value={idea}
+                onChange={(e) => {
+                  setIdea(e.target.value);
+                  setSaved(false);
+                }}
+                placeholder="What's your content idea? Paste a rough concept, title, or vibe…"
+              />
+            </div>
 
-                <motion.div variants={item} className="relative">
-                  <textarea
-                    value={idea}
-                    onChange={(e) => setIdea(e.target.value)}
-                    placeholder="What's your content idea? Paste a rough concept, a title, or just a vibe — ARIA writes the rest."
-                    rows={3}
-                    className="w-full bg-card border border-border rounded-2xl px-4 py-3.5
-                               font-body text-sm text-foreground placeholder:text-muted-foreground/50
-                               resize-none outline-none focus:border-primary/40 focus:ring-1
-                               focus:ring-primary/20 transition-all leading-relaxed"
-                  />
-                </motion.div>
-
+            {/* Generate button (no result yet) */}
+            {!result && !isPending && (
+              <motion.div variants={fadeUp} initial="hidden" animate="show">
+                <button
+                  onClick={handleGenerate}
+                  disabled={!idea.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl
+                             bg-primary text-white font-body font-semibold text-sm
+                             hover:opacity-90 transition-opacity disabled:opacity-40"
+                >
+                  <Sparkles size={15} /> Generate Script
+                </button>
                 {error && (
-                  <p className="text-destructive font-body text-sm">{error}</p>
+                  <p className="font-body text-xs text-red-500 text-center mt-2">
+                    {error}
+                  </p>
                 )}
-
-                <motion.div variants={item}>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isPending || !idea.trim()}
-                    className="flex items-center gap-2 px-6 py-3 bg-primary text-white
-                               rounded-xl font-body font-semibold text-sm hover:bg-primary/90
-                               disabled:opacity-50 active:scale-[0.98] transition-all shadow-warm"
-                  >
-                    {isPending ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ARIA is writing…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={15} /> Generate Script
-                      </>
-                    )}
-                  </button>
-                </motion.div>
               </motion.div>
             )}
 
-            {/* Generated hook line */}
+            {/* Generating state */}
+            {isPending && (
+              <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground font-body text-sm">
+                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                ARIA is writing…
+              </div>
+            )}
+
+            {/* Hook banner */}
             <AnimatePresence>
               {result?.hookLine && !isPending && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-5 bg-primary/8 border border-primary/15 rounded-xl px-4 py-3"
+                  className="bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3.5"
                 >
-                  <p className="font-body text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">
-                    Opening Hook
+                  <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
+                    Opening hook
                   </p>
-                  <p className="font-heading text-lg text-foreground">
+                  <p className="font-heading text-base text-foreground">
                     "{result.hookLine}"
                   </p>
                   {result.hookTip && (
@@ -667,16 +651,13 @@ export default function Studio() {
                   ))}
 
                   {/* Bottom actions */}
-                  <div className="flex gap-3 pt-4 pb-8">
+                  <div className="flex gap-3 pt-4 pb-10">
                     <button
                       onClick={handleSave}
                       disabled={saving || saved}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                        font-body font-semibold text-sm transition-all ${
-                          saved
-                            ? "bg-emerald-500/15 text-emerald-600"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
+                        font-body font-semibold text-sm transition-all
+                        ${saved ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                     >
                       {saved ? (
                         <>
@@ -684,15 +665,14 @@ export default function Studio() {
                         </>
                       ) : (
                         <>
-                          <Save size={14} /> Save Script
+                          <Save size={14} /> Save script
                         </>
                       )}
                     </button>
                     <button
-                      onClick={handleGoToLaunch}
+                      onClick={() => navigate("/dashboard/launch")}
                       className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                                 bg-primary text-white font-body font-semibold text-sm
-                                 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-warm"
+                                 bg-primary text-white font-body font-semibold text-sm hover:opacity-90 transition-opacity"
                     >
                       Go to Launch <ArrowRight size={14} />
                     </button>
@@ -700,92 +680,48 @@ export default function Studio() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Re-generate button (after result) */}
+            {result && !isPending && (
+              <div className="pb-4">
+                <button
+                  onClick={handleGenerate}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border
+                             font-body text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <Sparkles size={13} /> Regenerate script
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right context panel */}
-        <AnimatePresence>
-          {!focusMode && result && showContext && (
+        {/* Right: Context (desktop, hidden in focus mode) */}
+        {!focusMode && result && showContext && (
+          <div className="hidden lg:flex">
             <ContextPanel
-              visible
               idea={idea}
               hookLine={result?.hookLine}
-              ariaTip={selectedIdea?.ariaTip || result?.ariaPostingTip}
-              totalWords={words}
-              totalDuration={duration}
-              onToggle={() => setShowContext(false)}
+              hookTip={result?.hookTip}
+              words={words}
+              duration={duration}
+              platform={dbUser?.primary_platform || "Instagram"}
+              onClose={() => setShowContext(false)}
+            />
+          </div>
+        )}
+
+        {/* History drawer */}
+        <AnimatePresence>
+          {showHistory && (
+            <HistoryDrawer
+              history={history}
+              onSelect={handleSelectHistory}
+              onClose={() => setShowHistory(false)}
             />
           )}
         </AnimatePresence>
-
-        {/* Collapsed context toggle */}
-        {!focusMode && result && !showContext && (
-          <button
-            onClick={() => setShowContext(true)}
-            className="w-8 border-l border-border bg-muted/30 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft size={13} />
-          </button>
-        )}
       </div>
-
-      {/* ── History slide-over ── */}
-      <AnimatePresence>
-        {showHistory && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/40"
-              onClick={() => setShowHistory(false)}
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 28 }}
-              className="fixed right-0 top-0 bottom-0 z-50 w-80 bg-card border-l border-border
-                         flex flex-col shadow-2xl"
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-                <h3 className="font-heading text-base text-foreground">
-                  Script History
-                </h3>
-                <button
-                  onClick={() => setShowHistory(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {history.length === 0 ? (
-                  <p className="text-muted-foreground font-body text-sm text-center pt-8">
-                    No scripts yet. Generate your first one!
-                  </p>
-                ) : (
-                  history.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => handleHistorySelect(s)}
-                      className="w-full text-left bg-muted/50 hover:bg-muted rounded-xl p-3 transition-colors"
-                    >
-                      <p className="font-body text-sm font-semibold text-foreground truncate">
-                        {s.idea}
-                      </p>
-                      <p className="font-body text-xs text-muted-foreground mt-0.5 capitalize">
-                        {s.platform} · {s.niche}
-                      </p>
-                    </button>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -1,18 +1,35 @@
-import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
-import Sidebar from '@/components/dashboard/Sidebar';
+import React from "react";
+import { Outlet, useLocation } from "react-router-dom";
+import Sidebar from "@/components/dashboard/Sidebar";
+
+const FULL_BLEED_PATHS = [
+  "/dashboard/brain",
+  "/dashboard/studio",
+  "/dashboard/calendar",
+];
+
+const isFullBleed = (pathname) =>
+  FULL_BLEED_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 export default function Dashboard() {
   const location = useLocation();
-  const isBrainPage = location.pathname === '/dashboard/brain' || location.pathname.startsWith('/dashboard/brain/');
+  const fullBleed = isFullBleed(location.pathname);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
-      <main className={`lg:ml-60 ${isBrainPage ? 'h-[calc(100vh-60px)] lg:h-screen' : 'p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8'}`}>
-        <div className={isBrainPage ? 'h-full w-full' : 'max-w-5xl mx-auto'}>
-          <Outlet />
-        </div>
+      <main
+        className={`flex-1 min-w-0 ${fullBleed ? "overflow-hidden h-full" : "overflow-y-auto pb-16 lg:pb-0"}`}
+      >
+        {fullBleed ? (
+          <div className="h-full w-full">
+            <Outlet />
+          </div>
+        ) : (
+          <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+            <Outlet />
+          </div>
+        )}
       </main>
     </div>
   );

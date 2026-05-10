@@ -24,6 +24,7 @@ import {
   useIntegrationStatus,
   useDisconnectPlatform,
   useProfile,
+  useFetchYouTubeAnalytics,
 } from "@/hooks/useApi";
 import { useCreditsWallet, useCreditsHistory } from "@/hooks/useApi";
 import { useRazorpay } from "@/hooks/useRazorpay";
@@ -670,10 +671,12 @@ function CreditsTab() {
 function IntegrationsTab() {
   const { data: statusData, refetch } = useIntegrationStatus();
   const disconnectMutation = useDisconnectPlatform();
+  const fetchYTAnalytics = useFetchYouTubeAnalytics();
   const [searchParams] = useSearchParams();
   const [oauthError, setOauthError] = useState(null);
   const [oauthSuccess, setOauthSuccess] = useState(null);
   const [connectingPlatform, setConnectingPlatform] = useState(null);
+  const [ytFetchSuccess, setYtFetchSuccess] = useState(false);
 
   const status = statusData?.data?.connections ?? {};
 
@@ -714,6 +717,17 @@ function IntegrationsTab() {
       await disconnectMutation.mutateAsync(platformId);
       refetch();
     } catch {}
+  };
+
+  const handleFetchYTAnalytics = async () => {
+    setYtFetchSuccess(false);
+    try {
+      await fetchYTAnalytics.mutateAsync();
+      setYtFetchSuccess(true);
+      refetch();
+    } catch {
+      setOauthError("Could not fetch YouTube analytics. Please try again.");
+    }
   };
 
   return (
@@ -764,6 +778,13 @@ function IntegrationsTab() {
       {platforms.map(({ id, label, Icon, iconColor, bg, description }) => {
         const connected = status[id]?.connected;
         const handle = status[id]?.handle;
+        const isYouTube = id === "youtube";
+        const analyticsReady = isYouTube ? status[id]?.analyticsReady : null;
+        const analyticsScrapedAt = isYouTube
+          ? status[id]?.analyticsScrapedAt
+          : null;
+        const isFetching = isYouTube && fetchYTAnalytics.isPending;
+
         return (
           <motion.div
             key={id}
@@ -798,6 +819,76 @@ function IntegrationsTab() {
               <p className="font-body text-sm text-muted-foreground">
                 {description}
               </p>
+
+              {/* YouTube analytics status banner */}
+              {isYouTube && connected && (
+                <div className="mt-3">
+                  {analyticsReady ? (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-body text-xs text-emerald-500">
+                        <CheckCircle2 size={11} />
+                        ARIA analytics ready
+                        {analyticsScrapedAt && (
+                          <span className="text-muted-foreground ml-1">
+                            ·{" "}
+                            {new Date(analyticsScrapedAt).toLocaleDateString(
+                              "en-IN",
+                              { day: "numeric", month: "short" },
+                            )}
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        onClick={handleFetchYTAnalytics}
+                        disabled={isFetching}
+                        className="flex items-center gap-1 font-body text-xs text-muted-foreground
+                          hover:text-foreground transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          size={11}
+                          className={isFetching ? "animate-spin" : ""}
+                        />
+                        Refresh
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className="flex items-center justify-between p-3 rounded-xl
+                      bg-amber-500/10 border border-amber-500/20"
+                    >
+                      <div>
+                        <p className="font-body text-xs font-semibold text-amber-500 mb-0.5">
+                          Analytics not fetched yet
+                        </p>
+                        <p className="font-body text-[11px] text-muted-foreground">
+                          Fetch your channel data so ARIA can personalise
+                          everything for you.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleFetchYTAnalytics}
+                        disabled={isFetching}
+                        className="ml-3 shrink-0 flex items-center gap-1.5 font-body text-xs
+                          px-3 py-1.5 rounded-lg bg-amber-500 text-white
+                          hover:bg-amber-600 transition-colors disabled:opacity-60"
+                      >
+                        {isFetching ? (
+                          <Loader2 size={11} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={11} />
+                        )}
+                        {isFetching ? "Fetching…" : "Fetch Analytics"}
+                      </button>
+                    </div>
+                  )}
+                  {ytFetchSuccess && (
+                    <p className="font-body text-xs text-emerald-500 mt-2 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Analytics updated — ARIA is now
+                      fully personalised for your YouTube channel.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="shrink-0">
               {connected ? (
