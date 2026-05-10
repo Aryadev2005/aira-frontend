@@ -675,17 +675,19 @@ function IntegrationsTab() {
   const [oauthSuccess, setOauthSuccess] = useState(null);
   const [connectingPlatform, setConnectingPlatform] = useState(null);
 
-  const status = statusData?.data?.integrations ?? {};
+  const status = statusData?.data?.connections ?? {};
 
   useEffect(() => {
     const error = searchParams.get("oauth_error");
     const success = searchParams.get("oauth_success");
     if (error)
       setOauthError(OAUTH_ERROR_MESSAGES[error] || "Connection failed.");
-    if (success)
+    if (success) {
       setOauthSuccess(
         `${success.charAt(0).toUpperCase() + success.slice(1)} connected!`,
       );
+      refetch();
+    }
   }, [searchParams]);
 
   const handleConnect = async (platformId) => {
