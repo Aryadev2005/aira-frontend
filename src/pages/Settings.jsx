@@ -692,10 +692,11 @@ function IntegrationsTab() {
     setConnectingPlatform(platformId);
     try {
       if (platformId === "youtube") {
-        const { data } = await api.get(
+        const res = await api.get(
           "/integrations/youtube/auth-url?flow=settings",
         );
-        if (data?.authUrl) window.location.href = data.authUrl;
+        const redirectUrl = res?.data?.url ?? res?.url ?? res?.authUrl;
+        if (redirectUrl) window.location.href = redirectUrl;
       } else if (platformId === "instagram") {
         window.location.href = "/onboarding?reconnect=instagram";
       }
