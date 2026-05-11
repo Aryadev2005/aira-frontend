@@ -12,7 +12,7 @@ const item = {
   show:   { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── History helpers ────────────────────────────────────────────────────────
 function gradeColor(grade) {
   if (!grade) return 'bg-muted text-muted-foreground';
   if (grade.startsWith('A')) return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
@@ -23,7 +23,7 @@ function gradeColor(grade) {
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff  = Date.now() - new Date(dateStr).getTime();
   const days  = Math.floor(diff / 86400000);
   const hours = Math.floor(diff / 3600000);
   const mins  = Math.floor(diff / 60000);
@@ -108,9 +108,20 @@ function CollapsibleSection({ title, icon: Icon, children, defaultOpen = false }
 }
 
 // ── History Card ───────────────────────────────────────────────────────────
+// NOTE: API returns snake_case fields (video_id, video_title, channel_name,
+// thumbnail_url, analysed_at) — do NOT use camelCase here.
 function HistoryCard({ entry, onReanalyse }) {
-  // API returns snake_case: video_id, video_title, channel_name, thumbnail_url, analysed_at
-  const { video_id, video_title, channel_name, score, grade, verdict, thumbnail_url, analysed_at } = entry;
+  const {
+    video_id,
+    video_title,
+    channel_name,
+    score,
+    grade,
+    verdict,
+    thumbnail_url,
+    analysed_at,
+  } = entry;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -125,29 +136,36 @@ function HistoryCard({ entry, onReanalyse }) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-body font-semibold text-foreground truncate">{video_title || video_id}</p>
+        <p className="text-sm font-body font-semibold text-foreground truncate">
+          {video_title || video_id}
+        </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-xs text-muted-foreground font-body truncate">{channel_name}</span>
+          {channel_name && (
+            <span className="text-xs text-muted-foreground font-body truncate">{channel_name}</span>
+          )}
           {analysed_at && (
             <span className="text-xs text-muted-foreground font-body flex items-center gap-1 flex-shrink-0">
               <Clock size={10} />{timeAgo(analysed_at)}
             </span>
           )}
         </div>
-        {verdict && <p className="text-xs text-muted-foreground font-body italic mt-0.5 truncate">"{verdict}"</p>}
+        {verdict && (
+          <p className="text-xs text-muted-foreground font-body italic mt-0.5 truncate">"{verdict}"</p>
+        )}
       </div>
 
-      {/* Score + grade + actions */}
+      {/* Score + grade + hover actions */}
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
         <div className="flex items-center gap-2">
           {grade && (
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full font-body ${gradeColor(grade)}`}>{grade}</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full font-body ${gradeColor(grade)}`}>
+              {grade}
+            </span>
           )}
           {score != null && (
             <span className="text-sm font-bold font-heading text-primary">{score}</span>
           )}
         </div>
-        {/* Action buttons — visible on hover */}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onReanalyse(video_id)}
@@ -182,8 +200,13 @@ export default function VideoDNA() {
 
   const { mutateAsync: analyseVideo, isPending: analyzing } = useVideoDNA();
   const { mutateAsync: analyseGap,   isPending: gapLoading } = useCompetitorGap();
-  // ↓ added refetch so history updates right after a new analysis completes
+
+  // FIX 1: also grab refetch so we can update history right after an analysis
   const { data: historyData, refetch: refetchHistory } = useVideoDNAHistory();
+
+  // FIX 2: axios wraps the response → historyData.data = { success, data: [...] }
+  //        so the actual array lives at historyData?.data?.data, NOT historyData?.data
+  const historyEntries = historyData?.data?.data ?? [];
 
   const extractVideoId = (input) => {
     const match = input.match(
@@ -206,7 +229,8 @@ export default function VideoDNA() {
     try {
       const data = await analyseVideo({ videoId });
       setResult(data.data);
-      refetchHistory(); // ← keeps history in sync after each analysis
+      // FIX 3: refresh history so the new entry appears without a page reload
+      refetchHistory();
     } catch (e) {
       setError(e?.response?.data?.message ?? 'Analysis failed. Please try again.');
     }
@@ -229,9 +253,6 @@ export default function VideoDNA() {
       setGapError(e?.response?.data?.message ?? 'Gap analysis failed.');
     }
   };
-
-  // API shape: axios response → { data: { success, data: [...rows] } }
-  const historyEntries = historyData?.data?.data ?? [];
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-10">
@@ -322,10 +343,10 @@ export default function VideoDNA() {
                 <span className="text-xs font-body font-bold text-primary mt-1">{result.grade}</span>
               </div>
               <div className="flex-1 space-y-3 w-full">
-                <ScoreBar label="Hook Strength"     score={result.hookScore} />
-                <ScoreBar label="Engagement Score"  score={result.engagementScore} />
-                <ScoreBar label="Content Quality"   score={result.contentQualityScore} />
-                <ScoreBar label="SEO Score"         score={result.seoScore} />
+                <ScoreBar label="Hook Strength"    score={result.hookScore} />
+                <ScoreBar label="Engagement Score" score={result.engagementScore} />
+                <ScoreBar label="Content Quality"  score={result.contentQualityScore} />
+                <ScoreBar label="SEO Score"        score={result.seoScore} />
               </div>
             </div>
             {result.engagementRate && (
@@ -360,9 +381,9 @@ export default function VideoDNA() {
               {result.actionItems?.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-foreground font-body">Action Items:</p>
-                  {result.actionItems.map((item, i) => (
+                  {result.actionItems.map((actionItem, i) => (
                     <div key={i} className="flex gap-2 text-xs font-body text-muted-foreground">
-                      <span className="text-primary">→</span><span>{item}</span>
+                      <span className="text-primary">→</span><span>{actionItem}</span>
                     </div>
                   ))}
                 </div>
@@ -385,7 +406,7 @@ export default function VideoDNA() {
             </div>
           </CollapsibleSection>
 
-          {/* SEO & Viral */}
+          {/* SEO & Viral Strategy */}
           <CollapsibleSection title="SEO & Viral Strategy" icon={TrendingUp}>
             <div className="space-y-3 pt-1">
               {result.betterTitle && (
@@ -418,8 +439,8 @@ export default function VideoDNA() {
                   <div key={i} className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold font-body text-foreground">
-                        {Math.floor(opp.start / 60)}:{String(opp.start % 60).padStart(2,'0')} –
-                        {Math.floor(opp.end / 60)}:{String(opp.end % 60).padStart(2,'0')}
+                        {Math.floor(opp.start / 60)}:{String(opp.start % 60).padStart(2, '0')} –&nbsp;
+                        {Math.floor(opp.end   / 60)}:{String(opp.end   % 60).padStart(2, '0')}
                       </span>
                       <span className="text-xs text-primary font-body">Viral Score: {opp.viralScore}</span>
                     </div>
@@ -476,6 +497,7 @@ export default function VideoDNA() {
 
         {gapResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            {/* Platform source badges */}
             {gapResult.platformsAnalysed?.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-muted-foreground font-body">Analysed from:</span>
@@ -483,19 +505,25 @@ export default function VideoDNA() {
                   <span key={p}
                     className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-body font-medium">
                     {p === 'Instagram Reels' ? '🎬' : '📺'} {p}
-                    {p === 'Instagram Reels' && gapResult.instagramReelsCount > 0 ? ` (${gapResult.instagramReelsCount})` : ''}
-                    {p === 'YouTube' && gapResult.youtubeVideosCount > 0 ? ` (${gapResult.youtubeVideosCount})` : ''}
+                    {p === 'Instagram Reels' && gapResult.instagramReelsCount > 0
+                      ? ` (${gapResult.instagramReelsCount})` : ''}
+                    {p === 'YouTube' && gapResult.youtubeVideosCount > 0
+                      ? ` (${gapResult.youtubeVideosCount})` : ''}
                   </span>
                 ))}
               </div>
             )}
+
             <div className="flex items-center gap-3">
               <ScoreRing score={gapResult.opportunityScore} size={60} label="Opportunity" />
               <p className="text-sm font-body text-foreground">
-                Analysed <strong>{gapResult.videosAnalysed}</strong> top{gapResult.platformsAnalysed?.length > 1 ? ' posts' : ' videos'} in <strong>{gapResult.niche}</strong>.
+                Analysed <strong>{gapResult.videosAnalysed}</strong> top
+                {gapResult.platformsAnalysed?.length > 1 ? ' posts' : ' videos'} in{' '}
+                <strong>{gapResult.niche}</strong>.
                 Avg engagement: <strong>{gapResult.avgEngagementRate}%</strong>
               </p>
             </div>
+
             {gapResult.missedTopics?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold font-body text-green-500 mb-1.5">🎯 Untouched Topics (Your Opportunity):</p>
@@ -506,6 +534,7 @@ export default function VideoDNA() {
                 </div>
               </div>
             )}
+
             {gapResult.overservedTopics?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold font-body text-red-500 mb-1.5">🚫 Saturated (Avoid):</p>
@@ -516,6 +545,7 @@ export default function VideoDNA() {
                 </div>
               </div>
             )}
+
             {gapResult.scriptTemplate && (
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-xs font-semibold font-body mb-2">📝 ARIA Script Template:</p>
@@ -528,7 +558,14 @@ export default function VideoDNA() {
         )}
       </motion.div>
 
-      {/* ── History ───────────────────────────────────────────────────────── */}
+      {/* ── Recent Analyses (History) ──────────────────────────────────────
+          Root cause of history not showing was two bugs in the original:
+          1. historyData?.data → wrong nesting. Axios wraps response so the
+             array lives at historyData?.data?.data (success wrapper inside).
+          2. Field names were camelCase (item.videoId) but the API returns
+             snake_case (video_id, video_title, thumbnail_url, analysed_at).
+          Both are fixed via historyEntries derived above + HistoryCard below.
+      ───────────────────────────────────────────────────────────────────── */}
       {historyEntries.length > 0 && (
         <motion.div variants={item} className="space-y-3">
           <div className="flex items-center gap-2">
@@ -540,7 +577,11 @@ export default function VideoDNA() {
           </div>
           <div className="space-y-2">
             {historyEntries.map((entry, i) => (
-              <HistoryCard key={entry.video_id ?? i} entry={entry} onReanalyse={handleReanalyse} />
+              <HistoryCard
+                key={entry.video_id ?? i}
+                entry={entry}
+                onReanalyse={handleReanalyse}
+              />
             ))}
           </div>
         </motion.div>
