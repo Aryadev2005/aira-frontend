@@ -36,10 +36,13 @@ function timeAgo(dateStr) {
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function ScoreRing({ score, size = 80, label }) {
+  const safeScore = (typeof score === 'number' && isFinite(score) && !isNaN(score))
+    ? Math.min(100, Math.max(0, score))
+    : 0;
   const r = size * 0.38;
   const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-  const color = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+  const dash = (safeScore / 100) * circ;
+  const color = safeScore >= 80 ? '#22c55e' : safeScore >= 60 ? '#f59e0b' : '#ef4444';
   return (
     <div className="flex flex-col items-center gap-1">
       <svg width={size} height={size}>
@@ -56,7 +59,7 @@ function ScoreRing({ score, size = 80, label }) {
         />
         <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle"
           fill="var(--foreground)" fontSize={size * 0.22} fontWeight="700">
-          {score}
+          {safeScore}
         </text>
       </svg>
       {label && <span className="text-xs text-muted-foreground font-body">{label}</span>}
@@ -209,10 +212,32 @@ export default function VideoDNA() {
 
     try {
       const data = await analyseVideo({ videoId });
-      setResult(data.data);
-      refetchHistory(); // keep history in sync after each analysis
+
+      // api.js returns res.json() directly — shape is { success, data, timestamp }
+      // data.data is the result object from the backend
+      const result = data?.data ?? data;
+      if (!result || typeof result !== 'object') {
+        setError('Received an unexpected response. Please try again.');
+        return;
+      }
+
+      setResult(result);
+      refetchHistory();
     } catch (e) {
-      setError(e?.response?.data?.message ?? 'Analysis failed. Please try again.');
+      // api.js throws: new Error(message) with .status and .data attached
+      // NOT axios-style e.response.data.message
+      const message =
+        e?.data?.message ||       // backend error body
+        e?.message ||             // JS Error message
+        'Analysis failed. Please try again.';
+
+      // Don't show raw internal error strings to users
+      const userMessage =
+        message.includes('INTERNAL') || message.includes('500')
+          ? 'Analysis failed. Please try again in a moment.'
+          : message;
+
+      setError(userMessage);
     }
   };
 
@@ -229,7 +254,7 @@ export default function VideoDNA() {
       const data = await analyseGap({ niche: nicheInput.trim() });
       setGapResult(data.data);
     } catch (e) {
-      setGapError(e?.response?.data?.message ?? 'Gap analysis failed.');
+      setGapError(e?.data?.message || e?.message || 'Gap analysis failed.');
     }
   };
 
@@ -328,10 +353,12 @@ export default function VideoDNA() {
                 <ScoreBar label="SEO Score"        score={result.seoScore} />
               </div>
             </div>
-            {result.engagementRate && (
+            {result.engagementRate != null && (
               <div className="mt-4 flex gap-4 text-xs font-body text-muted-foreground flex-wrap">
                 <span>📊 ER: <strong className="text-foreground">{result.engagementRate}%</strong></span>
-                <span>⚡ vs Niche: <strong className="text-foreground">{result.erVsBenchmark}x</strong></span>
+                <span>⚡ vs Niche: <strong className="text-foreground">
+                  {isFinite(result.erVsBenchmark) ? result.erVsBenchmark : '—'}x
+                </strong></span>
                 <span>👁 Velocity: <strong className="text-foreground">{result.viewVelocityScore}/100</strong></span>
                 <span>⏱ Duration: <strong className="text-foreground">{result.durationScore}/100</strong></span>
                 <span className="text-green-500 text-[10px]">v2 deterministic</span>
@@ -409,10 +436,13 @@ export default function VideoDNA() {
           </CollapsibleSection>
 
           {/* Shorts Opportunities */}
-          {result.shortsOpportunities?.length > 0 && (
-            <CollapsibleSection title={`Shorts Opportunities (${result.shortsOpportunities.length})`} icon={Scissors}>
-              <div className="space-y-3 pt-1">
-                {result.shortsOpportunities.map((opp, i) => (
+          <CollapsibleSection
+            title={`Shorts Opportunities${result.shortsOpportunities?.length > 0 ? ` (${result.shortsOpportunities.length})` : ''}`}
+            icon={Scissors}
+          >
+            <div className="space-y-3 pt-1">
+              {result.shortsOpportunities?.length > 0 ? (
+                result.shortsOpportunities.map((opp, i) => (
                   <div key={i} className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold font-body text-foreground">
@@ -424,10 +454,14 @@ export default function VideoDNA() {
                     <p className="text-xs text-muted-foreground font-body">{opp.reason}</p>
                     <p className="text-xs font-body mt-1 bg-card rounded p-2 text-foreground">{opp.caption}</p>
                   </div>
-                ))}
-              </div>
-            </CollapsibleSection>
-          )}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground font-body">
+                  No strong clip moments detected for this video. Try a video with clear story beats or high-energy segments.
+                </p>
+              )}
+            </div>
+          </CollapsibleSection>
 
           {/* ARIA Insight */}
           <CollapsibleSection title="ARIA Insight" icon={Clock}>
