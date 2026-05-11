@@ -1,6 +1,12 @@
 // src/pages/dashboard/Studio.jsx
 // ── v3: / note picker added — all original logic preserved exactly ─────────────
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -157,16 +163,18 @@ function SectionBlock({
   onFocus,
   sectionRef,
 }) {
-  const c   = getSectionColors(section.label || section.type);
+  const c = getSectionColors(section.label || section.type);
   const dur = calcDuration(section.content);
 
   return (
     <div
       ref={sectionRef}
       className={`rounded-2xl border transition-all duration-200
-        ${isActive
-          ? `${c.border} ${c.bg} shadow-sm`
-          : "border-border hover:border-border/80"}`}
+        ${
+          isActive
+            ? `${c.border} ${c.bg} shadow-sm`
+            : "border-border hover:border-border/80"
+        }`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -184,7 +192,8 @@ function SectionBlock({
             {dur}
           </span>
           <span className="font-body text-[10px]">
-            {(section.content || "").trim().split(/\s+/).filter(Boolean).length}w
+            {(section.content || "").trim().split(/\s+/).filter(Boolean).length}
+            w
           </span>
         </div>
       </div>
@@ -331,8 +340,8 @@ function ContextPanel({
           </p>
           <div className="space-y-1.5">
             {[
-              { l: "Words",    v: words,    acc: false },
-              { l: "Duration", v: duration, acc: true  },
+              { l: "Words", v: words, acc: false },
+              { l: "Duration", v: duration, acc: true },
               { l: "Platform", v: platform, acc: false },
             ].map((row) => (
               <div key={row.l} className="flex items-center justify-between">
@@ -427,8 +436,8 @@ function NotePickerDropdown({ notes, query, onSelect, onClose }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -6, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0,  scale: 1 }}
-      exit={  { opacity: 0, y: -6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.98 }}
       transition={{ duration: 0.13 }}
       className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
     >
@@ -514,40 +523,40 @@ export default function Studio() {
 
   // Creator flow pre-fill — use separate selectors to avoid object-literal
   // returning a new ref on every render (causes getSnapshot infinite loop)
-  const ideaFromFlow    = useCreatorFlow((s) => s.selectedIdea?.title || "");
+  const ideaFromFlow = useCreatorFlow((s) => s.selectedIdea?.title || "");
   const setStudioSession = useCreatorFlow((s) => s.setStudioSession);
 
   // Local state — identical to original
-  const [idea,             setIdea]           = useState(ideaFromFlow || "");
-  const [result,           setResult]         = useState(null);
-  const [editedSections,   setEditedSections] = useState([]);
-  const [sessionId,        setSessionId]      = useState(null);
-  const [activeSectionId,  setActiveSection]  = useState(null);
-  const [showContext,      setShowContext]     = useState(true);
-  const [focusMode,        setFocusMode]      = useState(false);
-  const [saved,            setSaved]          = useState(false);
-  const [saving,           setSaving]         = useState(false);
-  const [error,            setError]          = useState(null);
-  const [showHistory,      setShowHistory]    = useState(false);
-  const [hookVariants,     setHookVariants]   = useState([]);
+  const [idea, setIdea] = useState(ideaFromFlow || "");
+  const [result, setResult] = useState(null);
+  const [editedSections, setEditedSections] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
+  const [activeSectionId, setActiveSection] = useState(null);
+  const [showContext, setShowContext] = useState(true);
+  const [focusMode, setFocusMode] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [hookVariants, setHookVariants] = useState([]);
   const [showHookVariants, setShowHookVariants] = useState(false);
   const [hookVariantCopied, setHookVariantCopied] = useState(null);
   const [studioTab, setStudioTab] = useState("script"); // "script" | "deep"
 
   // Note picker — only new state vs original
-  const [showNotePicker,  setShowNotePicker]  = useState(false);
+  const [showNotePicker, setShowNotePicker] = useState(false);
   const [notePickerQuery, setNotePickerQuery] = useState("");
 
   const sectionRefs = useRef({});
-  const ideaRef     = useRef(null);
+  const ideaRef = useRef(null);
 
   // API hooks — identical to original; useNotes added for picker only
   const { mutateAsync: generateScript, isPending } = useScriptStructure();
-  const { mutateAsync: saveSession  }              = useSaveSession();
-  const { mutateAsync: learnFromEdit }             = useLearnFromEdit();
-  const { data: historyData }                      = useScriptHistory();
-  const history                                    = historyData?.data || [];
-  const { mutateAsync: createNote }                = useCreateNote();
+  const { mutateAsync: saveSession } = useSaveSession();
+  const { mutateAsync: learnFromEdit } = useLearnFromEdit();
+  const { data: historyData } = useScriptHistory();
+  const history = historyData?.data || [];
+  const { mutateAsync: createNote } = useCreateNote();
   const { mutateAsync: rewriteHook, isPending: isRewriting } = useRewriteHook();
 
   // Notes for the "/" picker (staleTime 2 min from existing hook — no extra cost)
@@ -561,7 +570,7 @@ export default function Studio() {
   }, [ideaFromFlow]);
 
   // Computed — identical to original
-  const words    = totalWordCount(editedSections);
+  const words = totalWordCount(editedSections);
   const duration = calcDuration(editedSections.map((s) => s.content).join(" "));
 
   // Jump to section — identical to original
@@ -614,8 +623,8 @@ export default function Studio() {
   const handleNotePickerSelect = useCallback(
     (note) => {
       const slashIdx = idea.lastIndexOf("/");
-      const before   = slashIdx !== -1 ? idea.slice(0, slashIdx) : idea;
-      const insert   = note.title || note.content?.slice(0, 100) || "";
+      const before = slashIdx !== -1 ? idea.slice(0, slashIdx) : idea;
+      const insert = note.title || note.content?.slice(0, 100) || "";
       setIdea((before + insert).trimStart());
       setShowNotePicker(false);
       setNotePickerQuery("");
@@ -634,12 +643,12 @@ export default function Studio() {
     try {
       const res = await generateScript({
         idea,
-        platform:      dbUser?.primary_platform || "instagram",
-        niche:         dbUser?.niches?.[0]       || "general",
-        archetype:     dbUser?.archetype         || "CREATOR",
-        followerRange: dbUser?.follower_range    || "1K-10K",
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
+        archetype: dbUser?.archetype || "CREATOR",
+        followerRange: dbUser?.follower_range || "1K-10K",
       });
-      const data   = res.data;
+      const data = res.data;
       setResult(data);
       const cloned = JSON.parse(JSON.stringify(data.sections || []));
       setEditedSections(cloned);
@@ -647,10 +656,10 @@ export default function Studio() {
 
       const savedRes = await saveSession({
         idea,
-        platform:        dbUser?.primary_platform || "instagram",
-        niche:           dbUser?.niches?.[0]       || "general",
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
         generatedScript: data,
-        editedScript:    {},
+        editedScript: {},
       });
       const sid = savedRes?.data?.sessionId || null;
       setSessionId(sid);
@@ -665,11 +674,11 @@ export default function Studio() {
       });
       if (hookSection?.content) {
         createNote({
-          title:       idea.slice(0, 80),
-          content:     hookSection.content,
-          source:      "studio_hook",
+          title: idea.slice(0, 80),
+          content: hookSection.content,
+          source: "studio_hook",
           source_meta: { sessionId: sid },
-          tags:        ["hook"],
+          tags: ["hook"],
         }).catch(() => {});
       }
     } catch (e) {
@@ -693,10 +702,10 @@ export default function Studio() {
     try {
       await saveSession({
         idea,
-        platform:        dbUser?.primary_platform || "instagram",
-        niche:           dbUser?.niches?.[0]       || "general",
+        platform: dbUser?.primary_platform || "instagram",
+        niche: dbUser?.niches?.[0] || "general",
         generatedScript: result,
-        editedScript:    { sections: editedSections },
+        editedScript: { sections: editedSections },
       });
       // Learn from edits only when content actually changed
       const changed = editedSections.filter((s) => {
@@ -791,16 +800,25 @@ export default function Studio() {
               onClick={handleSave}
               disabled={saving || saved}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs font-semibold transition-all
-                ${saved
-                  ? "bg-emerald-500/15 text-emerald-600"
-                  : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                ${
+                  saved
+                    ? "bg-emerald-500/15 text-emerald-600"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
             >
               {saved ? (
-                <><CheckCircle2 size={12} /> Saved</>
+                <>
+                  <CheckCircle2 size={12} /> Saved
+                </>
               ) : saving ? (
-                <><div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" /> Saving…</>
+                <>
+                  <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />{" "}
+                  Saving…
+                </>
               ) : (
-                <><Save size={12} /> Save</>
+                <>
+                  <Save size={12} /> Save
+                </>
               )}
             </button>
           )}
@@ -868,49 +886,30 @@ export default function Studio() {
           {/* Centre: Editor */}
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
-              {/* Idea textarea */}
-              <div>
+              {/* ── Idea textarea with note picker ── */}
+              <div className="relative">
                 <textarea
+                  ref={ideaRef}
                   className="w-full bg-muted/40 border border-border rounded-2xl px-4 py-3.5
                            font-body text-sm text-foreground placeholder:text-muted-foreground/50
                            resize-none outline-none focus:border-primary/40 transition-colors"
                   rows={2}
                   value={idea}
-                  onChange={(e) => {
-                    setIdea(e.target.value);
-                    setSaved(false);
-                  }}
-                  placeholder="What's your content idea? Paste a rough concept, title, or vibe…"
+                  onChange={handleIdeaChange}
+                  onKeyDown={handleIdeaKeyDown}
+                  placeholder="What's your content idea? Type / to insert from Notes…"
                 />
+                <AnimatePresence>
+                  {showNotePicker && (
+                    <NotePickerDropdown
+                      notes={allNotes}
+                      query={notePickerQuery}
+                      onSelect={handleNotePickerSelect}
+                      onClose={() => setShowNotePicker(false)}
+                    />
+                  )}
+                </AnimatePresence>
               </div>
-        {/* Centre: Editor */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
-
-            {/* ── Idea textarea — only change: wrapped in relative div + picker ── */}
-            <div className="relative">
-              <textarea
-                ref={ideaRef}
-                className="w-full bg-muted/40 border border-border rounded-2xl px-4 py-3.5
-                           font-body text-sm text-foreground placeholder:text-muted-foreground/50
-                           resize-none outline-none focus:border-primary/40 transition-colors"
-                rows={2}
-                value={idea}
-                onChange={handleIdeaChange}
-                onKeyDown={handleIdeaKeyDown}
-                placeholder="What's your content idea? Type / to insert from Notes…"
-              />
-              <AnimatePresence>
-                {showNotePicker && (
-                  <NotePickerDropdown
-                    notes={allNotes}
-                    query={notePickerQuery}
-                    onSelect={handleNotePickerSelect}
-                    onClose={() => setShowNotePicker(false)}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
 
               {/* Generate button (no result yet) */}
               {!result && !isPending && (
@@ -922,42 +921,11 @@ export default function Studio() {
                              bg-primary text-white font-body font-semibold text-sm
                              hover:opacity-90 transition-opacity disabled:opacity-40"
                   >
-                
-                  <Sparkles size={15} /> Generate Script
-                </button>
-                {error && (
-                  <p className="font-body text-xs text-red-500 text-center mt-2">
-                    {error}
-                  </p>
-                )}
-              </motion.div>
-            )}
-
-            {/* Generating state */}
-            {isPending && (
-              <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground font-body text-sm">
-                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                AIRRA is writing…
-              </div>
-            )}
-
-            {/* Hook banner */}
-            <AnimatePresence>
-              {result?.hookLine && !isPending && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3.5"
-                >
-                  <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
-                    Opening hook
-                  </p>
-                  <p className="font-heading text-base text-foreground">
-                    "{result.hookLine}"
-                  </p>
-                  {result.hookTip && (
-                    <p className="font-body text-xs text-muted-foreground mt-1.5">
-                      {result.hookTip}
+                    <Sparkles size={15} /> Generate Script
+                  </button>
+                  {error && (
+                    <p className="font-body text-xs text-red-500 text-center mt-2">
+                      {error}
                     </p>
                   )}
                 </motion.div>
