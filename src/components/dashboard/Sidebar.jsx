@@ -51,7 +51,7 @@ const NAV_GROUPS = [
   {
     label: "Intelligence",
     items: [
-      { icon: Brain, label: "ARIA Brain", path: "/dashboard/brain" },
+      { icon: Brain, label: "AIRRA Brain", path: "/dashboard/brain" },
       { icon: BarChart3, label: "Video DNA", path: "/dashboard/video-dna" },
     ],
   },

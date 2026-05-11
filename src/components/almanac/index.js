@@ -1,4 +1,4 @@
-// AIRA Almanac Components
+// AIRRA Almanac Components
 export { default as AlmanacHero } from './AlmanacHero';
 export { default as AlmanacJourney } from './AlmanacJourney';
 export { default as AlmanacConstellation } from './AlmanacConstellation';

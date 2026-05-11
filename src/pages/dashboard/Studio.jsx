@@ -873,7 +873,7 @@ export default function Studio() {
             {isPending && (
               <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground font-body text-sm">
                 <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                ARIA is writing…
+                AIRRA is writing…
               </div>
             )}
 

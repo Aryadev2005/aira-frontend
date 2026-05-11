@@ -41,12 +41,12 @@ export default function Hero() {
             </motion.h1>
 
             <motion.p variants={item} className="text-accent-foreground/60 font-body text-lg max-w-lg mb-8 leading-relaxed">
-              AIRA gives you real trends, AI scripts, and the perfect posting time — 48 hours before your competitors.
+              AIRRA gives you real trends, AI scripts, and the perfect posting time — 48 hours before your competitors.
             </motion.p>
 
             <motion.div variants={item} className="flex flex-wrap gap-4 mb-10">
               <Link to="/register">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-pill px-8 py-6 text-base font-body font-semibold shadow-warm-lg">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 text-white rounded-pill px-8 py-6 text-base font-body font-semibold shadow-warm-lg">
                   Start for free — it's ₹0
                 </Button>
               </Link>
@@ -84,7 +84,7 @@ export default function Hero() {
             >
               <div className="flex items-center justify-between mb-4">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-primary text-white text-xs font-body font-semibold">
-                  AIRA DAILY BRIEF
+                  AIRRA DAILY BRIEF
                 </span>
                 <Sparkles size={18} className="text-primary" />
               </div>

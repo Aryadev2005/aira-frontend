@@ -22,7 +22,7 @@ const STEPS = [
   { id: 'verify',      label: 'Verify'     },
   { id: 'platforms',   label: 'Platforms'  },
   { id: 'connect',     label: 'Connect'    },
-  { id: 'analysis',    label: 'ARIA Setup' },
+  { id: 'analysis',    label: 'AIRRA Setup' },
 ];
 
 const stepVariants = {
@@ -167,7 +167,7 @@ function StepCredentials({ data, onChange, onNext }) {
   return (
     <div>
       <h2 className="font-heading text-2xl text-foreground mb-1">Create your account</h2>
-      <p className="text-muted-foreground font-body text-sm mb-6">Join 10,000+ Indian creators on ARIA</p>
+      <p className="text-muted-foreground font-body text-sm mb-6">Join 10,000+ Indian creators on AIRRA</p>
       <ErrorBanner message={globalErr} />
       <div className="space-y-4">
         <Input
@@ -247,7 +247,7 @@ function StepDetails({ data, onChange, onNext, onBack }) {
   return (
     <div>
       <h2 className="font-heading text-2xl text-foreground mb-1">Tell us about you</h2>
-      <p className="text-muted-foreground font-body text-sm mb-6">ARIA uses this to personalise your experience</p>
+      <p className="text-muted-foreground font-body text-sm mb-6">AIRRA uses this to personalise your experience</p>
       <div className="space-y-4">
         <Input
           icon={User} label="Full name"
@@ -481,7 +481,7 @@ function StepPlatforms({ data, onChange, onNext, onBack }) {
     <div>
       <h2 className="font-heading text-2xl text-foreground mb-1">Where do you create?</h2>
       <p className="text-muted-foreground font-body text-sm mb-6">
-        Select all platforms you use. ARIA will personalise trends for each.
+        Select all platforms you use. AIRRA will personalise trends for each.
       </p>
       <ErrorBanner message={error} />
       <div className="space-y-3 mb-2">
@@ -951,7 +951,7 @@ function StepAnalysis({ data, onFinish }) {
         onClick={onFinish}
         className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
       >
-        Enter ARIA <ArrowRight size={16} />
+        Enter AIRRA <ArrowRight size={16} />
       </button>
     </motion.div>
   );
