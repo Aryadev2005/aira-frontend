@@ -442,23 +442,84 @@ export default function VideoDNA() {
           >
             <div className="space-y-3 pt-1">
               {result.shortsOpportunities?.length > 0 ? (
-                result.shortsOpportunities.map((opp, i) => (
-                  <div key={i} className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold font-body text-foreground">
-                        {Math.floor(opp.start / 60)}:{String(opp.start % 60).padStart(2, '0')} –&nbsp;
-                        {Math.floor(opp.end   / 60)}:{String(opp.end   % 60).padStart(2, '0')}
-                      </span>
-                      <span className="text-xs text-primary font-body">Viral Score: {opp.viralScore}</span>
+                result.shortsOpportunities.map((opp, i) => {
+                  // Defensive coercion — handle string timestamps from older analyses
+                  const start      = typeof opp.start === 'number' ? opp.start : parseInt(opp.start, 10) || 0;
+                  const end        = typeof opp.end   === 'number' ? opp.end   : parseInt(opp.end,   10) || 0;
+                  const clipLength = end - start;
+                  const startFmt   = `${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`;
+                  const endFmt     = `${Math.floor(end   / 60)}:${String(end   % 60).padStart(2, '0')}`;
+
+                  const viralColor =
+                    opp.viralScore >= 80 ? 'text-green-500' :
+                    opp.viralScore >= 60 ? 'text-yellow-500' : 'text-muted-foreground';
+
+                  return (
+                    <div key={i} className="bg-muted rounded-lg p-3 space-y-2">
+                      {/* Header row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold font-body text-foreground bg-card px-2 py-0.5 rounded">
+                            {startFmt} → {endFmt}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-body">
+                            {clipLength}s clip
+                          </span>
+                        </div>
+                        <span className={`text-xs font-semibold font-body ${viralColor}`}>
+                          ⚡ {opp.viralScore}/100
+                        </span>
+                      </div>
+
+                      {/* Reason */}
+                      <p className="text-xs text-muted-foreground font-body leading-relaxed">
+                        {opp.reason}
+                      </p>
+
+                      {/* Caption with copy button */}
+                      <div className="bg-card rounded p-2 flex items-start justify-between gap-2">
+                        <p className="text-xs font-body text-foreground flex-1 leading-relaxed">
+                          {opp.caption}
+                        </p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(opp.caption || '');
+                          }}
+                          title="Copy caption"
+                          className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0 mt-0.5"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* YouTube deep link */}
+                      <a
+                        href={`https://youtube.com/watch?v=${result.videoId}&t=${start}s`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-primary font-body hover:underline w-fit"
+                      >
+                        <ExternalLink size={10} />
+                        Preview on YouTube at {startFmt}
+                      </a>
                     </div>
-                    <p className="text-xs text-muted-foreground font-body">{opp.reason}</p>
-                    <p className="text-xs font-body mt-1 bg-card rounded p-2 text-foreground">{opp.caption}</p>
-                  </div>
-                ))
+                  );
+                })
               ) : (
-                <p className="text-sm text-muted-foreground font-body">
-                  No strong clip moments detected for this video. Try a video with clear story beats or high-energy segments.
-                </p>
+                <div className="space-y-1 pt-1">
+                  <p className="text-sm text-muted-foreground font-body">
+                    No strong clip moments detected for this video.
+                  </p>
+                  <p className="text-xs text-muted-foreground font-body">
+                    {!result.videoId
+                      ? 'Video data unavailable.'
+                      : result.duration && parseInt(result.duration) < 180
+                      ? 'Video is under 3 minutes — too short to clip.'
+                      : 'Try a video with clear story beats, key moments, or high-energy segments.'}
+                  </p>
+                </div>
               )}
             </div>
           </CollapsibleSection>
