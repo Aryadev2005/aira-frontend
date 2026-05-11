@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Sparkles, ChevronDown, ChevronUp, TrendingUp, Eye, Clock, Scissors, Search } from 'lucide-react';
+import { Link2, Sparkles, ChevronDown, ChevronUp, TrendingUp, Eye, Clock, Scissors, Search, History, RefreshCw, ExternalLink } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useVideoDNA, useVideoDNAHistory, useCompetitorGap } from '@/hooks/useApi';
@@ -11,6 +11,27 @@ const item = {
   hidden: { opacity: 0, y: 20 },
   show:   { opacity: 1, y: 0, transition: { type: 'spring', damping: 25 } },
 };
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function gradeColor(grade) {
+  if (!grade) return 'bg-muted text-muted-foreground';
+  if (grade.startsWith('A')) return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+  if (grade.startsWith('B')) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
+  if (grade.startsWith('C')) return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400';
+  return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days  = Math.floor(diff / 86400000);
+  const hours = Math.floor(diff / 3600000);
+  const mins  = Math.floor(diff / 60000);
+  if (days  > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (mins  > 0) return `${mins}m ago`;
+  return 'just now';
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -86,6 +107,70 @@ function CollapsibleSection({ title, icon: Icon, children, defaultOpen = false }
   );
 }
 
+// ── History Card ───────────────────────────────────────────────────────────
+function HistoryCard({ entry, onReanalyse }) {
+  // API returns snake_case: video_id, video_title, channel_name, thumbnail_url, analysed_at
+  const { video_id, video_title, channel_name, score, grade, verdict, thumbnail_url, analysed_at } = entry;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border border-border rounded-xl p-3 flex items-center gap-3 group hover:border-border/60 transition-colors"
+    >
+      {/* Thumbnail */}
+      {thumbnail_url
+        ? <img src={thumbnail_url} alt={video_title} className="w-16 h-9 rounded-lg object-cover flex-shrink-0" />
+        : <div className="w-16 h-9 rounded-lg bg-muted flex-shrink-0" />
+      }
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-body font-semibold text-foreground truncate">{video_title || video_id}</p>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs text-muted-foreground font-body truncate">{channel_name}</span>
+          {analysed_at && (
+            <span className="text-xs text-muted-foreground font-body flex items-center gap-1 flex-shrink-0">
+              <Clock size={10} />{timeAgo(analysed_at)}
+            </span>
+          )}
+        </div>
+        {verdict && <p className="text-xs text-muted-foreground font-body italic mt-0.5 truncate">"{verdict}"</p>}
+      </div>
+
+      {/* Score + grade + actions */}
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {grade && (
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full font-body ${gradeColor(grade)}`}>{grade}</span>
+          )}
+          {score != null && (
+            <span className="text-sm font-bold font-heading text-primary">{score}</span>
+          )}
+        </div>
+        {/* Action buttons — visible on hover */}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onReanalyse(video_id)}
+            title="Re-analyse"
+            className="p-1.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"
+          >
+            <RefreshCw size={12} />
+          </button>
+          <a
+            href={`https://youtube.com/watch?v=${video_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open on YouTube"
+            className="p-1.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors"
+          >
+            <ExternalLink size={12} />
+          </a>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function VideoDNA() {
   const [url, setUrl]               = useState('');
@@ -97,7 +182,8 @@ export default function VideoDNA() {
 
   const { mutateAsync: analyseVideo, isPending: analyzing } = useVideoDNA();
   const { mutateAsync: analyseGap,   isPending: gapLoading } = useCompetitorGap();
-  const { data: historyData } = useVideoDNAHistory();
+  // ↓ added refetch so history updates right after a new analysis completes
+  const { data: historyData, refetch: refetchHistory } = useVideoDNAHistory();
 
   const extractVideoId = (input) => {
     const match = input.match(
@@ -120,9 +206,16 @@ export default function VideoDNA() {
     try {
       const data = await analyseVideo({ videoId });
       setResult(data.data);
+      refetchHistory(); // ← keeps history in sync after each analysis
     } catch (e) {
       setError(e?.response?.data?.message ?? 'Analysis failed. Please try again.');
     }
+  };
+
+  // Clicking ↺ on a history card fills the URL input and scrolls to top
+  const handleReanalyse = (videoId) => {
+    setUrl(`https://youtube.com/watch?v=${videoId}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleGapAnalysis = async () => {
@@ -136,6 +229,9 @@ export default function VideoDNA() {
       setGapError(e?.response?.data?.message ?? 'Gap analysis failed.');
     }
   };
+
+  // API shape: axios response → { data: { success, data: [...rows] } }
+  const historyEntries = historyData?.data?.data ?? [];
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-10">
@@ -314,7 +410,7 @@ export default function VideoDNA() {
             </div>
           </CollapsibleSection>
 
-          {/* Shorts Opportunities - hidden in v1, shown only if data exists */}
+          {/* Shorts Opportunities */}
           {result.shortsOpportunities?.length > 0 && (
             <CollapsibleSection title={`Shorts Opportunities (${result.shortsOpportunities.length})`} icon={Scissors}>
               <div className="space-y-3 pt-1">
@@ -380,7 +476,6 @@ export default function VideoDNA() {
 
         {gapResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-            {/* Platform source badges */}
             {gapResult.platformsAnalysed?.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-muted-foreground font-body">Analysed from:</span>
@@ -388,15 +483,12 @@ export default function VideoDNA() {
                   <span key={p}
                     className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-body font-medium">
                     {p === 'Instagram Reels' ? '🎬' : '📺'} {p}
-                    {p === 'Instagram Reels' && gapResult.instagramReelsCount > 0
-                      ? ` (${gapResult.instagramReelsCount})` : ''}
-                    {p === 'YouTube' && gapResult.youtubeVideosCount > 0
-                      ? ` (${gapResult.youtubeVideosCount})` : ''}
+                    {p === 'Instagram Reels' && gapResult.instagramReelsCount > 0 ? ` (${gapResult.instagramReelsCount})` : ''}
+                    {p === 'YouTube' && gapResult.youtubeVideosCount > 0 ? ` (${gapResult.youtubeVideosCount})` : ''}
                   </span>
                 ))}
               </div>
             )}
-
             <div className="flex items-center gap-3">
               <ScoreRing score={gapResult.opportunityScore} size={60} label="Opportunity" />
               <p className="text-sm font-body text-foreground">
@@ -404,7 +496,6 @@ export default function VideoDNA() {
                 Avg engagement: <strong>{gapResult.avgEngagementRate}%</strong>
               </p>
             </div>
-
             {gapResult.missedTopics?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold font-body text-green-500 mb-1.5">🎯 Untouched Topics (Your Opportunity):</p>
@@ -415,7 +506,6 @@ export default function VideoDNA() {
                 </div>
               </div>
             )}
-
             {gapResult.overservedTopics?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold font-body text-red-500 mb-1.5">🚫 Saturated (Avoid):</p>
@@ -426,7 +516,6 @@ export default function VideoDNA() {
                 </div>
               </div>
             )}
-
             {gapResult.scriptTemplate && (
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-xs font-semibold font-body mb-2">📝 ARIA Script Template:</p>
@@ -439,28 +528,19 @@ export default function VideoDNA() {
         )}
       </motion.div>
 
-      {/* History */}
-      {historyData?.data?.length > 0 && (
-        <motion.div variants={item}>
-          <h2 className="font-heading text-base font-semibold text-foreground mb-3">Recent Analyses</h2>
+      {/* ── History ───────────────────────────────────────────────────────── */}
+      {historyEntries.length > 0 && (
+        <motion.div variants={item} className="space-y-3">
+          <div className="flex items-center gap-2">
+            <History size={15} className="text-muted-foreground" />
+            <h2 className="font-heading text-base font-semibold text-foreground">Recent Analyses</h2>
+            <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full font-body">
+              {historyEntries.length}
+            </span>
+          </div>
           <div className="space-y-2">
-            {historyData.data.slice(0, 5).map((item) => (
-              <div key={item.videoId}
-                className="bg-card border border-border rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => setUrl(`https://youtube.com/watch?v=${item.videoId}`)}>
-                {item.thumbnailUrl && (
-                  <img src={item.thumbnailUrl} alt={item.videoTitle}
-                    className="w-16 h-9 rounded object-cover flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-body font-semibold text-foreground truncate">{item.videoTitle}</p>
-                  <p className="text-xs text-muted-foreground font-body">{item.channelName}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold text-primary font-body">{item.score}</p>
-                  <p className="text-xs text-muted-foreground font-body">{item.verdict}</p>
-                </div>
-              </div>
+            {historyEntries.map((entry, i) => (
+              <HistoryCard key={entry.video_id ?? i} entry={entry} onReanalyse={handleReanalyse} />
             ))}
           </div>
         </motion.div>
