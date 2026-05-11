@@ -1,26 +1,42 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, MessageSquare, Trash2, Pencil, Check, X, Loader2, ChevronLeft, ChevronRight,
-} from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+  Plus,
+  MessageSquare,
+  Trash2,
+  Pencil,
+  Check,
+  X,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 const timeLabel = (iso) => {
   const d = new Date(iso);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if (diffDays === 0)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 function RenameInput({ current, onSave, onCancel }) {
   const [val, setVal] = useState(current);
   const ref = useRef(null);
-  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
   return (
-    <form onSubmit={(e) => { e.preventDefault(); val.trim() && onSave(val.trim()); }}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        val.trim() && onSave(val.trim());
+      }}
       className="flex items-center gap-1 w-full"
     >
       <input
@@ -30,8 +46,19 @@ function RenameInput({ current, onSave, onCancel }) {
         className="flex-1 bg-transparent text-xs text-foreground border-b border-primary/40 outline-none py-0.5 min-w-0"
         maxLength={80}
       />
-      <button type="submit" className="text-emerald-400 hover:text-emerald-300 p-0.5"><Check size={12} /></button>
-      <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground p-0.5"><X size={12} /></button>
+      <button
+        type="submit"
+        className="text-emerald-400 hover:text-emerald-300 p-0.5"
+      >
+        <Check size={12} />
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-muted-foreground hover:text-foreground p-0.5"
+      >
+        <X size={12} />
+      </button>
     </form>
   );
 }
@@ -45,24 +72,34 @@ function SessionItem({ session, isActive, onSelect, onRename, onDelete }) {
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       className={`group relative flex items-start gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
-        isActive ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted/50'
+        isActive
+          ? "bg-primary/10 border border-primary/20"
+          : "hover:bg-muted/50"
       }`}
       onClick={() => !renaming && onSelect(session.session_id)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <MessageSquare size={13} className={`mt-0.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
+      <MessageSquare
+        size={13}
+        className={`mt-0.5 flex-shrink-0 ${isActive ? "text-primary" : "text-muted-foreground/50"}`}
+      />
 
       <div className="flex-1 min-w-0">
         {renaming ? (
           <RenameInput
             current={session.title}
-            onSave={(t) => { onRename(session.session_id, t); setRenaming(false); }}
+            onSave={(t) => {
+              onRename(session.session_id, t);
+              setRenaming(false);
+            }}
             onCancel={() => setRenaming(false)}
           />
         ) : (
           <>
-            <p className={`text-xs font-medium truncate leading-tight ${isActive ? 'text-foreground' : 'text-foreground/80'}`}>
+            <p
+              className={`text-xs font-medium truncate leading-tight ${isActive ? "text-foreground" : "text-foreground/80"}`}
+            >
               {session.title}
             </p>
             {session.preview && (
@@ -70,7 +107,9 @@ function SessionItem({ session, isActive, onSelect, onRename, onDelete }) {
                 {session.preview}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground/40 mt-1">{timeLabel(session.updated_at)}</p>
+            <p className="text-[10px] text-muted-foreground/40 mt-1">
+              {timeLabel(session.updated_at)}
+            </p>
           </>
         )}
       </div>
@@ -104,13 +143,20 @@ function SessionItem({ session, isActive, onSelect, onRename, onDelete }) {
   );
 }
 
-export default function SessionsSidebar({ activeSessionId, onSelectSession, onNewChat, collapsed, onToggle }) {
+export default function SessionsSidebar({
+  activeSessionId,
+  onSelectSession,
+  onNewChat,
+  collapsed,
+  onToggle,
+  currentSessionId,
+}) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch('/sessions');
+      const data = await apiFetch("/sessions");
       setSessions(data || []);
     } catch {
       setSessions([]);
@@ -119,7 +165,9 @@ export default function SessionsSidebar({ activeSessionId, onSelectSession, onNe
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Refresh when active session changes (new message was sent)
   useEffect(() => {
@@ -128,30 +176,38 @@ export default function SessionsSidebar({ activeSessionId, onSelectSession, onNe
 
   const handleDelete = async (sessionId) => {
     try {
-      await apiFetch(`/sessions/${sessionId}`, { method: 'DELETE' });
+      await apiFetch(`/sessions/${sessionId}`, { method: "DELETE" });
       setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
       if (sessionId === activeSessionId) onNewChat();
-    } catch {/* ignore */}
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleRename = async (sessionId, title) => {
     try {
       await apiFetch(`/sessions/${sessionId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ title }),
       });
-      setSessions((prev) => prev.map((s) => s.session_id === sessionId ? { ...s, title } : s));
-    } catch {/* ignore */}
+      setSessions((prev) =>
+        prev.map((s) => (s.session_id === sessionId ? { ...s, title } : s)),
+      );
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
     <motion.aside
       animate={{ width: collapsed ? 48 : 260 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className="flex-shrink-0 flex flex-col bg-card border-r border-border overflow-hidden"
     >
       {/* Header */}
-      <div className={`flex ${collapsed ? 'flex-col justify-center items-center py-4 gap-4 px-0' : 'items-center gap-2 px-3 py-4'} border-b border-border`}>
+      <div
+        className={`flex ${collapsed ? "flex-col justify-center items-center py-4 gap-4 px-0" : "items-center gap-2 px-3 py-4"} border-b border-border`}
+      >
         {!collapsed && (
           <motion.span
             initial={{ opacity: 0 }}
@@ -181,7 +237,10 @@ export default function SessionsSidebar({ activeSessionId, onSelectSession, onNe
         <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
           {loading ? (
             <div className="flex justify-center py-8">
-              <Loader2 size={16} className="animate-spin text-muted-foreground/40" />
+              <Loader2
+                size={16}
+                className="animate-spin text-muted-foreground/40"
+              />
             </div>
           ) : sessions.length === 0 ? (
             <p className="text-[11px] text-muted-foreground/40 text-center py-8 px-4">
