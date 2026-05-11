@@ -25,6 +25,7 @@ import {
   useDisconnectPlatform,
   useProfile,
   useFetchYouTubeAnalytics,
+  useSwitchPlatform,
 } from "@/hooks/useApi";
 import { useCreditsWallet, useCreditsHistory } from "@/hooks/useApi";
 import { useRazorpay } from "@/hooks/useRazorpay";
@@ -670,8 +671,10 @@ function CreditsTab() {
 // ══════════════════════════════════════════════════════════════════════════════
 function IntegrationsTab() {
   const { data: statusData, refetch } = useIntegrationStatus();
+  const { data: profileData, refetch: refetchProfile } = useProfile();
   const disconnectMutation = useDisconnectPlatform();
   const fetchYTAnalytics = useFetchYouTubeAnalytics();
+  const switchPlatformMutation = useSwitchPlatform();
   const [searchParams] = useSearchParams();
   const [oauthError, setOauthError] = useState(null);
   const [oauthSuccess, setOauthSuccess] = useState(null);
@@ -679,17 +682,29 @@ function IntegrationsTab() {
   const [ytFetchSuccess, setYtFetchSuccess] = useState(false);
 
   const status = statusData?.data?.connections ?? {};
+  const currentPrimary =
+    profileData?.data?.primary_platform ||
+    profileData?.data?.user?.primary_platform ||
+    "instagram";
+
+  const igConnected = !!status.instagram?.connected;
+  const ytConnected = !!status.youtube?.connected;
+  const ytAnalyticsReady = !!status.youtube?.analyticsReady;
+
+  // Show switcher only when both are connected AND yt analytics exist
+  const showSwitcher = igConnected && ytConnected && ytAnalyticsReady;
 
   useEffect(() => {
     const error = searchParams.get("oauth_error");
-    const success = searchParams.get("oauth_success");
+    const successParam = searchParams.get("oauth_success");
     if (error)
       setOauthError(OAUTH_ERROR_MESSAGES[error] || "Connection failed.");
-    if (success) {
+    if (successParam) {
       setOauthSuccess(
-        `${success.charAt(0).toUpperCase() + success.slice(1)} connected!`,
+        `${successParam.charAt(0).toUpperCase() + successParam.slice(1)} connected!`,
       );
       refetch();
+      refetchProfile();
     }
   }, [searchParams]);
 
@@ -716,6 +731,7 @@ function IntegrationsTab() {
     try {
       await disconnectMutation.mutateAsync(platformId);
       refetch();
+      refetchProfile();
     } catch {}
   };
 
@@ -725,8 +741,26 @@ function IntegrationsTab() {
       await fetchYTAnalytics.mutateAsync();
       setYtFetchSuccess(true);
       refetch();
+      refetchProfile();
     } catch {
       setOauthError("Could not fetch YouTube analytics. Please try again.");
+    }
+  };
+
+  const handleSwitchPlatform = async (targetPlatform) => {
+    if (targetPlatform === currentPrimary) return;
+    try {
+      setOauthError(null);
+      await switchPlatformMutation.mutateAsync(targetPlatform);
+      setOauthSuccess(
+        `Switched to ${targetPlatform === "youtube" ? "YouTube" : "Instagram"} — ARIA is now personalised for your ${targetPlatform === "youtube" ? "channel" : "account"}.`,
+      );
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Could not switch platform. Please try again.";
+      setOauthError(msg);
     }
   };
 
@@ -737,19 +771,14 @@ function IntegrationsTab() {
       animate="show"
       className="space-y-4"
     >
+      {/* ── Error / Success banners ── */}
       {oauthError && (
         <motion.div
           variants={item}
-          className="flex items-start gap-3 p-4 rounded-xl
-            bg-destructive/10 border border-destructive/20"
+          className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20"
         >
-          <AlertTriangle
-            size={16}
-            className="text-destructive mt-0.5 shrink-0"
-          />
-          <p className="flex-1 font-body text-sm text-destructive">
-            {oauthError}
-          </p>
+          <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />
+          <p className="flex-1 font-body text-sm text-destructive">{oauthError}</p>
           <button onClick={() => setOauthError(null)}>
             <X size={14} className="text-destructive/60" />
           </button>
@@ -759,22 +788,87 @@ function IntegrationsTab() {
       {oauthSuccess && (
         <motion.div
           variants={item}
-          className="flex items-start gap-3 p-4 rounded-xl
-            bg-emerald-500/10 border border-emerald-500/20"
+          className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
         >
-          <CheckCircle2
-            size={16}
-            className="text-emerald-500 mt-0.5 shrink-0"
-          />
-          <p className="flex-1 font-body text-sm text-emerald-500">
-            {oauthSuccess}
-          </p>
+          <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+          <p className="flex-1 font-body text-sm text-emerald-500">{oauthSuccess}</p>
           <button onClick={() => setOauthSuccess(null)}>
             <X size={14} className="text-emerald-500/60" />
           </button>
         </motion.div>
       )}
 
+      {/* ── PRIMARY PLATFORM SWITCHER ── */}
+      {/* Only visible when both connected + YT analytics ready */}
+      {showSwitcher && (
+        <motion.div
+          variants={item}
+          className="rounded-2xl border border-primary/20 bg-primary/5 p-5"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} className="text-primary" />
+            <p className="font-heading text-sm text-foreground">
+              Primary Platform
+            </p>
+            <span className="ml-auto text-[11px] font-body text-muted-foreground">
+              ARIA focuses on this
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: "instagram", label: "Instagram", Icon: Instagram, color: "#e1306c" },
+              { id: "youtube",   label: "YouTube",   Icon: Youtube,   color: "#FF0000" },
+            ].map(({ id, label, Icon, color }) => {
+              const isActive = currentPrimary === id;
+              const isSwitching =
+                switchPlatformMutation.isPending &&
+                switchPlatformMutation.variables === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleSwitchPlatform(id)}
+                  disabled={switchPlatformMutation.isPending}
+                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border transition-all font-body text-sm font-medium
+                    ${
+                      isActive
+                        ? "bg-card border-primary text-foreground shadow-sm"
+                        : "bg-transparent border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    }
+                    disabled:opacity-60`}
+                >
+                  {isSwitching ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Icon size={14} style={{ color }} />
+                  )}
+                  {label}
+                  {isActive && (
+                    <CheckCircle2 size={12} className="text-primary ml-auto" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="font-body text-[11px] text-muted-foreground mt-2.5">
+            Switching updates your Roadmap, Dashboard, Analytics, and Discovery instantly.
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Hint when YT connected but analytics not yet fetched ── */}
+      {igConnected && ytConnected && !ytAnalyticsReady && (
+        <motion.div
+          variants={item}
+          className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-start gap-3"
+        >
+          <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+          <p className="font-body text-xs text-amber-700 dark:text-amber-400">
+            Fetch your YouTube analytics below to unlock Platform Switching.
+          </p>
+        </motion.div>
+      )}
+
+      {/* ── Per-platform connection cards ── */}
       {platforms.map(({ id, label, Icon, iconColor, bg, description }) => {
         const connected = status[id]?.connected;
         const handle = status[id]?.handle;
@@ -820,7 +914,7 @@ function IntegrationsTab() {
                 {description}
               </p>
 
-              {/* YouTube analytics status banner */}
+              {/* YouTube analytics status */}
               {isYouTube && connected && (
                 <div className="mt-3">
                   {analyticsReady ? (
@@ -841,62 +935,46 @@ function IntegrationsTab() {
                       <button
                         onClick={handleFetchYTAnalytics}
                         disabled={isFetching}
-                        className="flex items-center gap-1 font-body text-xs text-muted-foreground
-                          hover:text-foreground transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                       >
                         <RefreshCw
                           size={11}
                           className={isFetching ? "animate-spin" : ""}
                         />
-                        Refresh
+                        {isFetching ? "Fetching…" : "Refresh"}
                       </button>
                     </div>
                   ) : (
-                    <div
-                      className="flex items-center justify-between p-3 rounded-xl
-                      bg-amber-500/10 border border-amber-500/20"
+                    <button
+                      onClick={handleFetchYTAnalytics}
+                      disabled={isFetching}
+                      className="flex items-center gap-1.5 font-body text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
                     >
-                      <div>
-                        <p className="font-body text-xs font-semibold text-amber-500 mb-0.5">
-                          Analytics not fetched yet
-                        </p>
-                        <p className="font-body text-[11px] text-muted-foreground">
-                          Fetch your channel data so ARIA can personalise
-                          everything for you.
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleFetchYTAnalytics}
-                        disabled={isFetching}
-                        className="ml-3 shrink-0 flex items-center gap-1.5 font-body text-xs
-                          px-3 py-1.5 rounded-lg bg-amber-500 text-white
-                          hover:bg-amber-600 transition-colors disabled:opacity-60"
-                      >
-                        {isFetching ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : (
-                          <Sparkles size={11} />
-                        )}
-                        {isFetching ? "Fetching…" : "Fetch Analytics"}
-                      </button>
-                    </div>
+                      {isFetching ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={11} />
+                      )}
+                      {isFetching ? "Fetching analytics…" : "Fetch Analytics"}
+                    </button>
                   )}
                   {ytFetchSuccess && (
                     <p className="font-body text-xs text-emerald-500 mt-2 flex items-center gap-1">
-                      <CheckCircle2 size={11} /> Analytics updated — ARIA is now
-                      fully personalised for your YouTube channel.
+                      <CheckCircle2 size={11} /> Analytics updated — ARIA is
+                      now fully personalised for your YouTube channel.
                     </p>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Connect / Disconnect button */}
             <div className="shrink-0">
               {connected ? (
                 <button
                   onClick={() => handleDisconnect(id)}
                   disabled={disconnectMutation.isPending}
-                  className="font-body text-sm px-4 py-2 rounded-xl bg-destructive/10
-                    text-destructive hover:bg-destructive/20 transition-colors"
+                  className="font-body text-sm px-4 py-2 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                 >
                   Disconnect
                 </button>
@@ -904,8 +982,7 @@ function IntegrationsTab() {
                 <button
                   onClick={() => handleConnect(id)}
                   disabled={connectingPlatform === id}
-                  className="font-body text-sm px-4 py-2 rounded-xl bg-primary text-white
-                    hover:bg-primary/90 transition-colors flex items-center gap-2"
+                  className="font-body text-sm px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors flex items-center gap-2"
                 >
                   {connectingPlatform === id && (
                     <Loader2 size={12} className="animate-spin" />

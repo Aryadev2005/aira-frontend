@@ -331,6 +331,31 @@ export const useFetchYouTubeAnalytics = () => {
   });
 };
 
+/**
+ * useSwitchPlatform
+ * Calls PATCH /profile/switch-platform.
+ * On success, invalidates profile, integration-status, roadmap, analytics-dashboard,
+ * and creator-analytics so every screen reflects the new platform immediately.
+ */
+export const useSwitchPlatform = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (platform) =>
+      api.patch("/profile/switch-platform", { platform }),
+    onSuccess: () => {
+      // Invalidate every query that is platform-sensitive
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["integration-status"] });
+      qc.invalidateQueries({ queryKey: ["analytics-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["creator-analytics"] });
+      qc.invalidateQueries({ queryKey: ["roadmap"] });
+      qc.invalidateQueries({ queryKey: ["best-times"] });
+      qc.invalidateQueries({ queryKey: ["brand-alert"] });
+      qc.invalidateQueries({ queryKey: ["viralIdeas"] });
+    },
+  });
+};
+
 // ── ARIA IDENTITY (Step 7) ────────────────────────────────────────────────
 export const useAriaIdentity = () =>
   useQuery({

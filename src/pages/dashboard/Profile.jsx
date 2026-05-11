@@ -153,12 +153,16 @@ function StatCard({ icon: Icon, label, value, color = "text-primary" }) {
 
 // ── Platform analytics section ────────────────────────────────────────────────
 function PlatformAnalytics({ profile, analyticsData }) {
-  const platform = profile?.primary_platform || "instagram";
   const hasInstagram = !!profile?.instagram_handle;
   const hasYoutube = !!profile?.youtube_handle;
 
   if (!hasInstagram && !hasYoutube) return null;
 
+  // Use primary_platform as source of truth.
+  // Fallback: if youtube_handle exists and no primary set, treat as youtube.
+  const platform =
+    profile?.primary_platform ||
+    (hasYoutube && !hasInstagram ? "youtube" : "instagram");
   const isYoutube = platform === "youtube";
 
   const instagramStats = [
