@@ -27,6 +27,9 @@ import {
   History,
   Clapperboard,
   AlertCircle,
+  StickyNote,
+  Link,
+  Search,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 import {
@@ -34,6 +37,7 @@ import {
   useLearnFromEdit,
   useScriptHistory,
   useRewriteHook,
+  useNotes,
 } from "@/hooks/useApi";
 import useCreatorFlow from "@/store/creatorFlow";
 import { auth } from "@/lib/firebase";
@@ -558,6 +562,170 @@ function HistoryDrawer({ history, onSelect, onClose }) {
   );
 }
 
+// ── Notes Picker Dropdown ───────────────────────────────────────────────────
+function NotesPicker({
+  isOpen,
+  onClose,
+  onSelect,
+  notes,
+  isLoading,
+  searchQuery,
+  setSearchQuery,
+  attachedNotes,
+}) {
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose]);
+
+  const filteredNotes =
+    notes?.filter((note) => {
+      const search = searchQuery.toLowerCase();
+      return (
+        note.title?.toLowerCase().includes(search) ||
+        note.content?.toLowerCase().includes(search) ||
+        note.tags?.some((tag) => tag.toLowerCase().includes(search))
+      );
+    }) || [];
+
+  const isAttached = (noteId) => attachedNotes.some((n) => n.id === noteId);
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      ref={pickerRef}
+      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+      transition={{ type: "spring", damping: 24, stiffness: 300 }}
+      className="absolute left-0 right-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-xl overflow-hidden"
+      style={{ maxHeight: 320 }}
+    >
+      {/* Search header */}
+      <div className="px-3 py-2.5 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <StickyNote size={14} className="text-primary" />
+          <span className="font-body text-xs font-semibold text-foreground">
+            Connect Notes
+          </span>
+          <span className="ml-auto font-body text-[10px] text-muted-foreground">
+            Press ESC to close
+          </span>
+        </div>
+        <div className="mt-2 relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search notes..."
+            autoFocus
+            className="w-full px-3 py-2 pl-8 rounded-lg bg-background border border-border font-body text-xs
+                       text-foreground placeholder:text-muted-foreground/50 outline-none
+                       focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+          />
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={12}
+          />
+        </div>
+      </div>
+
+      {/* Notes list */}
+      <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={18} className="animate-spin text-primary" />
+          </div>
+        ) : filteredNotes.length === 0 ? (
+          <div className="px-4 py-6 text-center">
+            <StickyNote
+              size={24}
+              className="text-muted-foreground/40 mx-auto mb-2"
+            />
+            <p className="font-body text-xs text-muted-foreground">
+              {searchQuery ? "No notes match your search" : "No notes found"}
+            </p>
+          </div>
+        ) : (
+          <div className="p-1.5 space-y-0.5">
+            {filteredNotes.map((note) => {
+              const attached = isAttached(note.id);
+              return (
+                <button
+                  key={note.id}
+                  onClick={() => onSelect(note)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg transition-all group
+                    ${
+                      attached
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-muted/60 border border-transparent"
+                    }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <div
+                      className={`mt-0.5 shrink-0 ${attached ? "text-primary" : "text-muted-foreground group-hover:text-primary"}`}
+                    >
+                      {attached ? (
+                        <Check size={14} />
+                      ) : (
+                        <StickyNote size={14} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`font-body text-xs font-medium truncate ${attached ? "text-primary" : "text-foreground"}`}
+                      >
+                        {note.title || "Untitled Note"}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
+                        {note.content?.slice(0, 80) || "No content"}
+                      </p>
+                      {note.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {note.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="font-body text-[9px] text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                          {note.tags.length > 3 && (
+                            <span className="font-body text-[9px] text-muted-foreground">
+                              +{note.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer tip */}
+      <div className="px-3 py-2 border-t border-border bg-muted/20">
+        <p className="font-body text-[10px] text-muted-foreground text-center">
+          Click to {attachedNotes.length > 0 ? "add more" : "attach"} notes ·
+          Full content will be sent to AI
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Studio
 // ══════════════════════════════════════════════════════════════════════════════
@@ -577,6 +745,17 @@ export default function Studio() {
   const [mood, setMood] = useState("");
   const [angle, setAngle] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Notes attachment state
+  const [showNotesPicker, setShowNotesPicker] = useState(false);
+  const [notesSearchQuery, setNotesSearchQuery] = useState("");
+  const [attachedNotes, setAttachedNotes] = useState([]);
+  const ideaTextareaRef = useRef(null);
+  const [slashTriggerPos, setSlashTriggerPos] = useState(null);
+
+  // Fetch notes
+  const { data: notesData, isLoading: notesLoading } = useNotes();
+  const userNotes = notesData?.notes || [];
 
   // Pipeline state
   const [isRunning, setIsRunning] = useState(false);
@@ -650,6 +829,50 @@ export default function Studio() {
     setError(null);
     setPhase(null);
     setStatusMsg("");
+    setAttachedNotes([]);
+    setShowNotesPicker(false);
+  };
+
+  const handleAttachNote = (note) => {
+    const alreadyAttached = attachedNotes.find((n) => n.id === note.id);
+    if (alreadyAttached) {
+      // Remove if already attached (toggle behavior)
+      setAttachedNotes((prev) => prev.filter((n) => n.id !== note.id));
+    } else {
+      // Add new note with full content
+      setAttachedNotes((prev) => [...prev, note]);
+    }
+    // Don't close picker - allow multiple selection
+  };
+
+  const handleRemoveAttachedNote = (noteId) => {
+    setAttachedNotes((prev) => prev.filter((n) => n.id !== noteId));
+  };
+
+  const handleIdeaKeyDown = (e) => {
+    // Close picker on Escape
+    if (e.key === "Escape" && showNotesPicker) {
+      e.preventDefault();
+      setShowNotesPicker(false);
+      setNotesSearchQuery("");
+      return;
+    }
+
+    // Trigger picker on "/"
+    if (e.key === "/" && !showNotesPicker) {
+      const textarea = e.target;
+      const cursorPos = textarea.selectionStart;
+      const textBeforeCursor = idea.slice(0, cursorPos);
+
+      // Only trigger if "/" is at start or after whitespace
+      const prevChar = textBeforeCursor.slice(-1);
+      if (cursorPos === 0 || prevChar === " " || prevChar === "\n") {
+        e.preventDefault();
+        setShowNotesPicker(true);
+        setNotesSearchQuery("");
+        setSlashTriggerPos(cursorPos);
+      }
+    }
   };
 
   const handleGenerate = async () => {
@@ -657,6 +880,17 @@ export default function Studio() {
     resetState();
     setIsRunning(true);
     abortRef.current = false;
+
+    // Build attached notes context with full content
+    const attachedNotesContext =
+      attachedNotes.length > 0
+        ? attachedNotes.map((note) => ({
+            id: note.id,
+            title: note.title,
+            content: note.content,
+            tags: note.tags,
+          }))
+        : undefined;
 
     try {
       await streamScript(
@@ -667,6 +901,7 @@ export default function Studio() {
           format,
           mood: mood || undefined,
           angle: angle || undefined,
+          attachedNotes: attachedNotesContext,
         },
         (event) => {
           if (abortRef.current) return;
@@ -751,6 +986,12 @@ export default function Studio() {
           researchBrief,
         },
         editedScript: { sections },
+        attachedNotes: attachedNotes.map((note) => ({
+          id: note.id,
+          title: note.title,
+          content: note.content,
+          tags: note.tags,
+        })),
       });
       const sId = data?.data?.sessionId;
       setSessionId(sId);
@@ -821,6 +1062,12 @@ export default function Studio() {
     setSaved(true);
     setShowHistory(false);
     setPhase("done");
+    // Restore attached notes if present in session
+    if (session.attachedNotes?.length) {
+      setAttachedNotes(session.attachedNotes);
+    } else {
+      setAttachedNotes([]);
+    }
   };
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -904,20 +1151,100 @@ export default function Studio() {
                   className="rounded-2xl border border-border bg-card p-5 space-y-4"
                 >
                   {/* Idea */}
-                  <div className="space-y-1.5">
-                    <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Content Idea
-                    </label>
-                    <textarea
-                      value={idea}
-                      onChange={(e) => setIdea(e.target.value)}
-                      placeholder="What's your content idea? Be specific — 'morning skincare for oily skin' not just 'skincare'"
-                      rows={2}
-                      disabled={isRunning}
-                      className="w-full px-4 py-3 rounded-xl bg-muted/40 border border-border font-body text-sm
-                                 text-foreground placeholder:text-muted-foreground/50 resize-none outline-none
-                                 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60 transition-all"
-                    />
+                  <div className="space-y-1.5 relative">
+                    <div className="flex items-center justify-between">
+                      <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Content Idea
+                      </label>
+                      {/* Attached notes count badge */}
+                      {attachedNotes.length > 0 && (
+                        <span className="font-body text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          {attachedNotes.length} note
+                          {attachedNotes.length > 1 ? "s" : ""} attached
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <textarea
+                        ref={ideaTextareaRef}
+                        value={idea}
+                        onChange={(e) => setIdea(e.target.value)}
+                        onKeyDown={handleIdeaKeyDown}
+                        placeholder="What's your content idea? Be specific — 'morning skincare for oily skin' not just 'skincare'"
+                        rows={3}
+                        disabled={isRunning}
+                        className="w-full px-4 py-3 rounded-xl bg-muted/40 border border-border font-body text-sm
+                                   text-foreground placeholder:text-muted-foreground/50 resize-none outline-none
+                                   focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60 transition-all"
+                      />
+                      {/* Notes picker */}
+                      <AnimatePresence>
+                        {showNotesPicker && (
+                          <NotesPicker
+                            isOpen={showNotesPicker}
+                            onClose={() => {
+                              setShowNotesPicker(false);
+                              setNotesSearchQuery("");
+                              ideaTextareaRef.current?.focus();
+                            }}
+                            onSelect={handleAttachNote}
+                            notes={userNotes}
+                            isLoading={notesLoading}
+                            searchQuery={notesSearchQuery}
+                            setSearchQuery={setNotesSearchQuery}
+                            attachedNotes={attachedNotes}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Attached notes chips */}
+                    <AnimatePresence>
+                      {attachedNotes.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex flex-wrap gap-1.5 pt-1"
+                        >
+                          {attachedNotes.map((note) => (
+                            <motion.div
+                              key={note.id}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20 group"
+                            >
+                              <StickyNote size={10} className="text-primary" />
+                              <span className="font-body text-[11px] text-primary font-medium max-w-[120px] truncate">
+                                {note.title || "Untitled"}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleRemoveAttachedNote(note.id)
+                                }
+                                className="text-primary/60 hover:text-primary transition-colors"
+                                disabled={isRunning}
+                              >
+                                <X size={10} />
+                              </button>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Tip about using / */}
+                    <div className="flex items-center gap-1.5 text-muted-foreground/70">
+                      <Link size={11} />
+                      <p className="font-body text-[10px]">
+                        Press{" "}
+                        <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">
+                          /
+                        </kbd>{" "}
+                        to connect notes as references for the AI
+                      </p>
+                    </div>
                   </div>
 
                   {/* Format picker */}
