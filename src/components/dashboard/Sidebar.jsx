@@ -8,7 +8,6 @@ import {
   Clapperboard,
   Rocket,
   Music,
-  Brain,
   BarChart3,
   User,
   Settings,
@@ -51,7 +50,6 @@ const NAV_GROUPS = [
   {
     label: "Intelligence",
     items: [
-      { icon: Brain, label: "ARIA Brain", path: "/dashboard/brain" },
       { icon: BarChart3, label: "Video DNA", path: "/dashboard/video-dna" },
     ],
   },
@@ -142,7 +140,7 @@ function DesktopSidebar() {
       : "@creator";
   const initials = name.charAt(0).toUpperCase();
   const plan = walletData?.plan ?? "free";
-  const isPro = plan === "pro" || plan === "max";
+  const isPro = plan === "pro" || plan === "max" || plan === "brand";
 
   const isActive = (path) =>
     path === "/dashboard"
@@ -160,7 +158,11 @@ function DesktopSidebar() {
           className={`font-body text-[10px] font-semibold px-2 py-0.5 rounded-full
           ${isPro ? "bg-amber-500/20 text-amber-400" : "bg-white/10 text-sidebar-foreground/50"}`}
         >
-          {isPro ? "Pro" : "Free"}
+          {plan === "brand"
+            ? "Brand"
+            : plan === "pro" || plan === "max"
+              ? "Pro"
+              : "Free"}
         </span>
       </div>
 
@@ -271,7 +273,7 @@ function MobileBar() {
 
   const name = profileData?.data?.user?.name || "Creator";
   const plan = walletData?.plan ?? "free";
-  const isPro = plan === "pro" || plan === "max";
+  const isPro = plan === "pro" || plan === "max" || plan === "brand";
 
   const isActive = (path) =>
     path === "/dashboard"
@@ -346,7 +348,11 @@ function MobileBar() {
                   {name}
                 </p>
                 <p className="font-body text-[11px] text-sidebar-foreground/50">
-                  {isPro ? "Pro plan" : "Free plan"}
+                  {plan === "brand"
+                    ? "Brand plan"
+                    : plan === "pro" || plan === "max"
+                      ? "Pro plan"
+                      : "Free plan"}
                 </p>
               </div>
             </div>

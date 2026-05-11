@@ -376,7 +376,7 @@ export default function AriaBrain() {
     async (sid) => {
       setLoadingHistory(true);
       try {
-        const res = await apiFetch(`/api/v1/agent/sessions/${sid}/messages`);
+        const res = await apiFetch(`/sessions/${sid}/messages`);
         const msgs = (res?.messages || []).map((m) => ({
           role: m.role === "assistant" ? "assistant" : "user",
           content: m.content,

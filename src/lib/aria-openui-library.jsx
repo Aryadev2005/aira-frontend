@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * aria-openui-library.jsx
  *
@@ -21,7 +20,7 @@
  */
 
 import React from "react";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { defineComponent, createLibrary } from "@openuidev/react-lang";
 import { motion } from "framer-motion";
 import {
@@ -69,10 +68,10 @@ const Card = ({ children, style, className = "" }) => (
   </div>
 );
 
-const Badge = ({ label, color = T.primary, bg, style = {} }) => (
+const Badge = ({ label, color = T.primary, bg }) => (
   <span
     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold font-body"
-    style={{ background: bg ?? `${color}20`, color, ...style }}
+    style={{ background: bg ?? `${color}20`, color }}
   >
     {label}
   </span>
@@ -91,7 +90,7 @@ const TrendCardComp = ({ props: p }) => (
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3 }}
   >
-    <Card style={{ borderColor: T.primary }} className="border-2">
+    <Card>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
@@ -124,9 +123,7 @@ const TrendCardComp = ({ props: p }) => (
 
         {/* Platform + source badges */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {p.platform && (
-            <Badge label={p.platform} color={T.primary} bg={`${T.primary}15`} />
-          )}
+          {p.platform && <Badge label={p.platform} />}
           {p.niche && (
             <Badge label={p.niche} bg={`${T.accent}15`} color={T.accent} />
           )}
@@ -189,7 +186,7 @@ const TrendCard = defineComponent({
       .optional()
       .describe("Platform: Instagram, YouTube, etc."),
     niche: z.string().optional().describe("Content niche"),
-    insight: z.string().optional().describe("ARIA actionable tip"),
+    insight: z.string().optional().describe("ARIA's actionable tip"),
   }),
   component: TrendCardComp,
 });
@@ -210,7 +207,7 @@ const TrendGridComp = ({ props: p }) => (
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: i * 0.07, duration: 0.3 }}
       >
-        <Card style={{ borderColor: T.primary }} className="border-2">
+        <Card>
           <div className="p-3 flex items-center gap-3">
             <span
               className="font-heading text-xl tabular-nums w-7 text-center"
@@ -230,7 +227,7 @@ const TrendGridComp = ({ props: p }) => (
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <TrendIcon dir={t.direction} />
-              {t.badge && <Badge label={t.badge} bg={undefined} />}
+              {t.badge && <Badge label={t.badge} />}
             </div>
           </div>
         </Card>
@@ -273,7 +270,7 @@ const SongCardComp = ({ props: p }) => (
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.3 }}
   >
-    <Card style={{ padding: 0 }}>
+    <Card>
       <div className="p-4 flex items-start gap-4">
         {/* Album art placeholder */}
         <div
@@ -293,7 +290,7 @@ const SongCardComp = ({ props: p }) => (
           </p>
           {/* Tags */}
           <div className="flex flex-wrap gap-1.5">
-            {p.genre && <Badge label={p.genre} bg={undefined} />}
+            {p.genre && <Badge label={p.genre} />}
             {p.mood && (
               <Badge label={p.mood} bg={`${T.sage}20`} color={T.sage} />
             )}
@@ -349,6 +346,7 @@ const SongCard = defineComponent({
 });
 
 // ─── 4. ContentIdea ──────────────────────────────────────────────────────────
+// NOTE: No `script` prop here. If user asks for a script → use ScriptCard instead.
 const ContentIdeaComp = ({ props: p }) => (
   <motion.div
     initial={{ opacity: 0, y: 6 }}
@@ -357,26 +355,35 @@ const ContentIdeaComp = ({ props: p }) => (
   >
     <Card style={{ borderLeft: `3px solid ${T.primary}` }}>
       <div className="p-4">
-        <div className="flex items-start gap-2 mb-2">
-          <Film size={15} style={{ color: T.primary, marginTop: 2 }} />
+        {/* Header */}
+        <div className="flex items-start gap-2 mb-3">
+          <Film
+            size={15}
+            style={{ color: T.primary, marginTop: 2, flexShrink: 0 }}
+          />
           <div>
             <p className="font-heading text-sm text-foreground leading-snug">
               {p.hook}
             </p>
             {p.format && (
               <p className="font-body text-[11px] text-muted-foreground mt-0.5">
-                Format: {p.format}
+                {p.format}
               </p>
             )}
           </div>
         </div>
-        {p.script && (
-          <div className="bg-secondary rounded-xl px-3 py-2 mb-3">
-            <p className="font-body text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
-              {p.script}
-            </p>
+
+        {/* Why it works */}
+        {p.whyItWorks && (
+          <div
+            className="rounded-lg px-3 py-2 mb-3 text-xs font-body leading-relaxed"
+            style={{ background: `${T.primary}10`, color: T.muted }}
+          >
+            💡 {p.whyItWorks}
           </div>
         )}
+
+        {/* Badges row */}
         <div className="flex flex-wrap gap-1.5">
           {p.niche && <Badge label={p.niche} />}
           {p.viralPotential && (
@@ -394,8 +401,9 @@ const ContentIdeaComp = ({ props: p }) => (
             />
           )}
         </div>
+
         {p.cta && (
-          <p className="font-body text-xs text-muted-foreground mt-2 flex items-center gap-1">
+          <p className="font-body text-xs text-muted-foreground mt-2.5 flex items-center gap-1">
             <ChevronRight size={12} style={{ color: T.primary }} /> {p.cta}
           </p>
         )}
@@ -407,20 +415,26 @@ const ContentIdeaComp = ({ props: p }) => (
 const ContentIdea = defineComponent({
   name: "ContentIdea",
   description:
-    "A single content idea with hook, optional script snippet, format, niche, and CTA.",
+    "A SINGLE content idea — concept title/hook, format, niche, and viral potential. NEVER use this for scripts. If the user asks for a script, use ScriptCard instead.",
   props: z.object({
     hook: z
       .string()
-      .describe("Attention-grabbing opening line or concept title"),
+      .describe("Punchy concept title or opening line — NOT a script"),
     format: z
       .string()
       .optional()
       .describe('e.g. "30s Reel", "Carousel", "YouTube Short"'),
-    script: z.string().optional().describe("Optional 2-4 line script snippet"),
+    whyItWorks: z
+      .string()
+      .optional()
+      .describe("1-sentence explanation of why this idea fits the creator"),
     niche: z.string().optional(),
     viralPotential: z.enum(["High", "Medium", "Low"]).optional(),
-    estimatedReach: z.string().optional().describe('e.g. "10K-50K"'),
-    cta: z.string().optional().describe("Next step suggestion"),
+    estimatedReach: z.string().optional().describe('e.g. "10K–30K"'),
+    cta: z
+      .string()
+      .optional()
+      .describe('Next step e.g. "Want a full script for this?"'),
   }),
   component: ContentIdeaComp,
 });
@@ -493,7 +507,7 @@ const IdeaBatch = defineComponent({
 // ─── 6. AnalyticsSnapshot ────────────────────────────────────────────────────
 const AnalyticsSnapshotComp = ({ props: p }) => (
   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-    <Card style={undefined}>
+    <Card>
       {p.title && (
         <div
           className="px-4 pt-3 pb-2 border-b"
@@ -570,7 +584,7 @@ const RateCardComp = ({ props: p }) => (
     initial={{ opacity: 0, scale: 0.97 }}
     animate={{ opacity: 1, scale: 1 }}
   >
-    <Card style={undefined}>
+    <Card>
       <div
         className="px-4 pt-4 pb-2 border-b"
         style={{ borderColor: T.border }}
@@ -656,7 +670,7 @@ const RateCard = defineComponent({
 // ─── 8. GrowthRoadmap ────────────────────────────────────────────────────────
 const GrowthRoadmapComp = ({ props: p }) => (
   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-    <Card style={undefined}>
+    <Card>
       {p.title && (
         <div
           className="px-4 pt-3 pb-2 border-b flex items-center gap-2"
@@ -861,6 +875,325 @@ const InfoAlert = defineComponent({
   component: InfoAlertComp,
 });
 
+// ─── 11. ScriptCard ──────────────────────────────────────────────────────────
+// Section type → visual accent colour
+const SECTION_COLORS = {
+  hook: {
+    bg: `hsl(22 67% 63% / 0.12)`,
+    border: `hsl(22 67% 63% / 0.35)`,
+    label: "HOOK",
+    dot: "hsl(22 67% 63%)",
+  },
+  build: {
+    bg: `hsl(210 60% 56% / 0.10)`,
+    border: `hsl(210 60% 56% / 0.30)`,
+    label: "BUILD",
+    dot: "hsl(210 60% 56%)",
+  },
+  value: {
+    bg: `hsl(140 35% 48% / 0.10)`,
+    border: `hsl(140 35% 48% / 0.30)`,
+    label: "VALUE",
+    dot: "hsl(140 35% 48%)",
+  },
+  cta: {
+    bg: `hsl(18 80% 10% / 0.07)`,
+    border: `hsl(18 80% 10% / 0.25)`,
+    label: "CTA",
+    dot: "hsl(18 80% 10%)",
+  },
+  transition: {
+    bg: `hsl(260 20% 55% / 0.09)`,
+    border: `hsl(260 20% 55% / 0.28)`,
+    label: "TRANSITION",
+    dot: "hsl(260 20% 55%)",
+  },
+  reveal: {
+    bg: `hsl(35 80% 56% / 0.10)`,
+    border: `hsl(35 80% 56% / 0.30)`,
+    label: "REVEAL",
+    dot: "hsl(35 80% 56%)",
+  },
+  default: {
+    bg: `hsl(30 22% 83% / 0.35)`,
+    border: `hsl(30 22% 83%)`,
+    label: "",
+    dot: T.muted,
+  },
+};
+
+const sectionStyle = (type = "default") =>
+  SECTION_COLORS[type.toLowerCase()] || SECTION_COLORS.default;
+
+const ScriptCardComp = ({ props: p }) => {
+  const totalDuration =
+    p.totalDuration || (p.scenes?.length ? `~${p.scenes.length * 4}s` : null);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <Card>
+        {/* ── Header ── */}
+        <div
+          className="px-4 pt-4 pb-3 border-b"
+          style={{ borderColor: T.border }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                style={{ background: `${T.primary}18` }}
+              >
+                <Film size={15} style={{ color: T.primary }} />
+              </div>
+              <div>
+                <p className="font-heading text-base text-foreground leading-snug">
+                  {p.title}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {p.format && (
+                    <span className="font-body text-[11px] text-muted-foreground">
+                      {p.format}
+                    </span>
+                  )}
+                  {p.format && totalDuration && (
+                    <span className="text-muted-foreground/40 text-[10px]">
+                      ·
+                    </span>
+                  )}
+                  {totalDuration && (
+                    <span className="font-body text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Clock size={10} />
+                      {totalDuration}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* Viral badge */}
+            {p.viralPotential && (
+              <Badge
+                label={`${p.viralPotential} potential`}
+                bg={
+                  p.viralPotential === "High" ? `${T.rising}20` : `${T.gold}20`
+                }
+                color={p.viralPotential === "High" ? T.rising : T.gold}
+              />
+            )}
+          </div>
+
+          {/* Meta tags */}
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {p.platform && <Badge label={p.platform} />}
+            {p.niche && (
+              <Badge label={p.niche} bg={`${T.accent}12`} color={T.accent} />
+            )}
+            {p.audio && (
+              <Badge
+                label={`🎵 ${p.audio}`}
+                bg={`${T.sage}18`}
+                color={T.sage}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* ── Scene breakdown ── */}
+        <div className="p-4 space-y-2.5">
+          {p.scenes.map((scene, i) => {
+            const style = sectionStyle(scene.type);
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.25 }}
+                className="rounded-xl border overflow-hidden"
+                style={{ background: style.bg, borderColor: style.border }}
+              >
+                {/* Scene header row */}
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+                  {/* Coloured dot */}
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: style.dot }}
+                  />
+                  {/* Scene label / type */}
+                  {style.label && (
+                    <span
+                      className="font-body text-[10px] font-bold tracking-widest uppercase"
+                      style={{ color: style.dot }}
+                    >
+                      {style.label}
+                    </span>
+                  )}
+                  {/* Timing */}
+                  {scene.timing && (
+                    <span className="font-body text-[10px] text-muted-foreground ml-auto tabular-nums">
+                      {scene.timing}
+                    </span>
+                  )}
+                </div>
+
+                <div className="px-3 pb-3 space-y-1.5">
+                  {/* Scene title / label */}
+                  {scene.scene && (
+                    <p className="font-body font-semibold text-xs text-foreground">
+                      {scene.scene}
+                    </p>
+                  )}
+
+                  {/* Dialogue */}
+                  {scene.dialogue && (
+                    <p className="font-body text-sm text-foreground/85 leading-relaxed">
+                      "{scene.dialogue}"
+                    </p>
+                  )}
+
+                  {/* Visual direction */}
+                  {scene.visual && (
+                    <p className="font-body text-xs text-muted-foreground italic">
+                      🎬 {scene.visual}
+                    </p>
+                  )}
+
+                  {/* SFX / audio cue */}
+                  {scene.sfx && (
+                    <p className="font-body text-xs" style={{ color: T.sage }}>
+                      🎵 {scene.sfx}
+                    </p>
+                  )}
+
+                  {/* On-screen text */}
+                  {scene.onScreenText && (
+                    <div
+                      className="inline-block mt-0.5 px-2 py-0.5 rounded font-body text-xs font-semibold"
+                      style={{ background: `${T.accent}12`, color: T.accent }}
+                    >
+                      TEXT: "{scene.onScreenText}"
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* ── Footer: ARIA tip + caption seed ── */}
+        {(p.ariaTip || p.captionHook || p.hashtags?.length) && (
+          <div
+            className="px-4 pb-4 pt-1 border-t space-y-2"
+            style={{ borderColor: T.border }}
+          >
+            {p.ariaTip && (
+              <p className="font-body text-xs text-muted-foreground">
+                💡 {p.ariaTip}
+              </p>
+            )}
+            {p.captionHook && (
+              <div
+                className="rounded-lg px-3 py-2 font-body text-xs"
+                style={{ background: `${T.primary}10`, color: T.primary }}
+              >
+                <span className="font-semibold">Caption opener:</span>{" "}
+                {p.captionHook}
+              </div>
+            )}
+            {p.hashtags?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {p.hashtags.map((h, i) => (
+                  <span
+                    key={i}
+                    className="font-body text-[11px] px-2 py-0.5 rounded-full"
+                    style={{ background: `${T.border}`, color: T.muted }}
+                  >
+                    #{h.replace(/^#/, "")}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </motion.div>
+  );
+};
+
+const ScriptCard = defineComponent({
+  name: "ScriptCard",
+  description: [
+    "Full reel / short / video script with scene-by-scene breakdown.",
+    'Use WHENEVER the user asks to "write a script", "give me a script", "script for X", or any variation.',
+    "NEVER use ContentIdea for scripts — always use ScriptCard.",
+    "Each scene has: type (hook/build/value/cta/transition/reveal), timing, dialogue, visual direction, sfx, on-screen text.",
+  ].join(" "),
+  props: z.object({
+    title: z.string().describe("Script title / content concept"),
+    format: z
+      .string()
+      .optional()
+      .describe('e.g. "30s Reel", "60s Reel", "YouTube Short"'),
+    totalDuration: z.string().optional().describe('e.g. "28–32 seconds"'),
+    platform: z.string().optional(),
+    niche: z.string().optional(),
+    audio: z.string().optional().describe("Suggested song or audio style"),
+    viralPotential: z.enum(["High", "Medium", "Low"]).optional(),
+    scenes: z
+      .array(
+        z.object({
+          type: z
+            .enum([
+              "hook",
+              "build",
+              "value",
+              "cta",
+              "transition",
+              "reveal",
+              "default",
+            ])
+            .describe("Section purpose — drives the colour coding"),
+          scene: z
+            .string()
+            .optional()
+            .describe('Short label e.g. "Opening Hook", "Punchline"'),
+          timing: z.string().optional().describe('Timestamp range e.g. "0–3s"'),
+          dialogue: z
+            .string()
+            .optional()
+            .describe("Spoken or on-camera dialogue"),
+          visual: z
+            .string()
+            .optional()
+            .describe("Camera direction / shot description"),
+          sfx: z.string().optional().describe("Audio cue or music note"),
+          onScreenText: z
+            .string()
+            .optional()
+            .describe("Text overlay that appears on screen"),
+        }),
+      )
+      .min(2)
+      .max(14)
+      .describe("All scenes in order — minimum hook + CTA"),
+    ariaTip: z
+      .string()
+      .optional()
+      .describe("ARIA's production tip for this specific script"),
+    captionHook: z
+      .string()
+      .optional()
+      .describe("Suggested caption opening line"),
+    hashtags: z
+      .array(z.string())
+      .optional()
+      .describe("3–6 hashtags without the # symbol"),
+  }),
+  component: ScriptCardComp,
+});
+
 // ─── Library export ──────────────────────────────────────────────────────────
 export const ariaLibrary = createLibrary({
   root: "IdeaBatch", // default root; model can override per response
@@ -875,6 +1208,7 @@ export const ariaLibrary = createLibrary({
     GrowthRoadmap,
     QuickActions,
     InfoAlert,
+    ScriptCard, // ← new
   ],
 });
 
