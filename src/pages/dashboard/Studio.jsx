@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Telescope,
+  Clapperboard,
   StickyNote,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
@@ -32,6 +34,7 @@ import {
   useNotes,
 } from "@/hooks/useApi";
 import useCreatorFlow from "@/store/creatorFlow";
+import DeepAnalysis from "@/components/studio/DeepAnalysis";
 import { sortTags, STRUCTURAL_TAG_META } from "@/constants/noteTags";
 
 // ── Animations ────────────────────────────────────────────────────────────────
@@ -274,9 +277,11 @@ function ContextPanel({
               className="mt-2 flex items-center gap-1.5 font-body text-[11px] text-primary/80
                          hover:text-primary transition-colors disabled:opacity-50"
             >
-              {isRewriting
-                ? <Loader2 size={10} className="animate-spin" />
-                : <RefreshCw size={10} />}
+              {isRewriting ? (
+                <Loader2 size={10} className="animate-spin" />
+              ) : (
+                <RefreshCw size={10} />
+              )}
               Try another hook
             </button>
 
@@ -300,9 +305,11 @@ function ContextPanel({
                       onClick={() => onCopyVariant(v.text, i)}
                       className="absolute top-2 right-2 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      {hookVariantCopied === i
-                        ? <Check size={11} className="text-emerald-500" />
-                        : <Copy size={11} />}
+                      {hookVariantCopied === i ? (
+                        <Check size={11} className="text-emerald-500" />
+                      ) : (
+                        <Copy size={11} />
+                      )}
                     </button>
                   </div>
                 ))}
@@ -525,6 +532,7 @@ export default function Studio() {
   const [hookVariants,     setHookVariants]   = useState([]);
   const [showHookVariants, setShowHookVariants] = useState(false);
   const [hookVariantCopied, setHookVariantCopied] = useState(null);
+  const [studioTab, setStudioTab] = useState("script"); // "script" | "deep"
 
   // Note picker — only new state vs original
   const [showNotePicker,  setShowNotePicker]  = useState(false);
@@ -805,21 +813,76 @@ export default function Studio() {
           </button>
         </div>
       </div>
+      <div className="flex items-center gap-1 p-1 mx-4 lg:mx-5 mt-3 bg-muted/40 rounded-xl border border-border w-fit">
+        <button
+          onClick={() => setStudioTab("script")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm font-medium transition-all
+      ${
+        studioTab === "script"
+          ? "bg-card text-foreground shadow-sm border border-border"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+        >
+          <Clapperboard size={14} />
+          Script Builder
+        </button>
+        <button
+          onClick={() => setStudioTab("deep")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm font-medium transition-all
+      ${
+        studioTab === "deep"
+          ? "bg-card text-foreground shadow-sm border border-border"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+        >
+          <Telescope size={14} />
+          Deep Analysis
+          <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+            NEW
+          </span>
+        </button>
+      </div>
 
-      {/* ── Three-panel shell ── */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Left: Outline (hidden in focus mode, desktop only) */}
-        {!focusMode && result && (
-          <div className="hidden lg:flex">
-            <OutlinePanel
-              sections={editedSections}
-              activeSectionId={activeSectionId}
-              onJump={jumpToSection}
-              onAdd={() => {}}
-            />
-          </div>
-        )}
+      {studioTab === "deep" ? (
+        <div className="flex flex-1 overflow-hidden">
+          <DeepAnalysis
+            userNiche={dbUser?.niches?.[0]}
+            userPlatform={dbUser?.primary_platform}
+          />
+        </div>
+      ) : (
+        /* ── Three-panel shell ── */
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Left: Outline (hidden in focus mode, desktop only) */}
+          {!focusMode && result && (
+            <div className="hidden lg:flex">
+              <OutlinePanel
+                sections={editedSections}
+                activeSectionId={activeSectionId}
+                onJump={jumpToSection}
+                onAdd={() => {}}
+              />
+            </div>
+          )}
 
+          {/* Centre: Editor */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
+              {/* Idea textarea */}
+              <div>
+                <textarea
+                  className="w-full bg-muted/40 border border-border rounded-2xl px-4 py-3.5
+                           font-body text-sm text-foreground placeholder:text-muted-foreground/50
+                           resize-none outline-none focus:border-primary/40 transition-colors"
+                  rows={2}
+                  value={idea}
+                  onChange={(e) => {
+                    setIdea(e.target.value);
+                    setSaved(false);
+                  }}
+                  placeholder="What's your content idea? Paste a rough concept, title, or vibe…"
+                />
+              </div>
         {/* Centre: Editor */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
@@ -849,16 +912,17 @@ export default function Studio() {
               </AnimatePresence>
             </div>
 
-            {/* Generate button (no result yet) */}
-            {!result && !isPending && (
-              <motion.div variants={fadeUp} initial="hidden" animate="show">
-                <button
-                  onClick={handleGenerate}
-                  disabled={!idea.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl
+              {/* Generate button (no result yet) */}
+              {!result && !isPending && (
+                <motion.div variants={fadeUp} initial="hidden" animate="show">
+                  <button
+                    onClick={handleGenerate}
+                    disabled={!idea.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl
                              bg-primary text-white font-body font-semibold text-sm
                              hover:opacity-90 transition-opacity disabled:opacity-40"
-                >
+                  >
+                
                   <Sparkles size={15} /> Generate Script
                 </button>
                 {error && (
@@ -898,106 +962,139 @@ export default function Studio() {
                   )}
                 </motion.div>
               )}
-            </AnimatePresence>
 
-            {/* Section blocks + bottom actions — IDENTICAL to original */}
-            <AnimatePresence>
-              {result && !isPending && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-4"
-                >
-                  {editedSections.map((section, idx) => (
-                    <SectionBlock
-                      key={section.id}
-                      section={section}
-                      index={idx}
-                      onChange={handleSectionChange}
-                      isActive={activeSectionId === section.id}
-                      onFocus={setActiveSection}
-                      sectionRef={(el) => {
-                        sectionRefs.current[section.id] = el;
-                      }}
-                    />
-                  ))}
-
-                  {/* Bottom actions */}
-                  <div className="flex gap-3 pt-4 pb-10">
-                    <button
-                      onClick={handleSave}
-                      disabled={saving || saved}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                        font-body font-semibold text-sm transition-all
-                        ${saved
-                          ? "bg-emerald-500/15 text-emerald-600"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                    >
-                      {saved ? (
-                        <><CheckCircle2 size={14} /> Saved</>
-                      ) : (
-                        <><Save size={14} /> Save script</>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => navigate("/dashboard/launch")}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                                 bg-primary text-white font-body font-semibold text-sm hover:opacity-90 transition-opacity"
-                    >
-                      Go to Launch <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </motion.div>
+              {/* Generating state */}
+              {isPending && (
+                <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground font-body text-sm">
+                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  ARIA is writing…
+                </div>
               )}
-            </AnimatePresence>
 
-            {/* Re-generate button (after result) */}
-            {result && !isPending && (
-              <div className="pb-4">
-                <button
-                  onClick={handleGenerate}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border
+              {/* Hook banner */}
+              <AnimatePresence>
+                {result?.hookLine && !isPending && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3.5"
+                  >
+                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
+                      Opening hook
+                    </p>
+                    <p className="font-heading text-base text-foreground">
+                      "{result.hookLine}"
+                    </p>
+                    {result.hookTip && (
+                      <p className="font-body text-xs text-muted-foreground mt-1.5">
+                        {result.hookTip}
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Section blocks */}
+              <AnimatePresence>
+                {result && !isPending && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4"
+                  >
+                    {editedSections.map((section, idx) => (
+                      <SectionBlock
+                        key={section.id}
+                        section={section}
+                        index={idx}
+                        onChange={handleSectionChange}
+                        isActive={activeSectionId === section.id}
+                        onFocus={setActiveSection}
+                        sectionRef={(el) => {
+                          sectionRefs.current[section.id] = el;
+                        }}
+                      />
+                    ))}
+
+                    {/* Bottom actions */}
+                    <div className="flex gap-3 pt-4 pb-10">
+                      <button
+                        onClick={handleSave}
+                        disabled={saving || saved}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
+                        font-body font-semibold text-sm transition-all
+                        ${saved ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                      >
+                        {saved ? (
+                          <>
+                            <CheckCircle2 size={14} /> Saved
+                          </>
+                        ) : (
+                          <>
+                            <Save size={14} /> Save script
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => navigate("/dashboard/launch")}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
+                                 bg-primary text-white font-body font-semibold text-sm hover:opacity-90 transition-opacity"
+                      >
+                        Go to Launch <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Re-generate button (after result) */}
+              {result && !isPending && (
+                <div className="pb-4">
+                  <button
+                    onClick={handleGenerate}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border
                              font-body text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                >
-                  <Sparkles size={13} /> Regenerate script
-                </button>
-              </div>
-            )}
+                  >
+                    <Sparkles size={13} /> Regenerate script
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Right: Context (desktop, hidden in focus mode) */}
-        {!focusMode && result && showContext && (
-          <div className="hidden lg:flex">
-            <ContextPanel
-              idea={idea}
-              hookLine={result?.hookLine}
-              hookTip={result?.hookTip}
-              words={words}
-              duration={duration}
-              platform={dbUser?.primary_platform || "Instagram"}
-              onClose={() => setShowContext(false)}
-              hookVariants={hookVariants}
-              showHookVariants={showHookVariants}
-              isRewriting={isRewriting}
-              onTryAnotherHook={handleTryAnotherHook}
-              hookVariantCopied={hookVariantCopied}
-              onCopyVariant={handleCopyVariant}
-            />
-          </div>
-        )}
-
-        {/* History drawer */}
-        <AnimatePresence>
-          {showHistory && (
-            <HistoryDrawer
-              history={history}
-              onSelect={handleSelectHistory}
-              onClose={() => setShowHistory(false)}
-            />
+          {/* Right: Context (desktop, hidden in focus mode) */}
+          {!focusMode && result && showContext && (
+            <div className="hidden lg:flex">
+              <ContextPanel
+                idea={idea}
+                hookLine={result?.hookLine}
+                hookTip={result?.hookTip}
+                words={words}
+                duration={duration}
+                platform={dbUser?.primary_platform || "Instagram"}
+                onClose={() => setShowContext(false)}
+                hookVariants={hookVariants}
+                showHookVariants={showHookVariants}
+                isRewriting={isRewriting}
+                onTryAnotherHook={handleTryAnotherHook}
+                hookVariantCopied={hookVariantCopied}
+                onCopyVariant={handleCopyVariant}
+              />
+            </div>
           )}
-        </AnimatePresence>
-      </div>
+
+          {/* History drawer */}
+          <AnimatePresence>
+            {showHistory && (
+              <HistoryDrawer
+                history={history}
+                onSelect={handleSelectHistory}
+                onClose={() => setShowHistory(false)}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
