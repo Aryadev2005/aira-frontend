@@ -34,7 +34,7 @@ const STREAM_URL = `${import.meta.env.VITE_API_BASE_URL}/api/v1/agent/stream`;
 const GREETING = {
   role: "assistant",
   content:
-    'Hey! I\'m **ARIA** — your AI content strategist 🧠\n\nAsk me anything:\n- "What should I post this week?"\n- "Write me a reel script about street food"\n- "What audio is trending for travel reels?"',
+    'Hey! I\'m **AIRRA** — your AI content strategist 🧠\n\nAsk me anything:\n- "What should I post this week?"\n- "Write me a reel script about street food"\n- "What audio is trending for travel reels?"',
   toolEvents: [],
 };
 

@@ -43,7 +43,7 @@ export default function SignIn() {
       >
         {/* Logo */}
         <motion.div variants={item} className="text-center mb-8">
-          <Link to="/" className="font-heading text-3xl text-primary">ARIA</Link>
+          <Link to="/" className="font-heading text-3xl text-primary">AIRRA</Link>
           <p className="text-muted-foreground font-body text-sm mt-1">Welcome back</p>
         </motion.div>
 

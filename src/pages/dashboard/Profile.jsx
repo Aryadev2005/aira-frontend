@@ -1515,7 +1515,7 @@ function AnalyticsTab() {
               <Zap size={13} className="text-primary" />
             </div>
             <p className="font-body text-xs font-semibold text-foreground uppercase tracking-wider">
-              ARIA's Diagnosis
+              AIRRA's Diagnosis
             </p>
           </div>
           <p className="font-body text-sm text-foreground leading-relaxed">

@@ -292,11 +292,11 @@ export default function Onboarding() {
                   Connect your account
                 </h2>
                 <p className="text-muted-foreground font-body text-center mb-2">
-                  ARIA will analyse your content and automatically detect your
+                  AIRRA will analyse your content and automatically detect your
                   niche, archetype, and growth opportunities.
                 </p>
                 <p className="text-primary/70 font-body text-xs text-center mb-8">
-                  🔒 Read-only access. ARIA never posts without your permission.
+                  🔒 Read-only access. AIRRA never posts without your permission.
                 </p>
 
                 <div className="space-y-3">
@@ -461,7 +461,7 @@ export default function Onboarding() {
                       Account connected!
                     </h2>
                     <p className="text-muted-foreground font-body text-sm">
-                      ARIA will finish analysing your account in the background.
+                      AIRRA will finish analysing your account in the background.
                       Check your profile in a few minutes.
                     </p>
                   </div>
@@ -498,7 +498,7 @@ export default function Onboarding() {
                 className="bg-primary hover:bg-primary/90 text-white rounded-pill px-10 py-6 font-body font-semibold shadow-warm text-base"
               >
                 {analysingStatus === "done"
-                  ? "Enter ARIA →"
+                  ? "Enter AIRRA →"
                   : "Continue anyway →"}
               </Button>
             )}

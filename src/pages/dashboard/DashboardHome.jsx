@@ -1,10 +1,15 @@
 // src/pages/dashboard/DashboardHome.jsx
-// ── v2 redesign: clean stats strip + workflow cards + trending row ────────────
-import React from "react";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Bell, ArrowRight, Sparkles } from "lucide-react";
-import { useProfile, useAnalyticsDashboard, useViralIdeas } from "@/hooks/useApi";
+import {
+  useProfile,
+  useAnalyticsDashboard,
+  useViralIdeas,
+  useScriptHistory,      // NEW IMPORT — for Studio chip
+  useCalendarEntries,    // NEW IMPORT — for Launch chip
+} from "@/hooks/useApi";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -22,6 +27,12 @@ const today = () =>
     month: "long",
   });
 
+// Returns current month key "YYYY-MM" for calendar query
+const currentMonthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
 const BADGE_STYLES = {
   HOT: "bg-primary/15 text-primary",
   RISING: "bg-amber-500/15 text-amber-600",
@@ -38,23 +49,30 @@ const item = {
   show: { opacity: 1, y: 0, transition: { type: "spring", damping: 24 } },
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
+// ── StatCell ──────────────────────────────────────────────────────────────────
+// CHANGE: value can now be null → renders "—" instead of fake fallback
 function StatCell({ label, value, suffix, delta, accent = false }) {
+  const isEmpty = value === null || value === undefined;
   return (
     <div className="flex-1 min-w-0 bg-card border border-border rounded-2xl px-4 py-3.5">
       <p className="font-body text-xs text-muted-foreground mb-1">{label}</p>
       <p
-        className={`font-heading text-2xl leading-none ${accent ? "text-primary" : "text-foreground"}`}
+        className={`font-heading text-2xl leading-none ${
+          isEmpty
+            ? "text-muted-foreground/30"
+            : accent
+            ? "text-primary"
+            : "text-foreground"
+        }`}
       >
-        {value}
-        {suffix && (
+        {isEmpty ? "—" : value}
+        {!isEmpty && suffix && (
           <span className="font-body text-sm ml-0.5 text-muted-foreground">
             {suffix}
           </span>
         )}
       </p>
-      {delta && (
+      {delta && !isEmpty && (
         <p className="font-body text-[11px] text-muted-foreground mt-1">
           {delta}
         </p>
@@ -63,6 +81,7 @@ function StatCell({ label, value, suffix, delta, accent = false }) {
   );
 }
 
+// ── WorkflowCard — unchanged ──────────────────────────────────────────────────
 function WorkflowCard({ step, title, desc, chips, cta, active, onClick }) {
   return (
     <button
@@ -74,28 +93,21 @@ function WorkflowCard({ step, title, desc, chips, cta, active, onClick }) {
             : "bg-card border-border hover:border-primary/20 hover:bg-muted/40"
         }`}
     >
-      {/* Step label */}
       <div className="flex items-center gap-2 mb-3">
         <span
-          className={`w-2 h-2 rounded-full flex-shrink-0 ${active ? "bg-primary" : "bg-muted-foreground/40"}`}
+          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+            active ? "bg-primary" : "bg-muted-foreground/40"
+          }`}
         />
         <span className="font-body text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           {step}
         </span>
       </div>
-
-      {/* Title */}
       <p className="font-heading text-lg text-foreground mb-1.5">{title}</p>
-
-      {/* Description */}
       <p className="font-body text-sm text-muted-foreground leading-relaxed mb-3">
         {desc}
       </p>
-
-      {/* Chips */}
       <div className="flex gap-2 mb-4">{chips}</div>
-
-      {/* CTA */}
       <div
         className={`flex items-center gap-1.5 font-body text-sm font-semibold
         ${active ? "text-primary" : "text-muted-foreground"}`}
@@ -142,19 +154,35 @@ export default function DashboardHome() {
   const { data: ideasData, isLoading: ideasLoading } = useViralIdeas({});
   const liveIdeas = ideasData?.data?.ideas?.slice(0, 6) ?? [];
 
-  const analytics = analyticsData?.data;
-  const growth = analytics?.growthRate ?? "+18.2";
-  const health = analytics?.currentHealthScore ?? 84;
-  const ideas = liveIdeas.length > 0 ? liveIdeas.length : (analytics?.contentIdeas ?? 27);
-  const bestTime = analytics?.bestWindow ?? "8:42";
-  const growthDelta = analytics?.growthDelta ? `▲ ${analytics.growthDelta} vs last week` : null;
-  const healthDelta = analytics?.healthDelta ? `▲ ${analytics.healthDelta} vs last week` : null;
+  // NEW: fetch script history for Studio chip
+  const { data: historyData } = useScriptHistory();
+  const scriptCount = historyData?.data?.length ?? 0;
+
+  // NEW: fetch this month's calendar entries for Launch chip
+  const { data: calendarData } = useCalendarEntries(currentMonthKey());
+  const calendarCount = calendarData?.data?.length ?? 0;
+
+  // ── Stats — null fallbacks instead of fake numbers ────────────────────────
+  // CHANGE: ?? null instead of ?? "+18.2" / ?? 84 / ?? 27 / ?? "8:42"
+  const analytics  = analyticsData?.data;
+  const growth     = analytics?.growthRate         ?? null;
+  const health     = analytics?.currentHealthScore ?? null;
+  const ideas      = liveIdeas.length > 0
+    ? liveIdeas.length
+    : (analytics?.contentIdeas ?? null);
+  const bestTime   = analytics?.bestWindow         ?? null;
+  const growthDelta = analytics?.growthDelta
+    ? `▲ ${analytics.growthDelta} vs last week`
+    : null;
+  const healthDelta = analytics?.healthDelta
+    ? `▲ ${analytics.healthDelta} vs last week`
+    : null;
 
   const STATS = [
     {
       label: "7-day growth",
       value: growth,
-      suffix: "%",
+      suffix: growth !== null ? "%" : "",
       delta: growthDelta,
       accent: true,
     },
@@ -173,22 +201,44 @@ export default function DashboardHome() {
     {
       label: "Best window",
       value: bestTime,
-      suffix: " PM",
+      // CHANGE: only show "PM" suffix if we have a real value
+      suffix: bestTime !== null ? " PM" : "",
       delta: null,
     },
   ];
+
+  // ── Workflow active state logic ────────────────────────────────────────────
+  // CHANGE: active is computed, not hardcoded to always be Discover
+  // Logic: if user has saved scripts → Studio is active
+  //        if user has calendar entries → Launch is active
+  //        otherwise Discover is active (default starting step)
+  const activeStep = useMemo(() => {
+    if (calendarCount > 0) return "launch";
+    if (scriptCount > 0)   return "studio";
+    return "discover";
+  }, [scriptCount, calendarCount]);
 
   const WORKFLOW = [
     {
       id: "discover",
       stepNum: "01",
       step: "01 · Discover",
-      active: true,
+      // CHANGE: active based on computed activeStep
+      active: activeStep === "discover",
       title: "What to make",
       desc: "Niche trends, viral angles, competitor moves — surfaced 48h before the algorithm.",
-      chips: liveIdeas.length > 0
-        ? [<span key="hot" className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">Hot · {liveIdeas.length}</span>]
-        : [],
+      // ORIGINAL chip logic preserved — dynamic live ideas count
+      chips:
+        liveIdeas.length > 0
+          ? [
+              <span
+                key="hot"
+                className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+              >
+                Hot · {liveIdeas.length}
+              </span>,
+            ]
+          : [],
       cta: "Browse brief",
       path: "/dashboard/discover",
     },
@@ -196,17 +246,21 @@ export default function DashboardHome() {
       id: "studio",
       stepNum: "02",
       step: "02 · Studio",
-      active: false,
+      active: activeStep === "studio",
       title: "How to make it",
       desc: "Script builder, BGM matcher, hook variations — without losing your voice.",
-      chips: [
-        <span
-          key="c"
-          className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600"
-        >
-          Drafting · 2
-        </span>,
-      ],
+      // CHANGE: chip is dynamic — shows real script count, hidden when 0
+      chips:
+        scriptCount > 0
+          ? [
+              <span
+                key="c"
+                className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600"
+              >
+                Drafting · {scriptCount}
+              </span>,
+            ]
+          : [],
       cta: "Open studio",
       path: "/dashboard/studio",
     },
@@ -214,17 +268,21 @@ export default function DashboardHome() {
       id: "launch",
       stepNum: "03",
       step: "03 · Launch",
-      active: false,
+      active: activeStep === "launch",
       title: "Drop it right",
       desc: "Optimal timing, posting package, and brand-deal alerts so hits don't slip.",
-      chips: [
-        <span
-          key="c"
-          className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600"
-        >
-          Queued · 1
-        </span>,
-      ],
+      // CHANGE: chip is dynamic — shows real calendar count, hidden when 0
+      chips:
+        calendarCount > 0
+          ? [
+              <span
+                key="c"
+                className="font-body text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600"
+              >
+                Queued · {calendarCount}
+              </span>,
+            ]
+          : [],
       cta: "Schedule",
       path: "/dashboard/launch",
     },
@@ -253,7 +311,7 @@ export default function DashboardHome() {
         </button>
       </motion.div>
 
-      {/* ── Stats strip ── */}
+      {/* ── Stats strip — unchanged structure, StatCell handles null ── */}
       <motion.div
         variants={item}
         className="flex gap-3 overflow-x-auto pb-1 no-scrollbar"
@@ -263,7 +321,7 @@ export default function DashboardHome() {
         ))}
       </motion.div>
 
-      {/* ── Workflow ── */}
+      {/* ── Workflow — unchanged structure, WORKFLOW array is now dynamic ── */}
       <motion.div variants={item}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading text-base text-foreground">
@@ -272,12 +330,16 @@ export default function DashboardHome() {
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
           {WORKFLOW.map((w) => (
-            <WorkflowCard key={w.id} {...w} onClick={() => navigate(w.path)} />
+            <WorkflowCard
+              key={w.id}
+              {...w}
+              onClick={() => navigate(w.path)}
+            />
           ))}
         </div>
       </motion.div>
 
-      {/* ── Trending for you ── */}
+      {/* ── Trending for you — unchanged ── */}
       <motion.div variants={item}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading text-base text-foreground">
@@ -291,40 +353,29 @@ export default function DashboardHome() {
           </button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
-          {ideasLoading
-            ? [1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="w-44 h-28 bg-muted rounded-2xl animate-pulse flex-shrink-0" />
-              ))
-            : liveIdeas.length === 0
-            ? (
-                <div
-                  onClick={() => navigate("/dashboard/settings")}
-                  className="flex-shrink-0 w-64 bg-card border border-border rounded-2xl p-4 flex items-center justify-center cursor-pointer hover:bg-muted/40 transition-colors"
-                >
-                  <p className="font-body text-sm text-muted-foreground text-center">
-                    Connect Instagram to see personalized trends →
-                  </p>
-                </div>
-              )
-            : liveIdeas.map((idea, i) => (
-                <TrendCard key={idea.title + i} {...idea} />
-              ))}
+          {ideasLoading ? (
+            [1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-44 h-24 bg-muted rounded-2xl animate-pulse"
+              />
+            ))
+          ) : liveIdeas.length > 0 ? (
+            liveIdeas.map((idea, i) => (
+              <TrendCard
+                key={idea.id || i}
+                title={idea.title}
+                badge={idea.badge}
+                growthSignal={idea.growthSignal}
+                velocityScore={idea.velocityScore}
+              />
+            ))
+          ) : (
+            <p className="font-body text-sm text-muted-foreground py-4">
+              No trending ideas right now — check back soon.
+            </p>
+          )}
         </div>
-      </motion.div>
-
-      {/* ── ARIA tip ── */}
-      <motion.div
-        variants={item}
-        className="flex items-start gap-3 bg-primary/6 border border-primary/15 rounded-2xl px-4 py-3.5"
-      >
-        <span className="text-primary mt-0.5 flex-shrink-0">
-          <Sparkles size={14} />
-        </span>
-        <p className="font-body text-sm text-foreground/80 leading-relaxed">
-          <span className="font-semibold text-primary">ARIA tip:</span> Add a
-          pattern-interrupt in your next hook — try starting with a number or a
-          counter-intuitive statement to spike 3-second retention.
-        </p>
       </motion.div>
     </motion.div>
   );
