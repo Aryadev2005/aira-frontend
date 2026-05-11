@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Calendar,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -195,6 +196,7 @@ export default function Launch() {
   const selectedIdea = useCreatorFlow((s) => s.selectedIdea);
   const studioSessionId = useCreatorFlow((s) => s.studioSessionId);
   const setLaunchCtx = useCreatorFlow((s) => s.setLaunchContext);
+  const launchPackage = useCreatorFlow((s) => s.launchPackage); // NOW has caption, hashtags, script
 
   const { data: profileData } = useProfile();
   const user = profileData?.data?.user;
@@ -211,6 +213,7 @@ export default function Launch() {
   const bestSlot = timing?.bestSlots?.[0];
 
   const [sessionIdea, setSessionIdea] = useState(flowIdea || "");
+  const [sessionScript, setSessionScript] = useState("");
   const [postingPackage, setPostingPackage] = useState(null);
   const [packageError, setPackageError] = useState(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -220,6 +223,27 @@ export default function Launch() {
   useEffect(() => {
     if (flowIdea && !sessionIdea) setSessionIdea(flowIdea);
   }, [flowIdea]);
+
+  // KEY CHANGE: If Studio sent us a rich package, pre-populate the posting package
+  // so the user sees the Studio-generated caption/hashtags immediately
+  useEffect(() => {
+    if (launchPackage && launchPackage.caption) {
+      // Pre-fill the posting package with Studio's research-backed content
+      setPostingPackage({
+        caption: launchPackage.caption,
+        hashtags: {
+          mega: launchPackage.hashtags?.slice(0, 3) || [],
+          mid: launchPackage.hashtags?.slice(3, 7) || [],
+          niche: launchPackage.hashtags?.slice(7) || [],
+        },
+        firstComment: launchPackage.hashtags?.join(" ") || "",
+        brief: launchPackage.hookLine || "",
+        storyCopy: launchPackage.trendInsight || "",
+        fromStudio: true, // flag so UI can show "From Studio" badge
+      });
+      setSessionScript(launchPackage.script || "");
+    }
+  }, [launchPackage]);
 
   // Store timing in Zustand
   useEffect(() => {
@@ -233,8 +257,12 @@ export default function Launch() {
     try {
       const data = await generatePackage({
         idea: sessionIdea || "general content",
+        script: sessionScript || undefined, // ← passes full script text
         platform: user?.primary_platform || "instagram",
         niche: user?.niches?.[0] || "lifestyle",
+        hookLine: launchPackage?.hookLine || undefined,
+        trendInsight: launchPackage?.trendInsight || undefined,
+        format: launchPackage?.format || undefined,
       });
       const pkg = data?.data;
       setPostingPackage(pkg);
@@ -251,26 +279,28 @@ export default function Launch() {
         idea: selectedIdea?.contentAngle || sessionIdea,
         platform: user?.primary_platform || "instagram",
         niche: user?.niches?.[0] || "general",
-        format: selectedIdea?.formatSuggestion || selectedIdea?.format,
+        format:
+          launchPackage?.format ||
+          selectedIdea?.formatSuggestion ||
+          selectedIdea?.format,
         scheduled_date: date,
         scheduled_time: time,
         status,
         studio_session_id: studioSessionId || undefined,
-        source: studioSessionId ? "discovery" : "manual",
-        hook: postingPackage?.caption?.split("\n")?.[0] || selectedIdea?.hook,
-        caption: postingPackage?.caption,
+        source: studioSessionId ? "studio" : "manual",
+        hook: launchPackage?.hookLine || postingPackage?.brief || "",
+        caption: postingPackage?.caption || launchPackage?.caption || "",
         hashtags: [
           ...(postingPackage?.hashtags?.mega || []),
           ...(postingPackage?.hashtags?.mid || []),
           ...(postingPackage?.hashtags?.niche || []),
         ],
-        aria_tip: timing?.ariaReason,
+        aria_tip: postingPackage?.storyCopy || "",
+        is_ai_suggested: true,
       });
-      setShowCalendarModal(false);
       setCalendarSaved(true);
-    } catch (e) {
-      console.error(e);
-    }
+      setShowCalendarModal(false);
+    } catch {}
   };
 
   return (
@@ -375,16 +405,43 @@ export default function Launch() {
           </h3>
         </div>
 
+        {postingPackage?.fromStudio && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/15">
+            <Sparkles size={12} className="text-primary shrink-0" />
+            <p className="font-body text-xs text-foreground">
+              <span className="font-semibold">Pre-filled from Studio</span> —
+              research-backed caption and hashtags ready. Regenerate below to
+              get ARIA's launch-optimized version.
+            </p>
+          </div>
+        )}
+
         <textarea
           value={sessionIdea}
           onChange={(e) => setSessionIdea(e.target.value)}
-          placeholder="Your content idea (pre-filled from Studio if you came from there)"
-          rows={3}
+          placeholder="Your content idea (pre-filled from Studio)"
+          rows={2}
           className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3
                      font-body text-sm text-foreground placeholder:text-muted-foreground/50
-                     resize-none outline-none focus:border-primary/40 focus:ring-1
-                     focus:ring-primary/20 transition-all leading-relaxed"
+                     resize-none outline-none focus:border-primary/40 transition-all leading-relaxed"
         />
+
+        {sessionScript && (
+          <details className="group">
+            <summary className="cursor-pointer font-body text-xs text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
+              <ChevronDown
+                size={12}
+                className="group-open:rotate-180 transition-transform"
+              />
+              View script ({sessionScript.split(/\s+/).length} words)
+            </summary>
+            <div className="mt-2 p-3 rounded-xl bg-muted/30 border border-border">
+              <p className="font-body text-xs text-foreground whitespace-pre-line leading-relaxed line-clamp-10">
+                {sessionScript}
+              </p>
+            </div>
+          </details>
+        )}
 
         {packageError && (
           <p className="text-destructive font-body text-xs">{packageError}</p>
@@ -403,7 +460,10 @@ export default function Launch() {
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              <Zap size={15} /> Generate Package
+              <Zap size={15} />
+              {postingPackage?.fromStudio
+                ? "Regenerate with ARIA"
+                : "Generate Package"}
             </span>
           )}
         </Button>

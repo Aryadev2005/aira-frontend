@@ -1,12 +1,9 @@
 // src/pages/dashboard/Studio.jsx
-// ── v3: / note picker added — all original logic preserved exactly ─────────────
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+// ── Fully rewired: single section, two-pass research→script pipeline ──────────
+// Phase 1: Deep research agent streams progress updates
+// Phase 2: Script sections stream in one by one
+// History stored. Go to Launch passes full context (script, caption, hashtags).
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,37 +16,75 @@ import {
   CheckCircle2,
   Zap,
   Timer,
-  Plus,
   X,
   Loader2,
   RefreshCw,
   Copy,
   Check,
-  Telescope,
+  Globe,
+  FileText,
+  ChevronDown,
+  History,
   Clapperboard,
-  StickyNote,
+  AlertCircle,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 import {
-  useScriptStructure,
   useSaveSession,
   useLearnFromEdit,
   useScriptHistory,
-  useCreateNote,
   useRewriteHook,
-  useNotes,
 } from "@/hooks/useApi";
 import useCreatorFlow from "@/store/creatorFlow";
-import DeepAnalysis from "@/components/studio/DeepAnalysis";
-import { sortTags, STRUCTURAL_TAG_META } from "@/constants/noteTags";
+import { auth } from "@/lib/firebase";
+
+// ── SSE streaming helper ──────────────────────────────────────────────────────
+async function streamScript(body, onEvent) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  const token = await user.getIdToken();
+  const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+  const res = await fetch(`${BASE}/api/v1/studio/script/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split("\n\n");
+    buf = parts.pop() ?? "";
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line || line.startsWith(": ping")) continue;
+      if (line.startsWith("data: ")) {
+        try {
+          onEvent(JSON.parse(line.slice(6)));
+        } catch {}
+      }
+    }
+  }
+}
 
 // ── Animations ────────────────────────────────────────────────────────────────
 const fadeUp = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 24 } },
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 22 } },
 };
 
-// ── Section colour map ────────────────────────────────────────────────────────
+// ── Section color map ─────────────────────────────────────────────────────────
 const SECTION_COLORS = {
   hook: {
     dot: "bg-orange-500",
@@ -69,6 +104,18 @@ const SECTION_COLORS = {
     bg: "bg-emerald-500/8",
     border: "border-emerald-500/20",
   },
+  detail: {
+    dot: "bg-violet-500",
+    text: "text-violet-500",
+    bg: "bg-violet-500/8",
+    border: "border-violet-500/20",
+  },
+  transition: {
+    dot: "bg-amber-500",
+    text: "text-amber-500",
+    bg: "bg-amber-500/8",
+    border: "border-amber-500/20",
+  },
   default: {
     dot: "bg-primary",
     text: "text-primary",
@@ -76,85 +123,181 @@ const SECTION_COLORS = {
     border: "border-primary/20",
   },
 };
+const getSC = (type = "") => SECTION_COLORS[type] || SECTION_COLORS.default;
 
-const getSectionColors = (label = "") => {
-  const l = label.toLowerCase();
-  if (l.includes("hook") || l.includes("open")) return SECTION_COLORS.hook;
-  if (l.includes("cta") || l.includes("call") || l.includes("close"))
-    return SECTION_COLORS.cta;
-  if (
-    l.includes("body") ||
-    l.includes("value") ||
-    l.includes("step") ||
-    l.includes("story")
-  )
-    return SECTION_COLORS.body;
-  return SECTION_COLORS.default;
-};
-
-// ── Duration helper (130 wpm) ─────────────────────────────────────────────────
+// ── Duration helper ───────────────────────────────────────────────────────────
 const calcDuration = (text = "") => {
   const w = text.trim().split(/\s+/).filter(Boolean).length;
   const s = Math.round((w / 130) * 60);
-  return s < 60 ? `~${s}s` : `~${Math.floor(s / 60)}m ${s % 60}s`;
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-const totalWordCount = (sections = []) =>
-  sections.reduce(
-    (acc, s) =>
-      acc + (s.content || "").trim().split(/\s+/).filter(Boolean).length,
-    0,
-  );
+// ── Format options ────────────────────────────────────────────────────────────
+const FORMATS = [
+  { value: "reel", label: "Reel", emoji: "🎬" },
+  { value: "post", label: "Post", emoji: "📝" },
+  { value: "carousel", label: "Carousel", emoji: "🖼️" },
+  { value: "video", label: "Video", emoji: "📹" },
+  { value: "story", label: "Story", emoji: "⭕" },
+  { value: "thread", label: "Thread", emoji: "🧵" },
+];
 
-// ── Outline panel (left) ──────────────────────────────────────────────────────
-function OutlinePanel({ sections, activeSectionId, onJump, onAdd }) {
+// ── Phase indicator ───────────────────────────────────────────────────────────
+function PhaseBar({ phase, statusMsg, sectionsTotal, sectionsDone }) {
+  const phases = [
+    { key: "researching", label: "Deep Research", icon: Globe },
+    { key: "scripting", label: "Script", icon: FileText },
+  ];
+
   return (
-    <div className="w-48 xl:w-52 shrink-0 border-r border-border bg-muted/20 flex flex-col">
-      <div className="px-3 py-3 border-b border-border">
-        <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Outline
-        </p>
-      </div>
-      <div className="flex-1 overflow-y-auto py-1.5">
-        {sections.map((s) => {
-          const c = getSectionColors(s.label || s.type);
-          const isAct = s.id === activeSectionId;
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {phases.map((p, i) => {
+          const isDone =
+            (phase === "scripting" && p.key === "researching") ||
+            phase === "done";
+          const isActive = phase === p.key;
+          const Icon = p.icon;
           return (
-            <button
-              key={s.id}
-              onClick={() => onJump(s.id)}
-              className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 transition-colors
-                ${isAct ? "bg-primary/10" : "hover:bg-muted/60"}`}
-            >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
-              <div className="min-w-0">
-                <p
-                  className={`font-body text-xs font-semibold truncate ${isAct ? c.text : "text-foreground"}`}
-                >
-                  {s.label || s.type || "Section"}
-                </p>
-                <p className="font-body text-[10px] text-muted-foreground">
-                  {calcDuration(s.content)}
-                </p>
+            <React.Fragment key={p.key}>
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-body font-medium transition-all
+                ${isDone ? "bg-emerald-500/10 text-emerald-600" : isActive ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"}`}
+              >
+                {isActive ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : isDone ? (
+                  <Check size={11} />
+                ) : (
+                  <Icon size={11} />
+                )}
+                {p.label}
               </div>
-            </button>
+              {i < phases.length - 1 && (
+                <div
+                  className={`w-6 h-px ${isDone || (phase === "scripting" && p.key === "researching") ? "bg-emerald-400/50" : "bg-border"}`}
+                />
+              )}
+            </React.Fragment>
           );
         })}
+        {phase === "scripting" && sectionsTotal > 0 && (
+          <span className="ml-auto font-body text-xs text-muted-foreground">
+            {sectionsDone}/{sectionsTotal} sections
+          </span>
+        )}
       </div>
-      <div className="border-t border-border p-2">
-        <button
-          onClick={onAdd}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl
-                     font-body text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-        >
-          <Plus size={12} /> Add section
-        </button>
-      </div>
+
+      {statusMsg && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30 border border-border">
+          <Loader2 size={11} className="animate-spin text-primary shrink-0" />
+          <p className="font-body text-xs text-muted-foreground">{statusMsg}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Section editor block ──────────────────────────────────────────────────────
+// ── Research brief card ───────────────────────────────────────────────────────
+function ResearchBriefCard({ brief, visible }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!brief || !visible) return null;
+
+  const trendColor =
+    {
+      rising: "text-emerald-500 bg-emerald-500/10",
+      peaking: "text-orange-500 bg-orange-500/10",
+      declining: "text-red-500 bg-red-500/10",
+      evergreen: "text-blue-500 bg-blue-500/10",
+    }[brief.trendStrength] || "text-primary bg-primary/10";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-border bg-muted/20 overflow-hidden"
+    >
+      {/* Summary row */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Globe size={13} className="text-primary" />
+          <span className="font-body text-xs font-semibold text-foreground">
+            Research Brief
+          </span>
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${trendColor}`}
+          >
+            {brief.trendStrength}
+          </span>
+        </div>
+        <ChevronDown
+          size={12}
+          className={`text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden border-t border-border"
+          >
+            <div className="px-4 py-3 space-y-3">
+              <p className="font-body text-xs text-foreground leading-relaxed">
+                {brief.trendSummary}
+              </p>
+
+              {brief.topViralAngles?.length > 0 && (
+                <div>
+                  <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    Viral Angles
+                  </p>
+                  <div className="space-y-1">
+                    {brief.topViralAngles.slice(0, 3).map((a, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="font-body text-[10px] font-bold text-primary shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <p className="font-body text-xs text-foreground">{a}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {brief.competitorGaps && (
+                <div className="px-3 py-2 rounded-lg bg-primary/5 border border-primary/10">
+                  <p className="font-body text-[10px] font-semibold text-primary mb-0.5">
+                    Opportunity Gap
+                  </p>
+                  <p className="font-body text-xs text-foreground">
+                    {brief.competitorGaps}
+                  </p>
+                </div>
+              )}
+
+              {brief.bestTiming && (
+                <p className="font-body text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    Best time:
+                  </span>{" "}
+                  {brief.bestTiming}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ── Section block ─────────────────────────────────────────────────────────────
 function SectionBlock({
   section,
   index,
@@ -163,27 +306,23 @@ function SectionBlock({
   onFocus,
   sectionRef,
 }) {
-  const c = getSectionColors(section.label || section.type);
+  const c = getSC(section.type);
   const dur = calcDuration(section.content);
-
   return (
-    <div
+    <motion.div
       ref={sectionRef}
-      className={`rounded-2xl border transition-all duration-200
-        ${
-          isActive
-            ? `${c.border} ${c.bg} shadow-sm`
-            : "border-border hover:border-border/80"
-        }`}
+      variants={fadeUp}
+      initial="hidden"
+      animate="show"
+      className={`rounded-xl border transition-all ${isActive ? `${c.border} ${c.bg} shadow-sm` : "border-border hover:border-border/80"}`}
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${c.dot}`} />
           <span
             className={`font-body text-xs font-semibold uppercase tracking-wider ${c.text}`}
           >
-            {section.label || section.type || `Section ${index + 1}`}
+            {section.label}
           </span>
         </div>
         <div className="flex items-center gap-3 text-muted-foreground">
@@ -197,23 +336,17 @@ function SectionBlock({
           </span>
         </div>
       </div>
-      {/* Textarea */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <textarea
           value={section.content || ""}
           onChange={(e) => onChange(section.id, e.target.value)}
           onFocus={() => onFocus(section.id)}
-          placeholder={
-            section.placeholder ||
-            `Write your ${section.label || "section"} here…`
-          }
+          placeholder={section.placeholder}
           rows={4}
-          className="w-full bg-transparent font-body text-sm text-foreground
-                     placeholder:text-muted-foreground/40 resize-none outline-none leading-relaxed"
+          className="w-full bg-transparent font-body text-sm text-foreground placeholder:text-muted-foreground/40 resize-none outline-none leading-relaxed"
           style={{ minHeight: 80 }}
         />
       </div>
-      {/* Tip */}
       {section.tip && (
         <div className="px-4 pb-3 flex items-start gap-2 border-t border-border/50 pt-2">
           <Zap size={11} className="text-primary mt-0.5 shrink-0" />
@@ -222,26 +355,29 @@ function SectionBlock({
           </p>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
-// ── Context panel (right) ─────────────────────────────────────────────────────
+// ── Context panel ─────────────────────────────────────────────────────────────
 function ContextPanel({
-  idea,
   hookLine,
   hookTip,
+  trendInsight,
+  caption,
+  hashtags,
   words,
   duration,
   platform,
   onClose,
-  hookVariants,
-  showHookVariants,
-  isRewriting,
-  onTryAnotherHook,
-  hookVariantCopied,
-  onCopyVariant,
 }) {
+  const [copied, setCopied] = useState(null);
+  const copy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   return (
     <div className="w-60 xl:w-64 shrink-0 border-l border-border bg-muted/20 flex flex-col">
       <div className="flex items-center justify-between px-3 py-3 border-b border-border">
@@ -252,120 +388,114 @@ function ContextPanel({
           onClick={onClose}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          <X size={13} />
+          <X size={14} />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-5">
-        {/* Idea */}
-        <div>
-          <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Idea
-          </p>
-          <p className="font-body text-xs text-foreground leading-relaxed">
-            {idea || "—"}
-          </p>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Words", value: words },
+            { label: "Duration", value: duration },
+            { label: "Platform", value: platform },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-muted/40 rounded-lg px-2.5 py-2">
+              <p className="font-body text-[9px] text-muted-foreground uppercase tracking-wider">
+                {label}
+              </p>
+              <p className="font-body text-xs font-semibold text-foreground mt-0.5">
+                {value}
+              </p>
+            </div>
+          ))}
         </div>
+
+        {/* Trend insight */}
+        {trendInsight && (
+          <div className="bg-primary/5 border border-primary/15 rounded-lg px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold text-primary mb-1">
+              Trend Insight
+            </p>
+            <p className="font-body text-xs text-foreground leading-snug">
+              {trendInsight}
+            </p>
+          </div>
+        )}
 
         {/* Hook */}
         {hookLine && (
           <div>
-            <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Hook line
+            <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+              Hook Line
             </p>
-            <p className="font-heading text-sm text-primary leading-snug">
-              "{hookLine}"
-            </p>
-            {hookTip && (
-              <p className="font-body text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                {hookTip}
+            <div className="bg-orange-500/5 border border-orange-500/15 rounded-lg px-3 py-2.5">
+              <p className="font-body text-xs font-medium text-foreground leading-snug">
+                "{hookLine}"
               </p>
-            )}
-            <button
-              onClick={onTryAnotherHook}
-              disabled={isRewriting}
-              className="mt-2 flex items-center gap-1.5 font-body text-[11px] text-primary/80
-                         hover:text-primary transition-colors disabled:opacity-50"
-            >
-              {isRewriting ? (
-                <Loader2 size={10} className="animate-spin" />
-              ) : (
-                <RefreshCw size={10} />
+              {hookTip && (
+                <p className="font-body text-[10px] text-muted-foreground mt-1.5 leading-snug">
+                  {hookTip}
+                </p>
               )}
-              Try another hook
-            </button>
-
-            {/* Hook variants */}
-            {showHookVariants && hookVariants.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {hookVariants.map((v, i) => (
-                  <div
-                    key={i}
-                    className="bg-primary/6 border border-primary/15 rounded-xl p-2.5 relative group"
-                  >
-                    <p className="font-body text-xs text-foreground leading-snug pr-5">
-                      "{v.text}"
-                    </p>
-                    {v.improvement && (
-                      <p className="font-body text-[10px] text-muted-foreground mt-1">
-                        {v.improvement}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => onCopyVariant(v.text, i)}
-                      className="absolute top-2 right-2 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {hookVariantCopied === i ? (
-                        <Check size={11} className="text-emerald-500" />
-                      ) : (
-                        <Copy size={11} />
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {showHookVariants && !isRewriting && hookVariants.length === 0 && (
-              <p className="mt-2 font-body text-[11px] text-muted-foreground">
-                No variants returned. Try again.
-              </p>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Stats */}
-        <div>
-          <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Script stats
-          </p>
-          <div className="space-y-1.5">
-            {[
-              { l: "Words", v: words, acc: false },
-              { l: "Duration", v: duration, acc: true },
-              { l: "Platform", v: platform, acc: false },
-            ].map((row) => (
-              <div key={row.l} className="flex items-center justify-between">
-                <span className="font-body text-xs text-muted-foreground">
-                  {row.l}
-                </span>
-                <span
-                  className={`font-body text-xs font-semibold ${row.acc ? "text-primary" : "text-foreground"}`}
-                >
-                  {row.v}
-                </span>
-              </div>
-            ))}
+        {/* Caption */}
+        {caption && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Caption
+              </p>
+              <button
+                onClick={() => copy(caption, "cap")}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {copied === "cap" ? (
+                  <Check size={11} className="text-emerald-500" />
+                ) : (
+                  <Copy size={11} />
+                )}
+              </button>
+            </div>
+            <p className="font-body text-xs text-foreground leading-relaxed whitespace-pre-line line-clamp-6">
+              {caption}
+            </p>
           </div>
-        </div>
+        )}
 
-        {/* ARIA tip */}
-        <div className="flex items-start gap-2 bg-primary/6 border border-primary/15 rounded-xl p-2.5">
-          <Sparkles size={11} className="text-primary mt-0.5 shrink-0" />
-          <p className="font-body text-[11px] text-muted-foreground leading-snug">
-            Add a pattern-interrupt in your hook — try a number or
-            counter-intuitive statement to spike 3-second retention.
-          </p>
-        </div>
+        {/* Hashtags */}
+        {hashtags?.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Hashtags
+              </p>
+              <button
+                onClick={() => copy(hashtags.join(" "), "tags")}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {copied === "tags" ? (
+                  <Check size={11} className="text-emerald-500" />
+                ) : (
+                  <Copy size={11} />
+                )}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {hashtags.slice(0, 8).map((t, i) => (
+                <span
+                  key={i}
+                  className="font-body text-[10px] text-primary bg-primary/8 px-2 py-0.5 rounded-full"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -375,694 +505,692 @@ function ContextPanel({
 function HistoryDrawer({ history, onSelect, onClose }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      className="absolute top-0 right-0 h-full w-72 bg-card border-l border-border z-20 flex flex-col shadow-xl"
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 28 }}
+      className="absolute right-0 top-0 h-full w-72 bg-card border-l border-border z-20 flex flex-col shadow-xl"
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <p className="font-heading text-sm text-foreground">History</p>
+        <p className="font-body text-sm font-semibold text-foreground">
+          Script History
+        </p>
         <button
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <X size={14} />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {history.length === 0 && (
-          <p className="font-body text-xs text-muted-foreground text-center pt-8">
-            No saved scripts yet.
-          </p>
-        )}
-        {history.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => onSelect(s)}
-            className="w-full text-left bg-muted/50 hover:bg-muted/80 rounded-xl px-3 py-2.5 transition-colors"
-          >
-            <p className="font-body text-xs font-semibold text-foreground truncate">
-              {s.idea || "Untitled"}
-            </p>
-            <p className="font-body text-[10px] text-muted-foreground mt-0.5">
-              {new Date(s.created_at || s.createdAt).toLocaleDateString(
-                "en-IN",
-                { day: "numeric", month: "short" },
-              )}
-            </p>
-          </button>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Note Picker Dropdown — triggered by "/" in idea textarea ──────────────────
-function NotePickerDropdown({ notes, query, onSelect, onClose }) {
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    return notes
-      .filter((n) => {
-        if (!q) return true;
-        return (
-          (n.title || "").toLowerCase().includes(q) ||
-          (n.content || "").toLowerCase().includes(q) ||
-          (n.tags || []).some((t) => t.includes(q))
-        );
-      })
-      .slice(0, 8);
-  }, [notes, query]);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -6, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-      transition={{ duration: 0.13 }}
-      className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
-        <div className="flex items-center gap-2">
-          <StickyNote size={12} className="text-primary" />
-          <span className="font-body text-xs font-semibold text-muted-foreground">
-            Insert from Notes
-            {query && <span className="text-foreground"> · "{query}"</span>}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X size={12} />
-        </button>
-      </div>
-
-      {/* List */}
-      <div className="max-h-56 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <p className="px-4 py-4 font-body text-sm text-muted-foreground text-center">
-            No notes match{query ? ` "${query}"` : ""}
+        {!history.length ? (
+          <p className="font-body text-xs text-muted-foreground text-center py-8">
+            No saved scripts yet
           </p>
         ) : (
-          filtered.map((note) => {
-            const displayTags = sortTags(note.tags ?? []).slice(0, 3);
-            return (
-              <button
-                key={note.id}
-                onClick={() => onSelect(note)}
-                className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors border-b border-border/40 last:border-0 group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-body text-sm text-foreground font-semibold truncate group-hover:text-primary transition-colors">
-                      {note.title || "(untitled)"}
-                    </p>
-                    {note.content && (
-                      <p className="font-body text-xs text-muted-foreground truncate mt-0.5">
-                        {note.content.slice(0, 70)}…
-                      </p>
-                    )}
-                  </div>
-                  {displayTags.length > 0 && (
-                    <div className="flex gap-1 flex-shrink-0 mt-0.5">
-                      {displayTags.map((tag) => {
-                        const meta = STRUCTURAL_TAG_META[tag];
-                        return (
-                          <span
-                            key={tag}
-                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold
-                              ${meta?.color ?? "bg-muted text-muted-foreground"}`}
-                          >
-                            {meta?.emoji ?? `#${tag}`}
-                          </span>
-                        );
-                      })}
-                    </div>
+          history.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => onSelect(s)}
+              className="w-full text-left bg-muted/50 hover:bg-muted/80 rounded-xl px-3 py-2.5 transition-colors"
+            >
+              <p className="font-body text-xs font-semibold text-foreground truncate">
+                {s.idea || "Untitled"}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                {s.format && (
+                  <span className="font-body text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full capitalize">
+                    {s.format}
+                  </span>
+                )}
+                <p className="font-body text-[10px] text-muted-foreground">
+                  {new Date(s.created_at || s.createdAt).toLocaleDateString(
+                    "en-IN",
+                    { day: "numeric", month: "short" },
                   )}
-                </div>
-              </button>
-            );
-          })
+                </p>
+              </div>
+            </button>
+          ))
         )}
-      </div>
-
-      <div className="px-3 py-2 border-t border-border bg-muted/20">
-        <p className="font-body text-[10px] text-muted-foreground">
-          Type to filter · Click to insert · Esc to close
-        </p>
       </div>
     </motion.div>
   );
 }
 
-// ── Main Studio ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Main Studio
+// ══════════════════════════════════════════════════════════════════════════════
 export default function Studio() {
   const navigate = useNavigate();
   const { dbUser } = useFirebaseAuth();
 
-  // Creator flow pre-fill — use separate selectors to avoid object-literal
-  // returning a new ref on every render (causes getSnapshot infinite loop)
+  // Creator flow pre-fill
   const ideaFromFlow = useCreatorFlow((s) => s.selectedIdea?.title || "");
   const setStudioSession = useCreatorFlow((s) => s.setStudioSession);
+  const setIdeaText = useCreatorFlow((s) => s.setIdeaText);
+  const setLaunchCtx = useCreatorFlow((s) => s.setLaunchContext);
 
-  // Local state — identical to original
+  // Form state
   const [idea, setIdea] = useState(ideaFromFlow || "");
-  const [result, setResult] = useState(null);
-  const [editedSections, setEditedSections] = useState([]);
+  const [format, setFormat] = useState("reel");
+  const [mood, setMood] = useState("");
+  const [angle, setAngle] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Pipeline state
+  const [isRunning, setIsRunning] = useState(false);
+  const [phase, setPhase] = useState(null); // "researching" | "scripting" | "done"
+  const [statusMsg, setStatusMsg] = useState("");
+  const [error, setError] = useState(null);
+
+  // Research state
+  const [researchBrief, setResearchBrief] = useState(null);
+
+  // Script state (streamed in)
+  const [sections, setSections] = useState([]);
+  const [totalSections, setTotalSections] = useState(0);
+  const [hookLine, setHookLine] = useState("");
+  const [hookTip, setHookTip] = useState("");
+  const [caption, setCaption] = useState("");
+  const [hashtags, setHashtags] = useState([]);
+  const [trendInsight, setTrendInsight] = useState("");
+  const [totalDuration, setTotalDuration] = useState("");
   const [sessionId, setSessionId] = useState(null);
+
+  // UI state
   const [activeSectionId, setActiveSection] = useState(null);
   const [showContext, setShowContext] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [hookVariants, setHookVariants] = useState([]);
-  const [showHookVariants, setShowHookVariants] = useState(false);
-  const [hookVariantCopied, setHookVariantCopied] = useState(null);
-  const [studioTab, setStudioTab] = useState("script"); // "script" | "deep"
-
-  // Note picker — only new state vs original
-  const [showNotePicker, setShowNotePicker] = useState(false);
-  const [notePickerQuery, setNotePickerQuery] = useState("");
 
   const sectionRefs = useRef({});
-  const ideaRef = useRef(null);
+  const abortRef = useRef(false);
 
-  // API hooks — identical to original; useNotes added for picker only
-  const { mutateAsync: generateScript, isPending } = useScriptStructure();
+  // API hooks
   const { mutateAsync: saveSession } = useSaveSession();
   const { mutateAsync: learnFromEdit } = useLearnFromEdit();
   const { data: historyData } = useScriptHistory();
   const history = historyData?.data || [];
-  const { mutateAsync: createNote } = useCreateNote();
-  const { mutateAsync: rewriteHook, isPending: isRewriting } = useRewriteHook();
 
-  // Notes for the "/" picker (staleTime 2 min from existing hook — no extra cost)
-  const { data: notesData } = useNotes({});
-  const allNotes = notesData?.notes ?? [];
+  const hasResult = sections.length > 0;
+  const words = sections.reduce(
+    (acc, s) =>
+      acc + (s.content || "").trim().split(/\s+/).filter(Boolean).length,
+    0,
+  );
+  const duration = calcDuration(sections.map((s) => s.content || "").join(" "));
 
-  // Pre-fill from flow — identical to original
+  // Sync idea to zustand
   useEffect(() => {
-    if (ideaFromFlow && !idea) setIdea(ideaFromFlow);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ideaFromFlow]);
+    setIdeaText(idea);
+  }, [idea]);
 
-  // Computed — identical to original
-  const words = totalWordCount(editedSections);
-  const duration = calcDuration(editedSections.map((s) => s.content).join(" "));
-
-  // Jump to section — identical to original
-  const jumpToSection = useCallback((id) => {
-    setActiveSection(id);
-    sectionRefs.current[id]?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  }, []);
-
-  // ── Note picker logic (new, self-contained) ───────────────────────────────
-  const handleIdeaChange = useCallback(
-    (e) => {
-      const val = e.target.value;
-      setIdea(val);
-      setSaved(false);
-
-      const lastChar = val[val.length - 1];
-
-      if (lastChar === "/") {
-        setShowNotePicker(true);
-        setNotePickerQuery("");
-        return;
-      }
-
-      if (showNotePicker) {
-        const slashIdx = val.lastIndexOf("/");
-        if (slashIdx !== -1) {
-          setNotePickerQuery(val.slice(slashIdx + 1));
-        } else {
-          // "/" was deleted — close picker
-          setShowNotePicker(false);
-        }
-      }
-    },
-    [showNotePicker],
-  );
-
-  const handleIdeaKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Escape" && showNotePicker) {
-        e.preventDefault();
-        setShowNotePicker(false);
-      }
-    },
-    [showNotePicker],
-  );
-
-  const handleNotePickerSelect = useCallback(
-    (note) => {
-      const slashIdx = idea.lastIndexOf("/");
-      const before = slashIdx !== -1 ? idea.slice(0, slashIdx) : idea;
-      const insert = note.title || note.content?.slice(0, 100) || "";
-      setIdea((before + insert).trimStart());
-      setShowNotePicker(false);
-      setNotePickerQuery("");
-      setTimeout(() => ideaRef.current?.focus(), 50);
-    },
-    [idea],
-  );
-
-  // ── Generate script — IDENTICAL to original ──────────────────────────────
-  const handleGenerate = async () => {
-    if (!idea.trim()) return;
-    setError(null);
-    setResult(null);
-    setSaved(false);
-    setSessionId(null);
-    try {
-      const res = await generateScript({
-        idea,
-        platform: dbUser?.primary_platform || "instagram",
-        niche: dbUser?.niches?.[0] || "general",
-        archetype: dbUser?.archetype || "CREATOR",
-        followerRange: dbUser?.follower_range || "1K-10K",
-      });
-      const data = res.data;
-      setResult(data);
-      const cloned = JSON.parse(JSON.stringify(data.sections || []));
-      setEditedSections(cloned);
-      if (cloned.length > 0) setActiveSection(cloned[0].id);
-
-      const savedRes = await saveSession({
-        idea,
-        platform: dbUser?.primary_platform || "instagram",
-        niche: dbUser?.niches?.[0] || "general",
-        generatedScript: data,
-        editedScript: {},
-      });
-      const sid = savedRes?.data?.sessionId || null;
-      setSessionId(sid);
-      setStudioSession?.(sid, data, cloned);
-      setShowHookVariants(false);
-      setHookVariants([]);
-
-      // Auto-save hook section to notes silently
-      const hookSection = cloned.find((s) => {
-        const l = (s.label || s.type || "").toLowerCase();
-        return l.includes("hook") || l.includes("open");
-      });
-      if (hookSection?.content) {
-        createNote({
-          title: idea.slice(0, 80),
-          content: hookSection.content,
-          source: "studio_hook",
-          source_meta: { sessionId: sid },
-          tags: ["hook"],
-        }).catch(() => {});
-      }
-    } catch (e) {
-      console.error(e);
-      setError("Could not generate script. Please try again.");
-    }
-  };
-
-  // ── Section edit — IDENTICAL to original ─────────────────────────────────
-  const handleSectionChange = (sectionId, newContent) => {
-    setEditedSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, content: newContent } : s)),
+  const handleSectionChange = useCallback((id, value) => {
+    setSections((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, content: value } : s)),
     );
     setSaved(false);
+  }, []);
+
+  const resetState = () => {
+    setResearchBrief(null);
+    setSections([]);
+    setTotalSections(0);
+    setHookLine("");
+    setHookTip("");
+    setCaption("");
+    setHashtags([]);
+    setTrendInsight("");
+    setTotalDuration("");
+    setSessionId(null);
+    setSaved(false);
+    setError(null);
+    setPhase(null);
+    setStatusMsg("");
   };
 
-  // ── Save — IDENTICAL to original ─────────────────────────────────────────
+  const handleGenerate = async () => {
+    if (!idea.trim() || isRunning) return;
+    resetState();
+    setIsRunning(true);
+    abortRef.current = false;
+
+    try {
+      await streamScript(
+        {
+          idea: idea.trim(),
+          platform: dbUser?.primary_platform || "instagram",
+          niche: dbUser?.niches?.[0] || "general",
+          format,
+          mood: mood || undefined,
+          angle: angle || undefined,
+        },
+        (event) => {
+          if (abortRef.current) return;
+
+          switch (event.type) {
+            case "phase":
+              setPhase(event.phase);
+              setStatusMsg(event.label);
+              break;
+
+            case "research_update":
+              setStatusMsg(event.message);
+              break;
+
+            case "research_done":
+              setResearchBrief(event.brief);
+              setStatusMsg("Research complete. Writing your script…");
+              break;
+
+            case "section":
+              setTotalSections(event.total);
+              setSections((prev) => {
+                const exists = prev.find((s) => s.id === event.section.id);
+                if (exists) return prev;
+                return [...prev, event.section];
+              });
+              break;
+
+            case "meta":
+              setHookLine(event.hookLine);
+              setHookTip(event.hookTip);
+              setCaption(event.caption);
+              setHashtags(event.hashtags);
+              setTrendInsight(event.trendInsight);
+              setTotalDuration(event.totalDuration);
+              break;
+
+            case "done":
+              setPhase("done");
+              setStatusMsg("Script ready!");
+              setIsRunning(false);
+              // Store in zustand for launch
+              setStudioSession(null, event.result, event.result.sections);
+              break;
+
+            case "error":
+              setError(event.message);
+              setIsRunning(false);
+              break;
+          }
+        },
+      );
+    } catch (err) {
+      if (!abortRef.current) setError(err.message || "Generation failed");
+      setIsRunning(false);
+    }
+  };
+
+  const handleStop = () => {
+    abortRef.current = true;
+    setIsRunning(false);
+    setPhase(null);
+    setStatusMsg("Stopped.");
+  };
+
   const handleSave = async () => {
-    if (!sessionId || !result) return;
+    if (saving || saved || !sections.length) return;
     setSaving(true);
     try {
-      await saveSession({
+      const data = await saveSession({
         idea,
         platform: dbUser?.primary_platform || "instagram",
         niche: dbUser?.niches?.[0] || "general",
-        generatedScript: result,
-        editedScript: { sections: editedSections },
+        format,
+        generatedScript: {
+          sections,
+          hookLine,
+          hookTip,
+          caption,
+          hashtags,
+          trendInsight,
+          researchBrief,
+        },
+        editedScript: { sections },
       });
-      // Learn from edits only when content actually changed
-      const changed = editedSections.filter((s) => {
-        const orig = result.sections?.find((o) => o.id === s.id);
-        return orig && orig.content !== s.content;
-      });
-      if (changed.length > 0) {
-        await learnFromEdit({
-          generatedSections: result.sections,
-          editedSections,
-          intentLabel: "tightened_language",
-          sessionId,
+      const sId = data?.data?.sessionId;
+      setSessionId(sId);
+      setStudioSession(sId, { sections, hookLine, hookTip }, sections);
+      setSaved(true);
+
+      // Learn from any edits
+      if (sections.length > 0) {
+        learnFromEdit({
+          generatedSections: sections,
+          editedSections: sections,
+          intentLabel: "script_edit",
+          sessionId: sId,
         }).catch(() => {});
       }
-      setSaved(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSaving(false);
-    }
+    } catch {}
+    setSaving(false);
   };
 
-  // ── Try another hook — IDENTICAL to original ─────────────────────────────
-  const handleTryAnotherHook = async () => {
-    if (!result?.hookLine || !idea) return;
-    setShowHookVariants(true);
-    setHookVariants([]);
-    try {
-      const res = await rewriteHook({
-        hook: result.hookLine,
+  // ── Go to Launch — passes full context ──────────────────────────────────────
+  const handleGoToLaunch = () => {
+    // Build a full script text from sections
+    const fullScript = sections
+      .map((s) => `[${s.label}]\n${s.content}`)
+      .join("\n\n");
+
+    // Store everything in zustand so Launch page can pre-fill
+    setStudioSession(
+      sessionId,
+      { sections, hookLine, hookTip, totalDuration },
+      sections,
+    );
+    setIdeaText(idea);
+
+    // Navigate with state — Launch page reads from creatorFlow (zustand)
+    // Also store the rich context that Launch needs for the posting package
+    setLaunchCtx(
+      {
+        // Pre-built caption from research (Launch can use or override)
+        caption,
+        hashtags,
+        script: fullScript,
+        hookLine,
+        trendInsight,
+        format,
         platform: dbUser?.primary_platform || "instagram",
-        niche: dbUser?.niches?.[0],
-      });
-      setHookVariants(res?.data?.rewrites ?? res?.rewrites ?? []);
-    } catch (e) {
-      console.error(e);
+      },
+      null, // slot is determined by Launch's own timing API
+    );
+
+    navigate("/dashboard/launch");
+  };
+
+  const handleSelectHistory = (session) => {
+    const script = session.edited_script || session.generated_script || {};
+    if (script.sections?.length) {
+      setSections(script.sections);
+      setHookLine(script.hookLine || "");
+      setHookTip(script.hookTip || "");
+      setCaption(script.caption || "");
+      setHashtags(script.hashtags || []);
+      setTrendInsight(script.trendInsight || "");
+      setResearchBrief(script.researchBrief || null);
+      setFormat(session.format || "reel");
     }
-  };
-
-  // ── Copy variant — IDENTICAL to original ─────────────────────────────────
-  const handleCopyVariant = (text, idx) => {
-    navigator.clipboard.writeText(text);
-    setHookVariantCopied(idx);
-    setTimeout(() => setHookVariantCopied(null), 1500);
-  };
-
-  // ── Load from history — IDENTICAL to original ────────────────────────────
-  const handleSelectHistory = (script) => {
-    const active = script.edited_script?.sections?.length
-      ? script.edited_script
-      : script.generated_script || null;
-    setIdea(script.idea);
-    setResult(active);
-    setEditedSections(JSON.parse(JSON.stringify(active?.sections || [])));
-    setSessionId(script.id);
+    setIdea(session.idea || "");
+    setSessionId(session.id);
+    setSaved(true);
     setShowHistory(false);
-    setSaved(false);
-    if (active?.sections?.[0]) setActiveSection(active.sections[0].id);
+    setPhase("done");
   };
 
-  // ── Render — IDENTICAL to original except idea textarea block ────────────
+  // ── Layout ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
-      {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-4 lg:px-5 py-2.5 border-b border-border bg-card/50 backdrop-blur shrink-0">
-        <div>
-          <h1 className="font-heading text-lg text-foreground">Studio</h1>
-          {result && (
-            <p className="font-body text-[11px] text-muted-foreground">
-              {words} words · {duration}
-            </p>
+    <div className="flex flex-col h-full bg-background">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 lg:px-5 py-3 border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <Clapperboard size={16} className="text-primary" />
+          <h1 className="font-display text-base font-semibold text-foreground">
+            Studio
+          </h1>
+          {format && (
+            <span className="font-body text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+              {format}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
+          {hasResult && (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={saving || saved}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs font-semibold transition-all
+                  ${saved ? "bg-emerald-500/15 text-emerald-600" : saving ? "opacity-60" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+              >
+                {saved ? (
+                  <>
+                    <CheckCircle2 size={12} /> Saved
+                  </>
+                ) : saving ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" /> Saving…
+                  </>
+                ) : (
+                  <>
+                    <Save size={12} /> Save
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleGoToLaunch}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white font-body text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
+                Go to Launch <ArrowRight size={12} />
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted
-                       font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs font-medium transition-all
+              ${showHistory ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"}`}
           >
-            <Clock size={12} /> History
+            <History size={12} />
+            History
           </button>
-          {result && (
+          {hasResult && (
             <button
               onClick={() => setFocusMode(!focusMode)}
-              className="p-2 rounded-xl bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1.5"
+              title={focusMode ? "Exit focus" : "Focus mode"}
             >
-              {focusMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              {focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
           )}
-          {result && (
-            <button
-              onClick={handleSave}
-              disabled={saving || saved}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs font-semibold transition-all
-                ${
-                  saved
-                    ? "bg-emerald-500/15 text-emerald-600"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              {saved ? (
-                <>
-                  <CheckCircle2 size={12} /> Saved
-                </>
-              ) : saving ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />{" "}
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <Save size={12} /> Save
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={() => navigate("/dashboard/launch")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white font-body text-xs font-semibold
-                       hover:opacity-90 transition-opacity"
-          >
-            Go to Launch <ArrowRight size={12} />
-          </button>
         </div>
       </div>
-      <div className="flex items-center gap-1 p-1 mx-4 lg:mx-5 mt-3 bg-muted/40 rounded-xl border border-border w-fit">
-        <button
-          onClick={() => setStudioTab("script")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm font-medium transition-all
-      ${
-        studioTab === "script"
-          ? "bg-card text-foreground shadow-sm border border-border"
-          : "text-muted-foreground hover:text-foreground"
-      }`}
-        >
-          <Clapperboard size={14} />
-          Script Builder
-        </button>
-        <button
-          onClick={() => setStudioTab("deep")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm font-medium transition-all
-      ${
-        studioTab === "deep"
-          ? "bg-card text-foreground shadow-sm border border-border"
-          : "text-muted-foreground hover:text-foreground"
-      }`}
-        >
-          <Telescope size={14} />
-          Deep Analysis
-          <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
-            NEW
-          </span>
-        </button>
-      </div>
 
-      {studioTab === "deep" ? (
-        <div className="flex flex-1 overflow-hidden">
-          <DeepAnalysis
-            userNiche={dbUser?.niches?.[0]}
-            userPlatform={dbUser?.primary_platform}
-          />
-        </div>
-      ) : (
-        /* ── Three-panel shell ── */
-        <div className="flex flex-1 overflow-hidden relative">
-          {/* Left: Outline (hidden in focus mode, desktop only) */}
-          {!focusMode && result && (
-            <div className="hidden lg:flex">
-              <OutlinePanel
-                sections={editedSections}
-                activeSectionId={activeSectionId}
-                onJump={jumpToSection}
-                onAdd={() => {}}
-              />
-            </div>
-          )}
-
-          {/* Centre: Editor */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 space-y-5">
-              {/* ── Idea textarea with note picker ── */}
-              <div className="relative">
-                <textarea
-                  ref={ideaRef}
-                  className="w-full bg-muted/40 border border-border rounded-2xl px-4 py-3.5
-                           font-body text-sm text-foreground placeholder:text-muted-foreground/50
-                           resize-none outline-none focus:border-primary/40 transition-colors"
-                  rows={2}
-                  value={idea}
-                  onChange={handleIdeaChange}
-                  onKeyDown={handleIdeaKeyDown}
-                  placeholder="What's your content idea? Type / to insert from Notes…"
-                />
-                <AnimatePresence>
-                  {showNotePicker && (
-                    <NotePickerDropdown
-                      notes={allNotes}
-                      query={notePickerQuery}
-                      onSelect={handleNotePickerSelect}
-                      onClose={() => setShowNotePicker(false)}
+      {/* Main body */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Left: input + script */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-2xl mx-auto px-4 lg:px-6 py-5 space-y-5">
+            {/* ── Input panel ─────────────────────────────────────────────── */}
+            <AnimatePresence>
+              {!focusMode && (
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="rounded-2xl border border-border bg-card p-5 space-y-4"
+                >
+                  {/* Idea */}
+                  <div className="space-y-1.5">
+                    <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Content Idea
+                    </label>
+                    <textarea
+                      value={idea}
+                      onChange={(e) => setIdea(e.target.value)}
+                      placeholder="What's your content idea? Be specific — 'morning skincare for oily skin' not just 'skincare'"
+                      rows={2}
+                      disabled={isRunning}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/40 border border-border font-body text-sm
+                                 text-foreground placeholder:text-muted-foreground/50 resize-none outline-none
+                                 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60 transition-all"
                     />
-                  )}
-                </AnimatePresence>
-              </div>
+                  </div>
 
-              {/* Generate button (no result yet) */}
-              {!result && !isPending && (
-                <motion.div variants={fadeUp} initial="hidden" animate="show">
+                  {/* Format picker */}
+                  <div className="space-y-1.5">
+                    <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Format
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {FORMATS.map((f) => (
+                        <button
+                          key={f.value}
+                          onClick={() => setFormat(f.value)}
+                          disabled={isRunning}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-xs font-medium transition-all
+                            ${
+                              format === f.value
+                                ? "bg-primary text-white"
+                                : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                            } disabled:opacity-50`}
+                        >
+                          <span>{f.emoji}</span> {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Advanced toggles */}
                   <button
-                    onClick={handleGenerate}
-                    disabled={!idea.trim()}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl
-                             bg-primary text-white font-body font-semibold text-sm
-                             hover:opacity-90 transition-opacity disabled:opacity-40"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <Sparkles size={15} /> Generate Script
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+                    />
+                    Advanced options
                   </button>
-                  {error && (
-                    <p className="font-body text-xs text-red-500 text-center mt-2">
-                      {error}
-                    </p>
-                  )}
+
+                  <AnimatePresence>
+                    {showAdvanced && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="grid grid-cols-2 gap-3 overflow-hidden"
+                      >
+                        <div className="space-y-1">
+                          <label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Mood
+                          </label>
+                          <input
+                            value={mood}
+                            onChange={(e) => setMood(e.target.value)}
+                            placeholder="e.g. funny, emotional"
+                            disabled={isRunning}
+                            className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border font-body text-xs
+                                       text-foreground placeholder:text-muted-foreground/50 outline-none
+                                       focus:ring-1 focus:ring-primary/30 disabled:opacity-60 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Angle
+                          </label>
+                          <input
+                            value={angle}
+                            onChange={(e) => setAngle(e.target.value)}
+                            placeholder="e.g. for beginners"
+                            disabled={isRunning}
+                            className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border font-body text-xs
+                                       text-foreground placeholder:text-muted-foreground/50 outline-none
+                                       focus:ring-1 focus:ring-primary/30 disabled:opacity-60 transition-all"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Generate / Stop */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={isRunning ? handleStop : handleGenerate}
+                      disabled={!idea.trim() && !isRunning}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-body font-semibold text-sm
+                                  transition-all disabled:opacity-40
+                                  ${
+                                    isRunning
+                                      ? "bg-red-500/10 text-red-500 hover:bg-red-500/15 border border-red-500/20"
+                                      : "bg-primary text-white hover:bg-primary/90"
+                                  }`}
+                    >
+                      {isRunning ? (
+                        <>
+                          <X size={14} /> Stop
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} /> Generate Script
+                        </>
+                      )}
+                    </button>
+                    {hasResult && !isRunning && (
+                      <button
+                        onClick={() => {
+                          resetState();
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-body text-sm
+                                   text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
+                      >
+                        <RefreshCw size={13} /> Clear
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               )}
+            </AnimatePresence>
 
-              {/* Generating state */}
-              {isPending && (
-                <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground font-body text-sm">
-                  <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  ARIA is writing…
-                </div>
+            {/* ── Phase indicator (while running) ─────────────────────────── */}
+            <AnimatePresence>
+              {(isRunning || (phase && phase !== "done")) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <PhaseBar
+                    phase={phase}
+                    statusMsg={statusMsg}
+                    sectionsTotal={totalSections}
+                    sectionsDone={sections.length}
+                  />
+                </motion.div>
               )}
+            </AnimatePresence>
 
-              {/* Hook banner */}
-              <AnimatePresence>
-                {result?.hookLine && !isPending && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3.5"
-                  >
-                    <p className="font-body text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
-                      Opening hook
-                    </p>
-                    <p className="font-heading text-base text-foreground">
-                      "{result.hookLine}"
-                    </p>
-                    {result.hookTip && (
-                      <p className="font-body text-xs text-muted-foreground mt-1.5">
-                        {result.hookTip}
-                      </p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            {/* ── Error ───────────────────────────────────────────────────── */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/20"
+                >
+                  <AlertCircle
+                    size={14}
+                    className="text-red-500 mt-0.5 shrink-0"
+                  />
+                  <p className="font-body text-sm text-red-600">{error}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-              {/* Section blocks */}
-              <AnimatePresence>
-                {result && !isPending && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="space-y-4"
-                  >
-                    {editedSections.map((section, idx) => (
-                      <SectionBlock
-                        key={section.id}
-                        section={section}
-                        index={idx}
-                        onChange={handleSectionChange}
-                        isActive={activeSectionId === section.id}
-                        onFocus={setActiveSection}
-                        sectionRef={(el) => {
-                          sectionRefs.current[section.id] = el;
-                        }}
-                      />
-                    ))}
+            {/* ── Research brief (collapsible) ─────────────────────────────── */}
+            <ResearchBriefCard
+              brief={researchBrief}
+              visible={!!researchBrief}
+            />
 
-                    {/* Bottom actions */}
-                    <div className="flex gap-3 pt-4 pb-10">
-                      <button
-                        onClick={handleSave}
-                        disabled={saving || saved}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                        font-body font-semibold text-sm transition-all
-                        ${saved ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                      >
-                        {saved ? (
-                          <>
-                            <CheckCircle2 size={14} /> Saved
-                          </>
-                        ) : (
-                          <>
-                            <Save size={14} /> Save script
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => navigate("/dashboard/launch")}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                                 bg-primary text-white font-body font-semibold text-sm hover:opacity-90 transition-opacity"
-                      >
-                        Go to Launch <ArrowRight size={14} />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            {/* ── Trend insight banner ─────────────────────────────────────── */}
+            <AnimatePresence>
+              {trendInsight && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-start gap-3 px-4 py-3 rounded-xl bg-primary/8 border border-primary/15"
+                >
+                  <Sparkles
+                    size={14}
+                    className="text-primary shrink-0 mt-0.5"
+                  />
+                  <p className="font-body text-xs font-medium text-foreground">
+                    {trendInsight}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-              {/* Re-generate button (after result) */}
-              {result && !isPending && (
-                <div className="pb-4">
+            {/* ── Script sections ──────────────────────────────────────────── */}
+            <div className="space-y-3">
+              {sections.map((section, idx) => (
+                <SectionBlock
+                  key={section.id}
+                  section={section}
+                  index={idx}
+                  onChange={handleSectionChange}
+                  isActive={activeSectionId === section.id}
+                  onFocus={setActiveSection}
+                  sectionRef={(el) => {
+                    sectionRefs.current[section.id] = el;
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* ── Bottom actions (after complete) ──────────────────────────── */}
+            <AnimatePresence>
+              {hasResult && !isRunning && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3 pt-2 pb-10"
+                >
                   <button
-                    onClick={handleGenerate}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border
-                             font-body text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                    onClick={handleSave}
+                    disabled={saving || saved}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-semibold text-sm transition-all
+                      ${saved ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                   >
-                    <Sparkles size={13} /> Regenerate script
+                    {saved ? (
+                      <>
+                        <CheckCircle2 size={14} /> Saved
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} /> Save script
+                      </>
+                    )}
                   </button>
-                </div>
+                  <button
+                    onClick={handleGoToLaunch}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white
+                               font-body font-semibold text-sm hover:opacity-90 transition-opacity"
+                  >
+                    Go to Launch <ArrowRight size={14} />
+                  </button>
+                </motion.div>
               )}
-            </div>
-          </div>
+            </AnimatePresence>
 
-          {/* Right: Context (desktop, hidden in focus mode) */}
-          {!focusMode && result && showContext && (
-            <div className="hidden lg:flex">
-              <ContextPanel
-                idea={idea}
-                hookLine={result?.hookLine}
-                hookTip={result?.hookTip}
-                words={words}
-                duration={duration}
-                platform={dbUser?.primary_platform || "Instagram"}
-                onClose={() => setShowContext(false)}
-                hookVariants={hookVariants}
-                showHookVariants={showHookVariants}
-                isRewriting={isRewriting}
-                onTryAnotherHook={handleTryAnotherHook}
-                hookVariantCopied={hookVariantCopied}
-                onCopyVariant={handleCopyVariant}
-              />
-            </div>
-          )}
-
-          {/* History drawer */}
-          <AnimatePresence>
-            {showHistory && (
-              <HistoryDrawer
-                history={history}
-                onSelect={handleSelectHistory}
-                onClose={() => setShowHistory(false)}
-              />
+            {/* Regenerate */}
+            {hasResult && !isRunning && (
+              <div className="pb-4">
+                <button
+                  onClick={handleGenerate}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border
+                             font-body text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <Sparkles size={13} /> Regenerate script
+                </button>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
         </div>
-      )}
+
+        {/* Right: context panel */}
+        {!focusMode && hasResult && showContext && (
+          <div className="hidden lg:flex">
+            <ContextPanel
+              hookLine={hookLine}
+              hookTip={hookTip}
+              trendInsight={trendInsight}
+              caption={caption}
+              hashtags={hashtags}
+              words={words}
+              duration={duration}
+              platform={dbUser?.primary_platform || "Instagram"}
+              onClose={() => setShowContext(false)}
+            />
+          </div>
+        )}
+
+        {/* History drawer */}
+        <AnimatePresence>
+          {showHistory && (
+            <HistoryDrawer
+              history={history}
+              onSelect={handleSelectHistory}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
