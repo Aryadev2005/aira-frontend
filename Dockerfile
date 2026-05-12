@@ -33,8 +33,11 @@ RUN printf 'server {\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
 \n\
+    resolver 127.0.0.11 valid=10s ipv6=off;\n\
+    set $backend http://backend:3000;\n\
+\n\
     location /api/ {\n\
-        proxy_pass http://backend:3000;\n\
+        proxy_pass $backend;\n\
         proxy_http_version 1.1;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
@@ -44,7 +47,7 @@ RUN printf 'server {\n\
     }\n\
 \n\
     location /health {\n\
-        proxy_pass http://backend:3000;\n\
+        proxy_pass $backend;\n\
     }\n\
 \n\
     location / {\n\
