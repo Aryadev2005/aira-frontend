@@ -152,7 +152,7 @@ function DesktopSidebar() {
       {/* Brand */}
       <div className="flex items-center justify-between px-4 pt-5 pb-4">
         <div className="font-heading text-xl text-sidebar-foreground tracking-tight">
-          ARIA
+          AIRRA
         </div>
         <span
           className={`font-body text-[10px] font-semibold px-2 py-0.5 rounded-full
@@ -165,31 +165,6 @@ function DesktopSidebar() {
               : "Free"}
         </span>
       </div>
-
-      {/* User card */}
-      <button
-        onClick={() => navigate("/dashboard/profile")}
-        className="mx-3 mb-4 flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/6 hover:bg-white/10 transition-colors"
-      >
-        <div
-          className="w-8 h-8 rounded-full bg-[hsl(var(--sidebar-primary))] flex items-center justify-center
-                        font-heading text-sm text-white flex-shrink-0"
-        >
-          {initials}
-        </div>
-        <div className="min-w-0 text-left flex-1">
-          <p className="font-body text-sm font-semibold text-sidebar-foreground truncate">
-            {name}
-          </p>
-          <p className="font-body text-[11px] text-sidebar-foreground/50 truncate">
-            {handle}
-          </p>
-        </div>
-        <ChevronRight
-          size={13}
-          className="text-sidebar-foreground/30 flex-shrink-0"
-        />
-      </button>
 
       {/* Nav groups */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-4 pb-2">
@@ -325,7 +300,7 @@ function MobileBar() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 pt-5 pb-3">
               <div className="font-heading text-lg text-sidebar-foreground">
-                ARIA
+                AIRRA
               </div>
               <button
                 onClick={() => setOpen(false)}
