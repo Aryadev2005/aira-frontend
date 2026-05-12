@@ -146,6 +146,36 @@ const FORMATS = [
   { value: "thread", label: "Thread", emoji: "🧵" },
 ];
 
+// ── Format duration config ────────────────────────────────────────────────────
+const FORMAT_DURATION_CONFIG = {
+  reel:     { min: 15,  max: 60,  step: 5,  unit: "seconds", label: "Duration",   default: 30  },
+  story:    { min: 5,   max: 60,  step: 5,  unit: "seconds", label: "Duration",   default: 15  },
+  post:     { min: 30,  max: 90,  step: 10, unit: "seconds", label: "Read time",  default: 60  },
+  carousel: { min: 1,   max: 10,  step: 1,  unit: "slides",  label: "Slides",     default: 5   },
+  video:    { min: 1,   max: 180, step: 1,  unit: "minutes", label: "Duration",   default: 5   },
+  thread:   { min: 1,   max: 10,  step: 1,  unit: "tweets",  label: "Tweets",     default: 5   },
+};
+
+// Converts slider value → human-readable label
+function formatDurationDisplay(value, unit) {
+  if (unit === "seconds") {
+    return value >= 60 ? `${Math.floor(value / 60)}m ${value % 60 > 0 ? value % 60 + "s" : ""}`.trim() : `${value}s`;
+  }
+  if (unit === "minutes") {
+    return value >= 60 ? `${Math.floor(value / 60)}h${value % 60 > 0 ? ` ${value % 60}m` : ""}` : `${value} min`;
+  }
+  return `${value} ${unit}`;
+}
+
+// Converts slider value → the duration string sent to the backend
+function formatDurationForBackend(value, unit) {
+  if (unit === "seconds") return `${value} seconds`;
+  if (unit === "minutes") return `${value} minutes`;
+  if (unit === "slides")  return `${value} slides`;
+  if (unit === "tweets")  return `${value} tweets`;
+  return `${value}`;
+}
+
 // ── Phase indicator ───────────────────────────────────────────────────────────
 function PhaseBar({ phase, statusMsg, sectionsTotal, sectionsDone }) {
   const phases = [
@@ -747,6 +777,10 @@ export default function Studio() {
   const [angle, setAngle] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Duration slider state
+  const [durationValue, setDurationValue] = useState(FORMAT_DURATION_CONFIG["reel"].default);
+  const [durationError, setDurationError] = useState("");
+
   // Notes attachment state
   const [showNotesPicker, setShowNotesPicker] = useState(false);
   const [notesSearchQuery, setNotesSearchQuery] = useState("");
@@ -807,6 +841,15 @@ export default function Studio() {
   useEffect(() => {
     setIdeaText(idea);
   }, [idea]);
+
+  // Reset duration to format default when format changes
+  useEffect(() => {
+    const cfg = FORMAT_DURATION_CONFIG[format];
+    if (cfg) {
+      setDurationValue(cfg.default);
+      setDurationError("");
+    }
+  }, [format]);
 
   // Load script from history if coming from calendar
   useEffect(() => {
@@ -915,6 +958,19 @@ export default function Studio() {
     }
   };
 
+  const handleDurationChange = (val) => {
+    const cfg = FORMAT_DURATION_CONFIG[format];
+    if (!cfg) return;
+    const clamped = Math.min(Math.max(val, cfg.min), cfg.max);
+    setDurationValue(clamped);
+    // Inline error — only show if somehow user bypasses the slider (e.g. manual input)
+    if (val > cfg.max) {
+      setDurationError(`Max duration for a ${format} is ${formatDurationDisplay(cfg.max, cfg.unit)}`);
+    } else {
+      setDurationError("");
+    }
+  };
+
   const handleGenerate = async () => {
     if (!idea.trim() || isRunning) return;
     resetState();
@@ -933,6 +989,7 @@ export default function Studio() {
         : undefined;
 
     try {
+      const cfg = FORMAT_DURATION_CONFIG[format];
       await streamScript(
         {
           idea: idea.trim(),
@@ -942,6 +999,7 @@ export default function Studio() {
           mood: mood || undefined,
           angle: angle || undefined,
           userQuery: idea,
+          duration: cfg ? formatDurationForBackend(durationValue, cfg.unit) : undefined,
           attachedNotes: attachedNotesContext,
         },
         (event) => {
@@ -1382,6 +1440,53 @@ export default function Studio() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Duration slider — after format picker */}
+                  {(() => {
+                    const cfg = FORMAT_DURATION_CONFIG[format];
+                    if (!cfg) return null;
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            {cfg.label}
+                          </label>
+                          <span className="font-body text-xs font-semibold text-foreground tabular-nums">
+                            {formatDurationDisplay(durationValue, cfg.unit)}
+                          </span>
+                        </div>
+
+                        <input
+                          type="range"
+                          min={cfg.min}
+                          max={cfg.max}
+                          step={cfg.step}
+                          value={durationValue}
+                          disabled={isRunning}
+                          onChange={(e) => handleDurationChange(Number(e.target.value))}
+                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer
+                                     bg-muted accent-primary disabled:opacity-50"
+                        />
+
+                        <div className="flex justify-between">
+                          <span className="font-body text-[10px] text-muted-foreground">
+                            {formatDurationDisplay(cfg.min, cfg.unit)}
+                          </span>
+                          <span className="font-body text-[10px] text-muted-foreground">
+                            {formatDurationDisplay(cfg.max, cfg.unit)}
+                          </span>
+                        </div>
+
+                        {/* Inline error */}
+                        {durationError && (
+                          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                            <AlertCircle size={12} className="text-destructive shrink-0" />
+                            <p className="font-body text-xs text-destructive">{durationError}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Advanced toggles */}
                   <button
