@@ -779,6 +779,7 @@ export default function Studio() {
 
   // Duration slider state
   const [durationValue, setDurationValue] = useState(FORMAT_DURATION_CONFIG["reel"].default);
+  const [minDurationValue, setMinDurationValue] = useState(FORMAT_DURATION_CONFIG["reel"].min);
   const [durationError, setDurationError] = useState("");
 
   // Notes attachment state
@@ -847,6 +848,7 @@ export default function Studio() {
     const cfg = FORMAT_DURATION_CONFIG[format];
     if (cfg) {
       setDurationValue(cfg.default);
+      setMinDurationValue(cfg.min);
       setDurationError("");
     }
   }, [format]);
@@ -971,6 +973,19 @@ export default function Studio() {
     }
   };
 
+  const handleMinDurationChange = (val) => {
+    const cfg = FORMAT_DURATION_CONFIG[format];
+    if (!cfg) return;
+    const clamped = Math.min(Math.max(val, cfg.min), durationValue);
+    setMinDurationValue(clamped);
+    // Ensure min is not greater than max
+    if (clamped > durationValue) {
+      setDurationError(`Min duration cannot be greater than max duration`);
+    } else {
+      setDurationError("");
+    }
+  };
+
   const handleGenerate = async () => {
     if (!idea.trim() || isRunning) return;
     resetState();
@@ -1000,6 +1015,7 @@ export default function Studio() {
           angle: angle || undefined,
           userQuery: idea,
           duration: cfg ? formatDurationForBackend(durationValue, cfg.unit) : undefined,
+          minDuration: cfg ? formatDurationForBackend(minDurationValue, cfg.unit) : undefined,
           attachedNotes: attachedNotesContext,
         },
         (event) => {
@@ -1475,6 +1491,39 @@ export default function Studio() {
                           <span className="font-body text-[10px] text-muted-foreground">
                             {formatDurationDisplay(cfg.max, cfg.unit)}
                           </span>
+                        </div>
+
+                        {/* Minimum Duration Slider */}
+                        <div className="space-y-2 mt-4 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between">
+                            <label className="font-body text-xs font-semibold text-foreground">
+                              Minimum {cfg.label.toLowerCase()}
+                            </label>
+                            <span className="font-body text-xs font-semibold text-foreground tabular-nums">
+                              {formatDurationDisplay(minDurationValue, cfg.unit)}
+                            </span>
+                          </div>
+
+                          <input
+                            type="range"
+                            min={cfg.min}
+                            max={durationValue}
+                            step={cfg.step}
+                            value={minDurationValue}
+                            disabled={isRunning}
+                            onChange={(e) => handleMinDurationChange(Number(e.target.value))}
+                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer
+                                       bg-muted accent-orange-500 disabled:opacity-50"
+                          />
+
+                          <div className="flex justify-between">
+                            <span className="font-body text-[10px] text-muted-foreground">
+                              {formatDurationDisplay(cfg.min, cfg.unit)}
+                            </span>
+                            <span className="font-body text-[10px] text-muted-foreground">
+                              {formatDurationDisplay(durationValue, cfg.unit)}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Inline error */}

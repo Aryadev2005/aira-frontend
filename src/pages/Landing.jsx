@@ -233,7 +233,7 @@ const LANDING_CSS = `
     font-size: 17px; font-weight: 400; color: var(--text-muted);
     margin-top: 16px; max-width: 520px; line-height: 1.65;
   }
-  .l-section-sub.dark { color: var(--text-muted-lt); }
+  .l-section-sub.dark { color: var(--text-muted-lt); max-width: 600px; margin-left: auto; margin-right: auto; }
 
   /* Scroll reveal */
   .l-reveal {
@@ -435,6 +435,10 @@ export default function Landing() {
 
     // ── 2. Custom cursor — add class to body ──────────────────────────────────
     document.body.classList.add('landing-cursor-active');
+    
+    // Ensure body background matches landing during page scroll
+    const originalBodyBg = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = '#0d0502';
 
     const dot  = cursorDotRef.current;
     const ring = cursorRingRef.current;
@@ -546,27 +550,8 @@ export default function Landing() {
     };
     document.addEventListener('mousemove', onParallax);
 
-    // ── 9. Text scramble on hero lines ────────────────────────────────────────
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('');
-    const scramble = (el, delay = 0) => {
-      const original = el.textContent.trim();
-      let frame = 0;
-      const totalFrames = 20;
-      setTimeout(() => {
-        const interval = setInterval(() => {
-          el.textContent = original.split('').map((c, i) => {
-            if (c === ' ') return ' ';
-            if (frame > (i / original.length) * totalFrames) return c;
-            return chars[Math.floor(Math.random() * chars.length)];
-          }).join('');
-          frame++;
-          if (frame >= totalFrames) { el.textContent = original; clearInterval(interval); }
-        }, 30);
-      }, delay);
-    };
-    const scrambleTimer = setTimeout(() => {
-      document.querySelectorAll('.l-hero-line').forEach((line, i) => scramble(line, i * 150));
-    }, 1200);
+    // ── 9. Hero parallax glow (moved up, no scramble animation) ─────────────
+    document.addEventListener('mousemove', onParallax);
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
@@ -574,6 +559,8 @@ export default function Landing() {
       document.head.removeChild(styleEl);
       // Remove cursor class
       document.body.classList.remove('landing-cursor-active');
+      // Restore body background
+      document.body.style.backgroundColor = originalBodyBg;
       // Cancel RAF
       cancelAnimationFrame(rafId);
       // Remove listeners
@@ -584,7 +571,6 @@ export default function Landing() {
       featureCards.forEach(c => c.removeEventListener('mousemove', onCardMouseMove));
       revealObserver.disconnect();
       clearTimeout(shimmerTimer);
-      clearTimeout(scrambleTimer);
     };
   }, []); // runs once on mount, cleans up on unmount
 
@@ -639,7 +625,7 @@ export default function Landing() {
 
           <div className="l-hero-stats">
             <div className="l-stat-item">
-              <span className="l-stat-num loading" ref={statTrendsRef} id="stat-trends">—</span>
+              <span className="l-stat-num" ref={statTrendsRef} id="stat-trends">2,500+</span>
               <span className="l-stat-label">Trends tracked</span>
             </div>
             <div className="l-stat-divider" />
@@ -749,6 +735,7 @@ export default function Landing() {
                 Matches your content idea to trending audio on Spotify, JioSaavn, and Instagram — so your Reels get the algorithmic boost that comes with the right sound.
               </p>
               <span className="l-feature-tag">Audio intelligence</span>
+              <div style={{ marginTop: '8px', padding: '4px 10px', background: 'rgba(212,115,58,0.1)', borderRadius: '100px', display: 'block', fontSize: '10px', fontWeight: '600', color: '#d4733a', letterSpacing: '0.05em', textTransform: 'uppercase', width: 'fit-content' }}>Coming Soon</div>
             </div>
 
             {/* Card 4 */}
@@ -803,7 +790,7 @@ export default function Landing() {
               <div className="l-live-card">
                 <div className="l-live-card-label">Trends tracked</div>
                 <div className="l-live-card-value">
-                  <span className="l-loading-shimmer" ref={statTrendsLvRef} id="stat-trends-live" />
+                  <span ref={statTrendsLvRef} id="stat-trends-live">2,500+</span>
                 </div>
                 <div className="l-live-card-sub">refreshed every 5 min</div>
               </div>
