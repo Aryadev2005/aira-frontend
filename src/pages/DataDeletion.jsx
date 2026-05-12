@@ -6,13 +6,13 @@ export default function DataDeletion() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => { document.title = 'Data Deletion Request — AIRA'; }, []);
+  useEffect(() => { document.title = 'Data Deletion Request — AIRRA'; }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const subject = encodeURIComponent('Data Deletion Request');
     const body = encodeURIComponent(
-      `Name: ${formData.name}\nRegistered Email: ${formData.email}\n\nMessage:\n${formData.message || 'Please delete all my AIRA data.'}`
+      `Name: ${formData.name}\nRegistered Email: ${formData.email}\n\nMessage:\n${formData.message || 'Please delete all my AIRRA data.'}`
     );
     window.location.href = `mailto:airrasupport@gmail.com?subject=${subject}&body=${body}`;
     setSubmitted(true);
@@ -33,7 +33,7 @@ export default function DataDeletion() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="font-heading text-2xl text-primary">AIRA</Link>
+            <Link to="/" className="font-heading text-2xl text-primary">AIRRA</Link>
             <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary font-body text-sm transition-colors">
               <ArrowLeft size={16} />Back to Home
             </Link>

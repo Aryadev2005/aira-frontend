@@ -297,7 +297,7 @@ export default function VideoDNA() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="bg-card border border-border rounded-xl p-6 text-center">
           <div className="w-10 h-10 mx-auto border-2 border-border border-t-primary rounded-full animate-spin mb-4" />
-          <p className="font-heading text-lg text-foreground mb-3">ARIA is reading the DNA...</p>
+          <p className="font-heading text-lg text-foreground mb-3">AIRRA is reading the DNA...</p>
           <div className="space-y-1.5 text-left max-w-xs mx-auto">
             {['Fetching YouTube metadata', 'Scraping replay heatmap', 'Running Hook Analyst', 'Running Retention Architect', 'Running SEO Strategist', 'Computing Value Density'].map((step, i) => (
               <motion.div key={step} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
@@ -524,8 +524,8 @@ export default function VideoDNA() {
             </div>
           </CollapsibleSection>
 
-          {/* ARIA Insight */}
-          <CollapsibleSection title="ARIA Insight" icon={Clock}>
+          {/* AIRRA Insight */}
+          <CollapsibleSection title="AIRRA Insight" icon={Clock}>
             <div className="space-y-2 pt-1">
               <p className="text-sm font-body text-foreground">{result.ariaInsight}</p>
               {result.benchmarkAnalysis && (
@@ -547,7 +547,7 @@ export default function VideoDNA() {
             <Search size={16} className="text-primary" /> Competitor Gap Analysis
           </h2>
           <p className="text-xs text-muted-foreground font-body">
-            ARIA analyses the top 10 videos in your niche and finds the topic no one has covered.
+            AIRRA analyses the top 10 videos in your niche and finds the topic no one has covered.
           </p>
         </div>
         <div className="flex gap-3">
@@ -611,7 +611,7 @@ export default function VideoDNA() {
             )}
             {gapResult.scriptTemplate && (
               <div className="bg-muted rounded-lg p-4">
-                <p className="text-xs font-semibold font-body mb-2">📝 ARIA Script Template:</p>
+                <p className="text-xs font-semibold font-body mb-2">📝 AIRRA Script Template:</p>
                 <pre className="text-xs font-body text-foreground whitespace-pre-wrap leading-relaxed">
                   {gapResult.scriptTemplate}
                 </pre>

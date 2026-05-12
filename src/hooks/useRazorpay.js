@@ -75,8 +75,8 @@ async function openCheckout({
       key: razorpayKeyId,
       amount,
       currency,
-      name: "ARIA",
-      description: description ?? "ARIA Plan",
+      name: "AIRRA",
+      description: description ?? "AIRRA Plan",
       image: "/logo.png",
       order_id: orderId,
       prefill: {
@@ -91,7 +91,7 @@ async function openCheckout({
           resolve({ dismissed: true });
         },
       },
-      notes: { itemId, paymentType, product: "ARIA" },
+      notes: { itemId, paymentType, product: "AIRRA" },
 
       // Step 3: Payment success → verify on backend
       handler: async (response) => {

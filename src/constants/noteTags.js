@@ -1,6 +1,6 @@
 // src/constants/noteTags.js
 // ── Single source of truth for all structural tag definitions ─────────────────
-// Used by Notes.jsx, NoteCard, NoteEditor, Studio.jsx (/ picker), and ARIA context
+// Used by Notes.jsx, NoteCard, NoteEditor, Studio.jsx (/ picker), and AIRRA context
 
 export const STRUCTURAL_TAGS = [
   "hook", "intro", "cta", "outro", "bridge",

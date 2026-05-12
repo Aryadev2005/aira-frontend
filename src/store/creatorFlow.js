@@ -70,7 +70,7 @@ const useCreatorFlow = create(
         }),
     }),
     {
-      name: "aria-creator-flow",
+      name: "airra-creator-flow",
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         selectedIdea:         state.selectedIdea,
