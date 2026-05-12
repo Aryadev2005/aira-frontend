@@ -25,7 +25,7 @@ function PolicyNavbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="font-heading text-2xl text-primary">AIRA</Link>
+          <Link to="/" className="font-heading text-2xl text-primary">AIRRA</Link>
           <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary font-body text-sm transition-colors">
             <ArrowLeft size={16} />Back to Home
           </Link>
@@ -58,7 +58,7 @@ function TableOfContents({ activeSection }) {
 export default function TermsOfService() {
   const [activeSection, setActiveSection] = useState('acceptance');
 
-  useEffect(() => { document.title = 'Terms of Service — AIRA'; }, []);
+  useEffect(() => { document.title = 'Terms of Service — AIRRA'; }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -86,17 +86,17 @@ export default function TermsOfService() {
 
             <section id="acceptance" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">1. Acceptance of Terms</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">By using AIRA, you agree to these Terms of Service. If you do not agree, do not use AIRA. These Terms constitute a legally binding agreement between you and AIRA.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">By using AIRRA, you agree to these Terms of Service. If you do not agree, do not use AIRRA. These Terms constitute a legally binding agreement between you and AIRRA.</p>
             </section>
 
             <section id="description" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">2. Description of Service</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRA provides AI-powered content intelligence tools for Indian social media creators. Features include trend analysis, content generation, song recommendations, and account analytics — all designed to help creators grow on Instagram and YouTube.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRRA provides AI-powered content intelligence tools for Indian social media creators. Features include trend analysis, content generation, song recommendations, and account analytics — all designed to help creators grow on Instagram and YouTube.</p>
             </section>
 
             <section id="eligibility" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">3. Eligibility</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">You must be at least <strong className="text-foreground">13 years old</strong> to use AIRA. By using AIRA, you represent and warrant that you meet this requirement.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">You must be at least <strong className="text-foreground">13 years old</strong> to use AIRRA. By using AIRRA, you represent and warrant that you meet this requirement.</p>
             </section>
 
             <section id="accounts" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
@@ -114,11 +114,11 @@ export default function TermsOfService() {
               <div className="font-body text-foreground text-sm sm:text-base space-y-3 leading-relaxed">
                 <p className="text-muted-foreground">You agree NOT to:</p>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-2">
-                  <li>Use AIRA to create spam or misleading content</li>
-                  <li>Attempt to reverse engineer or scrape AIRA's AI systems</li>
-                  <li>Use AIRA in violation of Instagram's, YouTube's, or any platform's terms</li>
-                  <li>Share, resell, or sublicense AIRA's AI-generated content commercially without attribution</li>
-                  <li>Use AIRA to generate content that is harmful, hateful, or illegal</li>
+                  <li>Use AIRRA to create spam or misleading content</li>
+                  <li>Attempt to reverse engineer or scrape AIRRA's AI systems</li>
+                  <li>Use AIRRA in violation of Instagram's, YouTube's, or any platform's terms</li>
+                  <li>Share, resell, or sublicense AIRRA's AI-generated content commercially without attribution</li>
+                  <li>Use AIRRA to generate content that is harmful, hateful, or illegal</li>
                 </ul>
               </div>
             </section>
@@ -126,10 +126,10 @@ export default function TermsOfService() {
             <section id="ai-content" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">6. AI-Generated Content</h2>
               <ul className="font-body text-muted-foreground text-sm sm:text-base space-y-2 list-disc list-inside leading-relaxed">
-                <li>AIRA uses AI to generate content suggestions, scripts, and captions</li>
+                <li>AIRRA uses AI to generate content suggestions, scripts, and captions</li>
                 <li>You are responsible for reviewing and editing AI-generated content before publishing</li>
-                <li>AIRA does not guarantee the accuracy, originality, or performance of AI-generated content</li>
-                <li>You retain ownership of content you create using AIRA's tools</li>
+                <li>AIRRA does not guarantee the accuracy, originality, or performance of AI-generated content</li>
+                <li>You retain ownership of content you create using AIRRA's tools</li>
               </ul>
             </section>
 
@@ -137,8 +137,8 @@ export default function TermsOfService() {
               <h2 className="font-heading text-xl text-primary mb-4">7. Connected Accounts (Instagram/YouTube)</h2>
               <ul className="font-body text-muted-foreground text-sm sm:text-base space-y-2 list-disc list-inside leading-relaxed">
                 <li>Connecting your social accounts is optional</li>
-                <li>You grant AIRA read-only access to your account analytics</li>
-                <li>AIRA will never post on your behalf without your explicit action</li>
+                <li>You grant AIRRA read-only access to your account analytics</li>
+                <li>AIRRA will never post on your behalf without your explicit action</li>
                 <li>You can disconnect accounts at any time from Settings</li>
                 <li>We comply with Meta Platform Terms and YouTube API Services Terms of Service</li>
               </ul>
@@ -162,16 +162,16 @@ export default function TermsOfService() {
             <section id="ip" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">9. Intellectual Property</h2>
               <ul className="font-body text-muted-foreground text-sm sm:text-base space-y-2 list-disc list-inside leading-relaxed">
-                <li>AIRA's platform, design, and underlying technology are owned by Aryadev Chatterjee</li>
-                <li>You may not copy, reproduce, or distribute AIRA's interface or systems</li>
-                <li>Trend data and analytics are proprietary to AIRA</li>
+                <li>AIRRA's platform, design, and underlying technology are owned by Aryadev Chatterjee</li>
+                <li>You may not copy, reproduce, or distribute AIRRA's interface or systems</li>
+                <li>Trend data and analytics are proprietary to AIRRA</li>
               </ul>
             </section>
 
             <section id="disclaimers" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">10. Disclaimers</h2>
               <ul className="font-body text-muted-foreground text-sm sm:text-base space-y-2 list-disc list-inside leading-relaxed">
-                <li>AIRA is provided "as is" without warranties of any kind</li>
+                <li>AIRRA is provided "as is" without warranties of any kind</li>
                 <li>We do not guarantee specific follower growth or engagement results</li>
                 <li>Trend predictions are AI-generated estimates, not guarantees</li>
                 <li>We are not responsible for actions taken by social media platforms on your account</li>
@@ -180,12 +180,12 @@ export default function TermsOfService() {
 
             <section id="liability" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">11. Limitation of Liability</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRA's liability is limited to the amount you paid in the 3 months preceding any claim. We are not liable for indirect, incidental, or consequential damages arising from your use of AIRA.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRRA's liability is limited to the amount you paid in the 3 months preceding any claim. We are not liable for indirect, incidental, or consequential damages arising from your use of AIRRA.</p>
             </section>
 
             <section id="termination" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">12. Termination</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">We may suspend or terminate your account if you violate these Terms. You may cancel your account at any time via Profile → Delete Account. Upon termination, your access to AIRA will cease immediately.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">We may suspend or terminate your account if you violate these Terms. You may cancel your account at any time via Profile → Delete Account. Upon termination, your access to AIRRA will cease immediately.</p>
             </section>
 
             <section id="governing-law" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
@@ -201,7 +201,7 @@ export default function TermsOfService() {
             <section id="contact" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">15. Contact</h2>
               <div className="font-body text-foreground text-sm sm:text-base space-y-1.5 leading-relaxed">
-                <p><span className="font-medium">Company:</span> <span className="text-muted-foreground">AIRA</span></p>
+                <p><span className="font-medium">Company:</span> <span className="text-muted-foreground">AIRRA</span></p>
                 <p><span className="font-medium">Email:</span> <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a></p>
                 <p><span className="font-medium">Website:</span> <a href="https://airra.in" className="text-primary hover:underline">airra.in</a></p>
               </div>
@@ -212,7 +212,7 @@ export default function TermsOfService() {
       </div>
       <footer className="border-t border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-body text-xs text-muted-foreground">© 2026 AIRA. All rights reserved.</p>
+          <p className="font-body text-xs text-muted-foreground">© 2026 AIRRA. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="font-body text-xs text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
             <Link to="/data-deletion" className="font-body text-xs text-muted-foreground hover:text-primary transition-colors">Data Deletion</Link>

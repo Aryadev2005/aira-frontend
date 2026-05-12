@@ -31,8 +31,8 @@ const stepVariants = {
   exit:   { opacity: 0, x: -40},
 };
 
-const REGISTER_STEP_KEY = 'aria_register_step';
-const REGISTER_DATA_KEY = 'aria_register_data';
+const REGISTER_STEP_KEY = 'airra_register_step';
+const REGISTER_DATA_KEY = 'airra_register_data';
 
 /** Persist onboarding progress without passwords (sessionStorage). */
 function persistRegisterProgress(stepIndex, formData) {
@@ -406,7 +406,7 @@ function StepVerify({ data, onChange, onNext, onBack }) {
           </div>
           <div className="bg-card border border-border rounded-xl p-4 text-left space-y-1.5">
             <p className="font-body text-xs text-muted-foreground mb-1">Steps:</p>
-            <p className="font-body text-sm text-foreground">1. Open the email from ARIA</p>
+            <p className="font-body text-sm text-foreground">1. Open the email from AIRRA</p>
             <p className="font-body text-sm text-foreground">2. Click "Verify email address"</p>
             <p className="font-body text-sm text-foreground">3. Come back and click Continue below</p>
           </div>
@@ -617,12 +617,12 @@ function StepConnect({ data, onChange, onNext, onBack }) {
   const platformConfig = {
     instagram: {
       icon: Instagram, label: 'Instagram',
-      sub: 'ARIA will read your posts, reels and engagement',
+      sub: 'AIRRA will read your posts, reels and engagement',
       gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/10', border: 'border-purple-500/30',
     },
     youtube: {
       icon: Youtube, label: 'YouTube',
-      sub: 'ARIA will read your videos, views and subscriber data',
+      sub: 'AIRRA will read your videos, views and subscriber data',
       gradient: 'from-red-500 to-orange-400', bg: 'bg-red-500/10', border: 'border-red-500/30',
     },
   };
@@ -631,10 +631,10 @@ function StepConnect({ data, onChange, onNext, onBack }) {
     <div>
       <h2 className="font-heading text-2xl text-foreground mb-1">Connect your accounts</h2>
       <p className="text-muted-foreground font-body text-sm mb-2">
-        ARIA needs read-only access to analyse your content and detect your niche.
+        AIRRA needs read-only access to analyse your content and detect your niche.
       </p>
       <p className="text-primary/70 font-body text-xs mb-6">
-        🔒 Read-only. ARIA never posts without your permission.
+        🔒 Read-only. AIRRA never posts without your permission.
       </p>
 
       <ErrorBanner message={error} />
@@ -717,7 +717,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
         <NavButtons
           onBack={onBack}
           onNext={handleNext}
-          nextLabel={allConnected ? 'Let ARIA analyse →' : 'Continue'}
+          nextLabel={allConnected ? 'Let AIRRA analyse →' : 'Continue'}
           disabled={!allConnected}
         />
         <button
@@ -733,7 +733,7 @@ function StepConnect({ data, onChange, onNext, onBack }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// STEP 6 — ARIA analysis
+// STEP 6 — AIRRA analysis
 // ════════════════════════════════════════════════════════════════════════════════
 function StepAnalysis({ data, onFinish }) {
   const [status, setStatus] = useState(() => data.skipProfileAnalysis ? 'skipped' : 'loading');
@@ -747,7 +747,7 @@ function StepAnalysis({ data, onFinish }) {
     'Detecting your niche...',
     'Analysing engagement patterns...',
     'Building your creator profile...',
-    'ARIA is almost ready...',
+    'AIRRA is almost ready...',
   ];
 
   useEffect(() => {
@@ -833,7 +833,7 @@ function StepAnalysis({ data, onFinish }) {
           onClick={onFinish}
           className="w-full py-3 bg-primary text-white rounded-xl font-body font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 mt-4"
         >
-          Enter ARIA <ArrowRight size={16} />
+          Enter AIRRA <ArrowRight size={16} />
         </button>
       </div>
     );
@@ -849,7 +849,7 @@ function StepAnalysis({ data, onFinish }) {
         >
           <Sparkles size={32} className="text-primary" />
         </motion.div>
-        <h2 className="font-heading text-2xl text-foreground mb-2">ARIA is analysing your account</h2>
+        <h2 className="font-heading text-2xl text-foreground mb-2">AIRRA is analysing your account</h2>
         <p className="text-muted-foreground font-body text-sm mb-6">This takes about 30–60 seconds</p>
         <div className="w-full bg-muted rounded-full h-2 mb-4">
           <motion.div
@@ -893,7 +893,7 @@ function StepAnalysis({ data, onFinish }) {
     >
       <div className="text-5xl mb-2">{emoji}</div>
       <div>
-        <h2 className="font-heading text-2xl text-foreground">ARIA found your vibe</h2>
+        <h2 className="font-heading text-2xl text-foreground">AIRRA found your vibe</h2>
         <p className="text-primary font-body font-semibold text-lg mt-1">{archetypeLabel}</p>
       </div>
 
@@ -908,7 +908,7 @@ function StepAnalysis({ data, onFinish }) {
       )}
 
       <div className="bg-card border border-border rounded-xl p-4 text-left">
-        <p className="text-[10px] text-muted-foreground font-body mb-1 uppercase tracking-wide">ARIA says</p>
+        <p className="text-[10px] text-muted-foreground font-body mb-1 uppercase tracking-wide">AIRRA says</p>
         <p className="text-sm text-foreground font-body italic leading-relaxed">"{ariaMessage}"</p>
       </div>
 
@@ -1063,14 +1063,14 @@ export default function Register() {
         followerRange:      'Under 1K',
       }).catch(() => {});
     } catch {}
-    sessionStorage.removeItem('aria_register_step');
-    sessionStorage.removeItem('aria_register_data');
+    sessionStorage.removeItem('airra_register_step');
+    sessionStorage.removeItem('airra_register_data');
     navigate('/dashboard');
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-8 px-4 pb-12">
-      <Link to="/" className="font-heading text-2xl text-primary mb-8">ARIA</Link>
+      <Link to="/" className="font-heading text-2xl text-primary mb-8">AIRRA</Link>
 
       {/* Progress bar */}
       <div className="w-full max-w-sm mb-6">

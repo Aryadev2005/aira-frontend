@@ -62,7 +62,7 @@ export const mockTestimonials = [
     name: "Priya Sharma",
     niche: "Fashion",
     rating: 5,
-    quote: "AIRA told me to post about 'quiet luxury' 3 days before it blew up on Indian Instagram. My reel got 2M views. Nothing else comes close.",
+    quote: "AIRRA told me to post about 'quiet luxury' 3 days before it blew up on Indian Instagram. My reel got 2M views. Nothing else comes close.",
     initials: "PS",
     color: "bg-primary"
   },

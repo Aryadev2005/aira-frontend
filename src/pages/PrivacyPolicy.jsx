@@ -22,7 +22,7 @@ function PolicyNavbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="font-heading text-2xl text-primary">AIRA</Link>
+          <Link to="/" className="font-heading text-2xl text-primary">AIRRA</Link>
           <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary font-body text-sm transition-colors">
             <ArrowLeft size={16} />Back to Home
           </Link>
@@ -55,7 +55,7 @@ function TableOfContents({ activeSection }) {
 export default function PrivacyPolicy() {
   const [activeSection, setActiveSection] = useState('introduction');
 
-  useEffect(() => { document.title = 'Privacy Policy — AIRA'; }, []);
+  useEffect(() => { document.title = 'Privacy Policy — AIRRA'; }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -84,8 +84,8 @@ export default function PrivacyPolicy() {
             <section id="introduction" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">1. Introduction</h2>
               <div className="font-body text-foreground leading-relaxed space-y-3 text-sm sm:text-base">
-                <p>AIRA ("we", "us", "our") is an AI-powered creator intelligence platform operated by Aryadev Chatterjee, based in India. This Privacy Policy explains how we collect, use, and protect your information when you use the AIRA platform available at <a href="https://airra.in" className="text-primary hover:underline">airra.in</a> and our mobile applications.</p>
-                <p>By using AIRA, you agree to the collection and use of information in accordance with this policy. Questions? Contact us at <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a>.</p>
+                <p>AIRRA ("we", "us", "our") is an AI-powered creator intelligence platform operated by Aryadev Chatterjee, based in India. This Privacy Policy explains how we collect, use, and protect your information when you use the AIRRA platform available at <a href="https://airra.in" className="text-primary hover:underline">airra.in</a> and our mobile applications.</p>
+                <p>By using AIRRA, you agree to the collection and use of information in accordance with this policy. Questions? Contact us at <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a>.</p>
               </div>
             </section>
 
@@ -101,7 +101,7 @@ export default function PrivacyPolicy() {
                     <li><span className="font-medium text-foreground">YouTube:</span> Subscriber count, video view counts, upload frequency, title patterns.</li>
                   </ul>
                 </div>
-                <div><p className="font-semibold mb-1">d. Content Generation Data</p><p className="text-muted-foreground">Scripts, captions, hooks, and hashtags you generate using AIRA.</p></div>
+                <div><p className="font-semibold mb-1">d. Content Generation Data</p><p className="text-muted-foreground">Scripts, captions, hooks, and hashtags you generate using AIRRA.</p></div>
                 <div><p className="font-semibold mb-1">e. Usage Data</p><p className="text-muted-foreground">Features used, session duration, and interaction patterns.</p></div>
                 <div><p className="font-semibold mb-1">f. Device Information</p><p className="text-muted-foreground">Device type, operating system, app version, and push notification token.</p></div>
                 <div><p className="font-semibold mb-1">g. Payment Information</p><p className="text-muted-foreground">Subscription status processed via RevenueCat. We do not store card or payment details.</p></div>
@@ -115,7 +115,7 @@ export default function PrivacyPolicy() {
                 <li>Generate AI-powered content tailored to your archetype</li>
                 <li>Analyse your account performance (with your explicit permission)</li>
                 <li>Send trend alerts and posting reminders via push notifications</li>
-                <li>Improve AIRA's AI models and recommendation accuracy</li>
+                <li>Improve AIRRA's AI models and recommendation accuracy</li>
                 <li>Process subscription payments</li>
                 <li>Provide customer support</li>
               </ul>
@@ -136,7 +136,7 @@ export default function PrivacyPolicy() {
                   <li>Upon disconnection, we delete your stored Instagram access token within 24 hours</li>
                 </ul>
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <p>Data obtained via the Instagram Graph API is used solely to provide personalised analytics within AIRA. We comply with Meta's Platform Terms and Developer Policies.</p>
+                  <p>Data obtained via the Instagram Graph API is used solely to provide personalised analytics within AIRRA. We comply with Meta's Platform Terms and Developer Policies.</p>
                 </div>
               </div>
             </section>
@@ -200,7 +200,7 @@ export default function PrivacyPolicy() {
             <section id="data-deletion" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">8. Data Deletion</h2>
               <div className="font-body text-foreground text-sm sm:text-base space-y-4 leading-relaxed">
-                <p className="text-muted-foreground">To delete all your AIRA data, choose one of the following options:</p>
+                <p className="text-muted-foreground">To delete all your AIRRA data, choose one of the following options:</p>
                 <div className="space-y-3">
                   <div className="p-4 bg-secondary rounded-lg"><p className="font-semibold mb-1">Option 1 — In the App</p><p className="text-muted-foreground">Profile → Settings → Delete Account</p></div>
                   <div className="p-4 bg-secondary rounded-lg"><p className="font-semibold mb-1">Option 2 — Email Request</p><p className="text-muted-foreground">Email <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a> with subject: "Data Deletion Request"</p></div>
@@ -222,18 +222,18 @@ export default function PrivacyPolicy() {
 
             <section id="childrens-privacy" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">10. Children's Privacy</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRA is not intended for users under 13 years of age. We do not knowingly collect personal data from children under 13. If you believe a child has provided us with personal information, contact us at <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a> and we will delete it promptly.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">AIRRA is not intended for users under 13 years of age. We do not knowingly collect personal data from children under 13. If you believe a child has provided us with personal information, contact us at <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a> and we will delete it promptly.</p>
             </section>
 
             <section id="changes" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">11. Changes to This Policy</h2>
-              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">We will notify you of material changes via email or in-app notification at least <strong className="text-foreground">7 days</strong> before changes take effect. Continued use of AIRA after that date constitutes acceptance of the updated policy.</p>
+              <p className="font-body text-muted-foreground text-sm sm:text-base leading-relaxed">We will notify you of material changes via email or in-app notification at least <strong className="text-foreground">7 days</strong> before changes take effect. Continued use of AIRRA after that date constitutes acceptance of the updated policy.</p>
             </section>
 
             <section id="contact" className="bg-card border border-border rounded-xl p-6 scroll-mt-24">
               <h2 className="font-heading text-xl text-primary mb-4">12. Contact Us</h2>
               <div className="font-body text-foreground text-sm sm:text-base space-y-1.5 leading-relaxed">
-                <p><span className="font-medium">Company:</span> <span className="text-muted-foreground">AIRA</span></p>
+                <p><span className="font-medium">Company:</span> <span className="text-muted-foreground">AIRRA</span></p>
                 <p><span className="font-medium">Founders:</span> <span className="text-muted-foreground">Aryadev Chatterjee, Sathish Dath, Shamit Sinha</span></p>
                 <p><span className="font-medium">Email:</span> <a href="mailto:airrasupport@gmail.com" className="text-primary hover:underline">airrasupport@gmail.com</a></p>
                 <p><span className="font-medium">Website:</span> <a href="https://airra.in" className="text-primary hover:underline">airra.in</a></p>
@@ -246,7 +246,7 @@ export default function PrivacyPolicy() {
       </div>
       <footer className="border-t border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-body text-xs text-muted-foreground">© 2026 AIRA. All rights reserved.</p>
+          <p className="font-body text-xs text-muted-foreground">© 2026 AIRRA. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <Link to="/terms" className="font-body text-xs text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>
             <Link to="/data-deletion" className="font-body text-xs text-muted-foreground hover:text-primary transition-colors">Data Deletion</Link>

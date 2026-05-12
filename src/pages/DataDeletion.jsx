@@ -49,7 +49,7 @@ export default function DataDeletion() {
           </div>
           <h1 className="font-heading text-4xl sm:text-5xl text-foreground mb-3">Data Deletion Request</h1>
           <p className="font-body text-muted-foreground text-base leading-relaxed max-w-lg mx-auto">
-            We respect your right to privacy. Use any of the options below to request deletion of all your AIRA data.
+            We respect your right to privacy. Use any of the options below to request deletion of all your AIRRA data.
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default function DataDeletion() {
                   <span className="bg-primary/10 text-primary font-body text-xs font-medium px-2.5 py-0.5 rounded-full">Fastest</span>
                 </div>
                 <p className="font-body font-semibold text-foreground text-sm mb-1">Delete directly in the app</p>
-                <p className="font-body text-muted-foreground text-sm">Open AIRA → Profile → Settings → <strong className="text-foreground">Delete Account</strong></p>
+                <p className="font-body text-muted-foreground text-sm">Open AIRRA → Profile → Settings → <strong className="text-foreground">Delete Account</strong></p>
                 <p className="font-body text-muted-foreground text-xs mt-2">All data deleted within 30 days.</p>
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function DataDeletion() {
                   placeholder="email@example.com"
                   className="w-full bg-background border border-border rounded-xl px-4 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 />
-                <p className="font-body text-xs text-muted-foreground mt-1.5">Use the email address associated with your AIRA account</p>
+                <p className="font-body text-xs text-muted-foreground mt-1.5">Use the email address associated with your AIRRA account</p>
               </div>
               <div>
                 <label htmlFor="deletion-message" className="block font-body font-medium text-foreground text-sm mb-1.5">Additional Notes <span className="text-muted-foreground font-normal">(optional)</span></label>

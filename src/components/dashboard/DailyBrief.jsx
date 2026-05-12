@@ -23,7 +23,7 @@ export default function DailyBrief() {
     >
       <div className="flex items-center justify-between mb-4">
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-primary text-white text-xs font-body font-semibold">
-          AIRA DAILY BRIEF
+          AIRRA DAILY BRIEF
         </span>
         <Sparkles size={18} className="text-primary" />
       </div>
