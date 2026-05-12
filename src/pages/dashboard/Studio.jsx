@@ -941,6 +941,7 @@ export default function Studio() {
           format,
           mood: mood || undefined,
           angle: angle || undefined,
+          userQuery: idea,
           attachedNotes: attachedNotesContext,
         },
         (event) => {
