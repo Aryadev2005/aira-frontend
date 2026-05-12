@@ -5,7 +5,7 @@
 // History stored. Go to Launch passes full context (script, caption, hashtags).
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sparkles,
   Clock,
@@ -731,6 +731,7 @@ function NotesPicker({
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Studio() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { dbUser } = useFirebaseAuth();
 
   // Creator flow pre-fill
@@ -806,6 +807,45 @@ export default function Studio() {
   useEffect(() => {
     setIdeaText(idea);
   }, [idea]);
+
+  // Load script from history if coming from calendar
+  useEffect(() => {
+    const calendarEntry = location.state?.calendarEntry;
+    if (calendarEntry && history.length > 0 && !sections.length) {
+      // Search for a script that matches this calendar entry's title
+      const matchingSession = history.find(
+        (session) =>
+          session.idea?.toLowerCase() === calendarEntry.title?.toLowerCase() ||
+          session.idea?.toLowerCase().includes(calendarEntry.title?.toLowerCase()),
+      );
+
+      if (matchingSession) {
+        // Load the script directly instead of calling handleSelectHistory
+        const script =
+          matchingSession.edited_script || matchingSession.generated_script || {};
+        if (script.sections?.length) {
+          setSections(script.sections);
+          setHookLine(script.hookLine || "");
+          setHookTip(script.hookTip || "");
+          setCaption(script.caption || "");
+          setHashtags(script.hashtags || []);
+          setTrendInsight(script.trendInsight || "");
+          setResearchBrief(script.researchBrief || null);
+          setFormat(matchingSession.format || "reel");
+        }
+        setIdea(matchingSession.idea || "");
+        setSessionId(matchingSession.id);
+        setSaved(true);
+        setPhase("done");
+        if (matchingSession.attachedNotes?.length) {
+          setAttachedNotes(matchingSession.attachedNotes);
+        }
+      } else if (calendarEntry.title) {
+        // Pre-fill the idea if no matching script found
+        setIdea(calendarEntry.title);
+      }
+    }
+  }, [location.state?.calendarEntry, history.length]);
 
   const handleSectionChange = useCallback((id, value) => {
     setSections((prev) =>
@@ -945,6 +985,15 @@ export default function Studio() {
               setIsRunning(false);
               // Store in zustand for launch
               setStudioSession(null, event.result, event.result.sections);
+              // Auto-save the generated script to history
+              autoSaveScript(
+                event.result.sections,
+                event.result.hookLine,
+                event.result.hookTip,
+                event.result.caption,
+                event.result.hashtags,
+                event.result.trendInsight,
+              );
               break;
 
             case "error":
@@ -1010,6 +1059,68 @@ export default function Studio() {
     } catch {}
     setSaving(false);
   };
+
+  // Helper to auto-save when script generation completes
+  const autoSaveScript = useCallback(
+    async (
+      generatedSections,
+      generatedHookLine,
+      generatedHookTip,
+      generatedCaption,
+      generatedHashtags,
+      generatedTrendInsight,
+    ) => {
+      try {
+        const data = await saveSession({
+          idea,
+          platform: dbUser?.primary_platform || "instagram",
+          niche: dbUser?.niches?.[0] || "general",
+          format,
+          generatedScript: {
+            sections: generatedSections,
+            hookLine: generatedHookLine,
+            hookTip: generatedHookTip,
+            caption: generatedCaption,
+            hashtags: generatedHashtags,
+            trendInsight: generatedTrendInsight,
+            researchBrief,
+          },
+          editedScript: { sections: generatedSections },
+          attachedNotes: attachedNotes.map((note) => ({
+            id: note.id,
+            title: note.title,
+            content: note.content,
+            tags: note.tags,
+          })),
+        });
+        const sId = data?.data?.sessionId;
+        setSessionId(sId);
+        setStudioSession(sId, { sections: generatedSections }, generatedSections);
+        setSaved(true);
+
+        // Learn from the generated script
+        learnFromEdit({
+          generatedSections,
+          editedSections: generatedSections,
+          intentLabel: "script_generated",
+          sessionId: sId,
+        }).catch(() => {});
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+      }
+    },
+    [
+      saveSession,
+      learnFromEdit,
+      idea,
+      dbUser,
+      format,
+      researchBrief,
+      attachedNotes,
+      setSessionId,
+      setStudioSession,
+    ],
+  );
 
   // ── Go to Launch — passes full context ──────────────────────────────────────
   const handleGoToLaunch = () => {

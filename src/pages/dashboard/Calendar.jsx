@@ -1,6 +1,7 @@
 // src/pages/dashboard/Calendar.jsx
 // ── v2 redesign: clean fixed grid + sliding day detail panel ─────────────────
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -135,6 +136,7 @@ function DayDetailPanel({
   onUpdate,
   onDelete,
   onAcceptAI,
+  onNavigateToStudio,
 }) {
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -181,7 +183,11 @@ function DayDetailPanel({
         {entries.map((e) => {
           const s = STATUS_STYLES[e.status] || STATUS_STYLES.idea;
           return (
-            <div key={e.id} className="bg-muted/50 rounded-xl p-3">
+            <div
+              key={e.id}
+              onClick={() => onNavigateToStudio(e)}
+              className="bg-muted/50 rounded-xl p-3 cursor-pointer hover:bg-muted/70 transition-colors"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="font-body text-sm font-semibold text-foreground truncate">
@@ -316,6 +322,7 @@ function DayDetailPanel({
 
 // ── Main Calendar ─────────────────────────────────────────────────────────────
 export default function CalendarPage() {
+  const navigate = useNavigate();
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
@@ -428,6 +435,16 @@ export default function CalendarPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleNavigateToStudio = (entry) => {
+    navigate("/dashboard/studio", {
+      state: {
+        calendarEntry: entry,
+        title: entry.title,
+        caption: entry.caption,
+      },
+    });
   };
 
   return (
@@ -571,6 +588,7 @@ export default function CalendarPage() {
               onUpdate={(data) => updateEntry(data)}
               onDelete={(id) => deleteEntry(id)}
               onAcceptAI={handleAcceptAI}
+              onNavigateToStudio={handleNavigateToStudio}
             />
           )}
         </AnimatePresence>
