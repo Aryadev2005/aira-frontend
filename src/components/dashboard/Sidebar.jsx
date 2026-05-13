@@ -19,6 +19,7 @@ import {
   Sparkles,
   X,
   Menu,
+  Eye,
 } from "lucide-react";
 import { useFirebaseAuth } from "@/lib/FirebaseAuthContext";
 import { useProfile, useCreditsWallet } from "@/hooks/useApi";
@@ -51,6 +52,7 @@ const NAV_GROUPS = [
     label: "Intelligence",
     items: [
       { icon: BarChart3, label: "Video DNA", path: "/dashboard/video-dna" },
+      { icon: Eye, label: "Rival Spy", path: "/dashboard/spy", hot: true },
     ],
   },
   {
