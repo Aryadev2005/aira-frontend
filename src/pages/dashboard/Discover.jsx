@@ -114,18 +114,16 @@ function NichePickerModal({ currentNiche, onSave, onClose, isFirstTime }) {
             </h2>
             <p className="text-muted-foreground font-body text-sm mt-0.5">
               {isFirstTime
-                ? "Tell ARIA your niche for personalized viral ideas"
+                ? "Tell AIRRA your niche for personalized viral ideas"
                 : "This updates your permanent niche across all of ARIA"}
             </p>
           </div>
-          {!isFirstTime && (
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              <X size={16} className="text-muted-foreground" />
-            </button>
-          )}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0"
+          >
+            <X size={16} className="text-muted-foreground" />
+          </button>
         </div>
 
         <input
@@ -447,7 +445,7 @@ export default function Discover() {
               >
                 <p className="text-3xl mb-3">🎯</p>
                 <p className="font-body font-semibold text-foreground mb-1">
-                  Tell ARIA what you create
+                  Tell AIRRA what you create
                 </p>
                 <p className="text-muted-foreground font-body text-sm mb-4">
                   We need your niche to find the right trending ideas for you
