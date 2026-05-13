@@ -3,7 +3,8 @@ npm-debug.log
 .git
 .gitignore
 README.md
-.env
+# Note: .env is NOT ignored - Vite needs it at build time to embed VITE_* variables
+# .env.local files are still ignored as they may contain dev overrides
 .env.local
 .env.*.local
 .DS_Store
