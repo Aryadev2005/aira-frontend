@@ -69,13 +69,13 @@ const NAV_FLAT = [
   { icon: Home, label: "Home", path: "/dashboard" },
   { icon: Compass, label: "Discover", path: "/dashboard/discover" },
   { icon: Clapperboard, label: "Studio", path: "/dashboard/studio" },
-  { icon: StickyNote, label: "Notes", path: "/dashboard/notes" },
+  { icon: Rocket, label: "Launch", path: "/dashboard/launch" },
   { icon: User, label: "Profile", path: "/dashboard/profile" },
 ];
 
 // ── Usage bar ─────────────────────────────────────────────────────────────────
 function UsageCard({ walletData }) {
-  const usedPct = walletData?.usedPct ?? 34;
+  const usedPct = walletData?.usedPct ?? 0;
   const planLabel = walletData?.planLabel ?? "Free";
   const nextReset = walletData?.nextResetAt;
   const remaining = Math.max(0, 100 - usedPct);
@@ -221,8 +221,8 @@ function DesktopSidebar() {
           <button
             onClick={() => navigate("/dashboard/settings?tab=credits")}
             className="mx-3 mb-3 w-[calc(100%-24px)] flex items-center justify-between gap-2
-                       bg-[hsl(var(--sidebar-primary))] hover:opacity-90 transition-opacity
-                       rounded-xl px-3 py-2.5"
+                       bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400
+                       transition-all shadow-md rounded-xl px-3 py-2.5"
           >
             <div className="text-left">
               <p className="font-body text-[13px] font-semibold text-white">
@@ -387,7 +387,8 @@ function MobileBar() {
                   to="/dashboard/settings?tab=credits"
                   onClick={() => setOpen(false)}
                   className="mx-3 mb-3 flex items-center justify-between gap-2
-                             bg-[hsl(var(--sidebar-primary))] rounded-xl px-3 py-2.5"
+                             bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400
+                             transition-all shadow-md rounded-xl px-3 py-2.5"
                 >
                   <div>
                     <p className="font-body text-[13px] font-semibold text-white">

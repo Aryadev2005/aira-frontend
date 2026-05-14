@@ -769,6 +769,7 @@ export default function Studio() {
   const setStudioSession = useCreatorFlow((s) => s.setStudioSession);
   const setIdeaText = useCreatorFlow((s) => s.setIdeaText);
   const setLaunchCtx = useCreatorFlow((s) => s.setLaunchContext);
+  const launchPackage = useCreatorFlow((s) => s.launchPackage);
 
   // Form state
   const [idea, setIdea] = useState(ideaFromFlow || "");

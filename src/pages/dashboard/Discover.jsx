@@ -264,10 +264,11 @@ export default function Discover() {
     queryClient.invalidateQueries({ queryKey: ["viralIdeas"] });
   };
 
-  const ideas = data?.data?.ideas || [];
-  const niche = data?.data?.niche || activeNiche || "";
-  const cached = data?.data?.cached;
-  const topPick = ideas[0] || null;
+  const ideas     = data?.data?.ideas || [];
+  const niche     = data?.data?.niche || activeNiche || "";
+  const cached    = data?.data?.cached;
+  const updatedAt = data?.data?.updatedAt ?? null;
+  const topPick   = ideas[0] || null;
   const rest = ideas.slice(1);
 
   // Build explore niche list — put user's niche first
@@ -306,7 +307,14 @@ export default function Discover() {
             <div className="flex items-center gap-1.5">
               <Globe size={12} className="text-muted-foreground" />
               <p className="text-muted-foreground font-body text-sm">
-                Global signals · 48–72h predictions
+                {updatedAt
+                  ? (() => {
+                      const diffH = Math.round((Date.now() - new Date(updatedAt).getTime()) / 3600000);
+                      if (diffH < 1) return "Updated just now · India signals";
+                      if (diffH < 24) return `Updated ${diffH}h ago · India signals`;
+                      return `Updated ${Math.round(diffH / 24)}d ago · India signals`;
+                    })()
+                  : "Global signals · 48–72h predictions"}
               </p>
             </div>
           </div>
@@ -456,6 +464,22 @@ export default function Discover() {
                 >
                   Set my niche
                 </button>
+              </motion.div>
+            )}
+
+            {/* Stale data warning */}
+            {updatedAt && !isLoading && !isRefreshing && (() => {
+              const diffH = Math.round((Date.now() - new Date(updatedAt).getTime()) / 3600000);
+              return diffH > 24;
+            })() && (
+              <motion.div
+                variants={item}
+                className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+              >
+                <span className="text-amber-500 text-xs">⚠</span>
+                <p className="font-body text-xs text-amber-600">
+                  Trend data is delayed — tap Refresh to update.
+                </p>
               </motion.div>
             )}
 

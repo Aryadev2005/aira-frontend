@@ -98,15 +98,9 @@ export default function Onboarding() {
         if (attempts < maxAttempts) {
           setTimeout(poll, 5000);
         } else {
-          // Timeout — use fallback and go to dashboard
-          setAnalysingStatus("done");
-          setDetectedNiche({
-            niches: ["general"],
-            archetype: "CREATOR",
-            archetypeEmoji: "🎯",
-            ariaMessage:
-              "ARIA is still analysing your account. Check back in a few minutes for your full profile!",
-          });
+          // Timeout — do NOT set a generic niche fallback.
+          // Instead show the niche picker so the user can set it manually.
+          setAnalysingStatus("timeout");
         }
       };
 
@@ -464,6 +458,40 @@ export default function Onboarding() {
                       AIRRA will finish analysing your account in the background.
                       Check your profile in a few minutes.
                     </p>
+                  </div>
+                )}
+
+                {analysingStatus === "timeout" && (
+                  <div className="text-center">
+                    <div className="text-5xl mb-4">🔍</div>
+                    <h2 className="font-heading text-2xl text-foreground mb-2">
+                      Still analysing your account
+                    </h2>
+                    <p className="text-muted-foreground font-body text-sm mb-6">
+                      This is taking longer than usual. Pick your niche now and ARIA will update your profile in the background.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-6">
+                      {["Fashion & Beauty", "Finance", "Food & Cooking", "Tech", "Fitness", "Travel", "Comedy", "Education"].map((n) => (
+                        <button
+                          key={n}
+                          onClick={async () => {
+                            try {
+                              await api.put("/users/niche", { niche: n.toLowerCase().split(" ")[0] });
+                            } catch {}
+                            setDetectedNiche({
+                              niches: [n.toLowerCase().split(" ")[0]],
+                              archetype: "CREATOR",
+                              archetypeEmoji: "🎯",
+                              ariaMessage: `Got it! ARIA will personalise everything for ${n} creators.`,
+                            });
+                            setAnalysingStatus("done");
+                          }}
+                          className="px-3 py-2.5 rounded-xl font-body text-sm font-medium bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-foreground"
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </motion.div>

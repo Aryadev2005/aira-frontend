@@ -165,6 +165,7 @@ export default function DashboardHome() {
   // ── Stats — null fallbacks instead of fake numbers ────────────────────────
   // CHANGE: ?? null instead of ?? "+18.2" / ?? 84 / ?? 27 / ?? "8:42"
   const analytics  = analyticsData?.data;
+  const isEmpty    = analytics?.isEmpty === true;
   const growth     = analytics?.growthRate         ?? null;
   const health     = analytics?.currentHealthScore ?? null;
   const ideas      = liveIdeas.length > 0
@@ -311,14 +312,25 @@ export default function DashboardHome() {
         </button>
       </motion.div>
 
-      {/* ── Stats strip — unchanged structure, StatCell handles null ── */}
-      <motion.div
-        variants={item}
-        className="flex gap-3 overflow-x-auto pb-1 no-scrollbar"
-      >
-        {STATS.map((s) => (
-          <StatCell key={s.label} {...s} />
-        ))}
+      {/* ── Stats strip — show empty state for new users ── */}
+      <motion.div variants={item}>
+        {isEmpty ? (
+          <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+            <div>
+              <p className="font-body text-sm font-semibold text-foreground">ARIA is learning your account</p>
+              <p className="font-body text-xs text-muted-foreground mt-0.5">
+                Connect Instagram or YouTube in Profile to unlock your analytics
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+            {STATS.map((s) => (
+              <StatCell key={s.label} {...s} />
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* ── Workflow — unchanged structure, WORKFLOW array is now dynamic ── */}
