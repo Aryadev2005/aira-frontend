@@ -547,6 +547,12 @@ export const useLearnFromEdit = () =>
       api.post("/studio/learn", body),
   });
 
+export const useRegenerateSection = () =>
+  useMutation({
+    mutationFn: /** @param {Record<string, any>} body */ (body) =>
+      api.post("/studio/script/regenerate-section", body),
+  });
+
 export const useTogglePin = () => {
   const qc = useQueryClient();
   return useMutation({

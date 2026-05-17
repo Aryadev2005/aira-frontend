@@ -38,6 +38,7 @@ import {
   useScriptHistory,
   useRewriteHook,
   useNotes,
+  useRegenerateSection,
 } from "@/hooks/useApi";
 import useCreatorFlow from "@/store/creatorFlow";
 import { auth } from "@/lib/firebase";
@@ -148,21 +149,67 @@ const FORMATS = [
 
 // ── Format duration config ────────────────────────────────────────────────────
 const FORMAT_DURATION_CONFIG = {
-  reel:     { min: 15,  max: 60,  step: 5,  unit: "seconds", label: "Duration",   default: 30  },
-  story:    { min: 5,   max: 60,  step: 5,  unit: "seconds", label: "Duration",   default: 15  },
-  post:     { min: 30,  max: 90,  step: 10, unit: "seconds", label: "Read time",  default: 60  },
-  carousel: { min: 1,   max: 10,  step: 1,  unit: "slides",  label: "Slides",     default: 5   },
-  video:    { min: 1,   max: 180, step: 1,  unit: "minutes", label: "Duration",   default: 5   },
-  thread:   { min: 1,   max: 10,  step: 1,  unit: "tweets",  label: "Tweets",     default: 5   },
+  reel: {
+    min: 15,
+    max: 60,
+    step: 5,
+    unit: "seconds",
+    label: "Duration",
+    default: 30,
+  },
+  story: {
+    min: 5,
+    max: 60,
+    step: 5,
+    unit: "seconds",
+    label: "Duration",
+    default: 15,
+  },
+  post: {
+    min: 30,
+    max: 90,
+    step: 10,
+    unit: "seconds",
+    label: "Read time",
+    default: 60,
+  },
+  carousel: {
+    min: 1,
+    max: 10,
+    step: 1,
+    unit: "slides",
+    label: "Slides",
+    default: 5,
+  },
+  video: {
+    min: 1,
+    max: 180,
+    step: 1,
+    unit: "minutes",
+    label: "Duration",
+    default: 5,
+  },
+  thread: {
+    min: 1,
+    max: 10,
+    step: 1,
+    unit: "tweets",
+    label: "Tweets",
+    default: 5,
+  },
 };
 
 // Converts slider value → human-readable label
 function formatDurationDisplay(value, unit) {
   if (unit === "seconds") {
-    return value >= 60 ? `${Math.floor(value / 60)}m ${value % 60 > 0 ? value % 60 + "s" : ""}`.trim() : `${value}s`;
+    return value >= 60
+      ? `${Math.floor(value / 60)}m ${value % 60 > 0 ? (value % 60) + "s" : ""}`.trim()
+      : `${value}s`;
   }
   if (unit === "minutes") {
-    return value >= 60 ? `${Math.floor(value / 60)}h${value % 60 > 0 ? ` ${value % 60}m` : ""}` : `${value} min`;
+    return value >= 60
+      ? `${Math.floor(value / 60)}h${value % 60 > 0 ? ` ${value % 60}m` : ""}`
+      : `${value} min`;
   }
   return `${value} ${unit}`;
 }
@@ -171,8 +218,8 @@ function formatDurationDisplay(value, unit) {
 function formatDurationForBackend(value, unit) {
   if (unit === "seconds") return `${value} seconds`;
   if (unit === "minutes") return `${value} minutes`;
-  if (unit === "slides")  return `${value} slides`;
-  if (unit === "tweets")  return `${value} tweets`;
+  if (unit === "slides") return `${value} slides`;
+  if (unit === "tweets") return `${value} tweets`;
   return `${value}`;
 }
 
@@ -339,6 +386,8 @@ function SectionBlock({
   isActive,
   onFocus,
   sectionRef,
+  onRegenerate,
+  isRegenerating,
 }) {
   const c = getSC(section.type);
   const dur = calcDuration(section.content);
@@ -360,6 +409,26 @@ function SectionBlock({
           </span>
         </div>
         <div className="flex items-center gap-3 text-muted-foreground">
+          {onRegenerate && (
+            <button
+              onClick={() => onRegenerate(section)}
+              disabled={isRegenerating}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-body text-[10px] font-medium transition-all
+                ${
+                  isRegenerating
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-muted hover:text-foreground"
+                }`}
+              title="Regenerate this section with AI"
+            >
+              {isRegenerating ? (
+                <Loader2 size={10} className="animate-spin" />
+              ) : (
+                <Sparkles size={10} />
+              )}
+              {isRegenerating ? "Working..." : "Regenerate"}
+            </button>
+          )}
           <span className="font-body text-[10px] flex items-center gap-1">
             <Timer size={10} />
             {dur}
@@ -756,6 +825,186 @@ function NotesPicker({
   );
 }
 
+// ── Regenerate Section Dialog ──────────────────────────────────────────────
+function RegenerateSectionDialog({
+  isOpen,
+  onClose,
+  section,
+  onRegenerate,
+  isRegenerating,
+}) {
+  const [instructions, setInstructions] = useState("");
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setInstructions("");
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!instructions.trim() || isRegenerating) return;
+    onRegenerate(instructions.trim());
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                section?.type === "hook"
+                  ? "bg-orange-500/15"
+                  : section?.type === "body"
+                    ? "bg-blue-500/15"
+                    : section?.type === "cta"
+                      ? "bg-emerald-500/15"
+                      : section?.type === "detail"
+                        ? "bg-violet-500/15"
+                        : section?.type === "transition"
+                          ? "bg-amber-500/15"
+                          : "bg-primary/15"
+              }`}
+            >
+              <Sparkles
+                size={16}
+                className={
+                  section?.type === "hook"
+                    ? "text-orange-500"
+                    : section?.type === "body"
+                      ? "text-blue-500"
+                      : section?.type === "cta"
+                        ? "text-emerald-500"
+                        : section?.type === "detail"
+                          ? "text-violet-500"
+                          : section?.type === "transition"
+                            ? "text-amber-500"
+                            : "text-primary"
+                }
+              />
+            </div>
+            <div>
+              <h3 className="font-body text-sm font-semibold text-foreground">
+                Regenerate: {section?.label}
+              </h3>
+              <p className="font-body text-xs text-muted-foreground">
+                Tell the AI how to improve this section
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={isRegenerating}
+            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Quick suggestions */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Make it punchier",
+              "Add more emotion",
+              "Make it funnier",
+              "Add a stronger hook",
+              "Make it more relatable",
+              "Add Indian context",
+            ].map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setInstructions(suggestion)}
+                disabled={isRegenerating}
+                className="px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted font-body text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+
+          {/* Instructions textarea */}
+          <div className="space-y-2">
+            <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Your Instructions
+            </label>
+            <textarea
+              ref={textareaRef}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder={`e.g., "Make this more energetic and add a personal story about my own experience..."`}
+              rows={4}
+              disabled={isRegenerating}
+              className="w-full px-4 py-3 rounded-xl bg-muted/40 border border-border font-body text-sm text-foreground placeholder:text-muted-foreground/50 resize-none outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60 transition-all"
+            />
+          </div>
+
+          {/* Current content preview */}
+          <div className="space-y-2">
+            <label className="font-body text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Current Content
+            </label>
+            <div className="px-4 py-3 rounded-xl bg-muted/30 border border-border/50 max-h-32 overflow-y-auto">
+              <p className="font-body text-xs text-muted-foreground leading-relaxed">
+                {section?.content || "No content"}
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isRegenerating}
+              className="flex-1 px-4 py-2.5 rounded-xl font-body text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!instructions.trim() || isRegenerating}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white font-body text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  Regenerate
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Studio
 // ══════════════════════════════════════════════════════════════════════════════
@@ -779,8 +1028,12 @@ export default function Studio() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Duration slider state
-  const [durationValue, setDurationValue] = useState(FORMAT_DURATION_CONFIG["reel"].default);
-  const [minDurationValue, setMinDurationValue] = useState(FORMAT_DURATION_CONFIG["reel"].min);
+  const [durationValue, setDurationValue] = useState(
+    FORMAT_DURATION_CONFIG["reel"].default,
+  );
+  const [minDurationValue, setMinDurationValue] = useState(
+    FORMAT_DURATION_CONFIG["reel"].min,
+  );
   const [durationError, setDurationError] = useState("");
 
   // Notes attachment state
@@ -830,6 +1083,12 @@ export default function Studio() {
   const { mutateAsync: learnFromEdit } = useLearnFromEdit();
   const { data: historyData } = useScriptHistory();
   const history = historyData?.data || [];
+  const { mutateAsync: regenerateSection } = useRegenerateSection();
+
+  // Section regeneration state
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [regeneratingSectionId, setRegeneratingSectionId] = useState(null);
 
   const hasResult = sections.length > 0;
   const words = sections.reduce(
@@ -862,13 +1121,17 @@ export default function Studio() {
       const matchingSession = history.find(
         (session) =>
           session.idea?.toLowerCase() === calendarEntry.title?.toLowerCase() ||
-          session.idea?.toLowerCase().includes(calendarEntry.title?.toLowerCase()),
+          session.idea
+            ?.toLowerCase()
+            .includes(calendarEntry.title?.toLowerCase()),
       );
 
       if (matchingSession) {
         // Load the script directly instead of calling handleSelectHistory
         const script =
-          matchingSession.edited_script || matchingSession.generated_script || {};
+          matchingSession.edited_script ||
+          matchingSession.generated_script ||
+          {};
         if (script.sections?.length) {
           setSections(script.sections);
           setHookLine(script.hookLine || "");
@@ -917,6 +1180,76 @@ export default function Studio() {
     setStatusMsg("");
     setAttachedNotes([]);
     setShowNotesPicker(false);
+    setShowRegenerateDialog(false);
+    setSelectedSection(null);
+    setRegeneratingSectionId(null);
+  };
+
+  // Section regeneration handlers
+  const handleOpenRegenerateDialog = (section) => {
+    setSelectedSection(section);
+    setShowRegenerateDialog(true);
+  };
+
+  const handleCloseRegenerateDialog = () => {
+    setShowRegenerateDialog(false);
+    setSelectedSection(null);
+  };
+
+  const handleRegenerateSection = async (instructions) => {
+    if (!selectedSection || !instructions.trim()) return;
+
+    setRegeneratingSectionId(selectedSection.id);
+    setError(null);
+
+    try {
+      // Prepare all sections data for context
+      const allSectionsData = sections.map((s) => ({
+        id: s.id,
+        label: s.label,
+        type: s.type,
+        content: s.content || "",
+      }));
+
+      const result = await regenerateSection({
+        sectionId: selectedSection.id,
+        sectionLabel: selectedSection.label,
+        sectionType: selectedSection.type,
+        currentContent: selectedSection.content || "",
+        userInstructions: instructions,
+        idea,
+        format,
+        mood,
+        angle,
+        researchBrief,
+        allSections: allSectionsData,
+      });
+
+      // Update the section with the new content
+      setSections((prev) =>
+        prev.map((s) =>
+          s.id === selectedSection.id
+            ? {
+                ...s,
+                content: result.content || s.content,
+                tip: result.tip || s.tip,
+              }
+            : s,
+        ),
+      );
+
+      // Mark as not saved since we made changes
+      setSaved(false);
+
+      // Close the dialog
+      handleCloseRegenerateDialog();
+    } catch (err) {
+      setError(
+        err.message || "Failed to regenerate section. Please try again.",
+      );
+    } finally {
+      setRegeneratingSectionId(null);
+    }
   };
 
   const handleAttachNote = (note) => {
@@ -968,7 +1301,9 @@ export default function Studio() {
     setDurationValue(clamped);
     // Inline error — only show if somehow user bypasses the slider (e.g. manual input)
     if (val > cfg.max) {
-      setDurationError(`Max duration for a ${format} is ${formatDurationDisplay(cfg.max, cfg.unit)}`);
+      setDurationError(
+        `Max duration for a ${format} is ${formatDurationDisplay(cfg.max, cfg.unit)}`,
+      );
     } else {
       setDurationError("");
     }
@@ -1015,8 +1350,12 @@ export default function Studio() {
           mood: mood || undefined,
           angle: angle || undefined,
           userQuery: idea,
-          duration: cfg ? formatDurationForBackend(durationValue, cfg.unit) : undefined,
-          minDuration: cfg ? formatDurationForBackend(minDurationValue, cfg.unit) : undefined,
+          duration: cfg
+            ? formatDurationForBackend(durationValue, cfg.unit)
+            : undefined,
+          minDuration: cfg
+            ? formatDurationForBackend(minDurationValue, cfg.unit)
+            : undefined,
           attachedNotes: attachedNotesContext,
         },
         (event) => {
@@ -1171,7 +1510,11 @@ export default function Studio() {
         });
         const sId = data?.data?.sessionId;
         setSessionId(sId);
-        setStudioSession(sId, { sections: generatedSections }, generatedSections);
+        setStudioSession(
+          sId,
+          { sections: generatedSections },
+          generatedSections,
+        );
         setSaved(true);
 
         // Learn from the generated script
@@ -1480,7 +1823,9 @@ export default function Studio() {
                           step={cfg.step}
                           value={durationValue}
                           disabled={isRunning}
-                          onChange={(e) => handleDurationChange(Number(e.target.value))}
+                          onChange={(e) =>
+                            handleDurationChange(Number(e.target.value))
+                          }
                           className="w-full h-1.5 rounded-full appearance-none cursor-pointer
                                      bg-muted accent-primary disabled:opacity-50"
                         />
@@ -1501,7 +1846,10 @@ export default function Studio() {
                               Minimum {cfg.label.toLowerCase()}
                             </label>
                             <span className="font-body text-xs font-semibold text-foreground tabular-nums">
-                              {formatDurationDisplay(minDurationValue, cfg.unit)}
+                              {formatDurationDisplay(
+                                minDurationValue,
+                                cfg.unit,
+                              )}
                             </span>
                           </div>
 
@@ -1512,7 +1860,9 @@ export default function Studio() {
                             step={cfg.step}
                             value={minDurationValue}
                             disabled={isRunning}
-                            onChange={(e) => handleMinDurationChange(Number(e.target.value))}
+                            onChange={(e) =>
+                              handleMinDurationChange(Number(e.target.value))
+                            }
                             className="w-full h-1.5 rounded-full appearance-none cursor-pointer
                                        bg-muted accent-orange-500 disabled:opacity-50"
                           />
@@ -1530,8 +1880,13 @@ export default function Studio() {
                         {/* Inline error */}
                         {durationError && (
                           <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-                            <AlertCircle size={12} className="text-destructive shrink-0" />
-                            <p className="font-body text-xs text-destructive">{durationError}</p>
+                            <AlertCircle
+                              size={12}
+                              className="text-destructive shrink-0"
+                            />
+                            <p className="font-body text-xs text-destructive">
+                              {durationError}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -1703,6 +2058,10 @@ export default function Studio() {
                   sectionRef={(el) => {
                     sectionRefs.current[section.id] = el;
                   }}
+                  onRegenerate={
+                    hasResult && !isRunning ? handleOpenRegenerateDialog : null
+                  }
+                  isRegenerating={regeneratingSectionId === section.id}
                 />
               ))}
             </div>
@@ -1781,6 +2140,19 @@ export default function Studio() {
               history={history}
               onSelect={handleSelectHistory}
               onClose={() => setShowHistory(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Regenerate Section Dialog */}
+        <AnimatePresence>
+          {showRegenerateDialog && (
+            <RegenerateSectionDialog
+              isOpen={showRegenerateDialog}
+              onClose={handleCloseRegenerateDialog}
+              section={selectedSection}
+              onRegenerate={handleRegenerateSection}
+              isRegenerating={!!regeneratingSectionId}
             />
           )}
         </AnimatePresence>
