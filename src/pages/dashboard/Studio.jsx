@@ -1005,6 +1005,91 @@ function RegenerateSectionDialog({
   );
 }
 
+// ── Hook Variant Picker ───────────────────────────────────────────────────────
+function HookVariantPicker({ variants, recommendation, onSelect, onSkip }) {
+  if (!variants?.length) return null;
+
+  const archetypeColors = {
+    CURIOSITY_GAP:      "bg-orange-500/10 border-orange-500/30 text-orange-600",
+    PATTERN_INTERRUPT:  "bg-violet-500/10 border-violet-500/30 text-violet-600",
+    PAIN_AMPLIFIER:     "bg-red-500/10 border-red-500/30 text-red-600",
+    IDENTITY_HOOK:      "bg-blue-500/10 border-blue-500/30 text-blue-600",
+    CONTRARIAN_CLAIM:   "bg-amber-500/10 border-amber-500/30 text-amber-600",
+    BEFORE_AFTER:       "bg-teal-500/10 border-teal-500/30 text-teal-600",
+    SOCIAL_PROOF_SHOCK: "bg-green-500/10 border-green-500/30 text-green-600",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-primary/20 bg-card p-5 space-y-4"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-body text-sm font-semibold text-foreground flex items-center gap-2">
+            <Sparkles size={14} className="text-primary" />
+            Pick your opening hook
+          </h3>
+          <p className="font-body text-xs text-muted-foreground mt-0.5">
+            3 psychology-backed variants. ARIA recommends{" "}
+            <span className="text-primary font-medium">
+              {variants.find((v) => v.archetype === recommendation?.archetype)?.archetypeLabel}
+            </span>
+          </p>
+        </div>
+        <button
+          onClick={onSkip}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Auto-select
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {variants.map((variant, i) => (
+          <button
+            key={variant.archetype}
+            onClick={() => onSelect(variant)}
+            className={`w-full text-left p-4 rounded-xl border transition-all hover:border-primary/40 hover:bg-primary/5 ${
+              variant.archetype === recommendation?.archetype
+                ? "border-primary/30 bg-primary/5"
+                : "border-border"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border font-body ${
+                  archetypeColors[variant.archetype] || "bg-muted text-muted-foreground border-border"
+                }`}
+              >
+                {variant.archetypeLabel}
+              </span>
+              {variant.archetype === recommendation?.archetype && (
+                <span className="text-[10px] font-semibold text-primary font-body">
+                  ★ ARIA Pick
+                </span>
+              )}
+            </div>
+            <p className="font-body text-sm font-medium text-foreground leading-snug mb-1.5">
+              "{variant.hookLine}"
+            </p>
+            <p className="font-body text-xs text-muted-foreground leading-relaxed">
+              {variant.visualCue}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      {recommendation?.reason && (
+        <p className="font-body text-xs text-muted-foreground/70 italic border-t border-border pt-3">
+          💡 {recommendation.reason}
+        </p>
+      )}
+    </motion.div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Studio
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1066,6 +1151,12 @@ export default function Studio() {
   const [trendInsight, setTrendInsight] = useState("");
   const [totalDuration, setTotalDuration] = useState("");
   const [sessionId, setSessionId] = useState(null);
+
+  // Hook variants state (NEW)
+  const [hookVariants, setHookVariants] = useState([]);
+  const [selectedHookArchetype, setSelectedHookArchetype] = useState(null);
+  const [hookRecommendation, setHookRecommendation] = useState(null);
+  const [showHookPicker, setShowHookPicker] = useState(false);
 
   // UI state
   const [activeSectionId, setActiveSection] = useState(null);
@@ -1183,6 +1274,10 @@ export default function Studio() {
     setShowRegenerateDialog(false);
     setSelectedSection(null);
     setRegeneratingSectionId(null);
+    setHookVariants([]);
+    setSelectedHookArchetype(null);
+    setHookRecommendation(null);
+    setShowHookPicker(false);
   };
 
   // Section regeneration handlers
@@ -1226,13 +1321,14 @@ export default function Studio() {
       });
 
       // Update the section with the new content
+      const data = result?.data ?? result;
       setSections((prev) =>
         prev.map((s) =>
           s.id === selectedSection.id
             ? {
                 ...s,
-                content: result.content || s.content,
-                tip: result.tip || s.tip,
+                content: data.content || s.content,
+                tip: data.tip || s.tip,
               }
             : s,
         ),
@@ -1392,6 +1488,15 @@ export default function Studio() {
               setHashtags(event.hashtags);
               setTrendInsight(event.trendInsight);
               setTotalDuration(event.totalDuration);
+              break;
+
+            case "hook_variants":
+              setHookVariants(event.variants);
+              setHookRecommendation({
+                archetype: event.recommendedArchetype,
+                reason: event.recommendationReason,
+              });
+              setShowHookPicker(true);
               break;
 
             case "done":
@@ -2044,6 +2149,30 @@ export default function Studio() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Hook Variant Picker — appears after research, before sections stream */}
+            {showHookPicker && hookVariants.length > 0 && sections.length === 0 && (
+              <HookVariantPicker
+                variants={hookVariants}
+                recommendation={hookRecommendation}
+                onSelect={(variant) => {
+                  setHookLine(variant.hookLine);
+                  setHookTip(variant.hookTip);
+                  setSelectedHookArchetype(variant.archetype);
+                  setShowHookPicker(false);
+                }}
+                onSkip={() => {
+                  const recommended = hookVariants.find(
+                    (v) => v.archetype === hookRecommendation?.archetype,
+                  );
+                  if (recommended) {
+                    setHookLine(recommended.hookLine);
+                    setSelectedHookArchetype(recommended.archetype);
+                  }
+                  setShowHookPicker(false);
+                }}
+              />
+            )}
 
             {/* ── Script sections ──────────────────────────────────────────── */}
             <div className="space-y-3">
